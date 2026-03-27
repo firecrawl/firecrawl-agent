@@ -18,10 +18,21 @@ export async function POST(req: Request) {
     );
   }
 
-  const agent = await createOrchestrator(config, firecrawlApiKey);
+  try {
+    const agent = await createOrchestrator(config, firecrawlApiKey);
 
-  return createAgentUIStreamResponse({
-    agent,
-    uiMessages: messages,
-  });
+    return createAgentUIStreamResponse({
+      agent,
+      uiMessages: messages as Parameters<
+        typeof createAgentUIStreamResponse
+      >[0]["uiMessages"],
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown error";
+    return new Response(JSON.stringify({ error: message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 }
