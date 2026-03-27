@@ -8,17 +8,19 @@ import { parseSkillBody } from "../skills/parser";
 import fs from "fs/promises";
 import path from "path";
 
-const delegateSchema = z.object({
+const subagentSchema = z.object({
   task: z.string().describe("The task to delegate"),
 });
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function makeDelegateTool(config: SubAgentConfig, subAgent: any) {
+function makeSubagentTool(
+  config: SubAgentConfig,
+  subAgent: ToolLoopAgent<never, ToolSet, never>,
+) {
   return tool({
     description: `Delegate a task to sub-agent "${config.name}": ${config.description}`,
-    inputSchema: delegateSchema,
+    inputSchema: subagentSchema,
     execute: async ({ task }) => {
-      const result = await subAgent.generate({ prompt: task } as any);
+      const result = await subAgent.generate({ prompt: task });
       return {
         subAgent: config.name,
         result: result.text,
@@ -67,9 +69,9 @@ When finished, write a clear summary of what you found.${preloadedSkills}`,
       stopWhen: stepCountIs(10),
     });
 
-    subAgentTools[`delegate_to_${config.id}`] = makeDelegateTool(
+    subAgentTools[`subagent_${config.id}`] = makeSubagentTool(
       config,
-      subAgent,
+      subAgent as unknown as ToolLoopAgent<never, ToolSet, never>,
     );
   }
 
