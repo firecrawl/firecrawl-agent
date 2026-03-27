@@ -9,7 +9,7 @@ export interface AgentConfig {
 }
 
 export interface ModelConfig {
-  provider: "anthropic" | "openai" | "google";
+  provider: "gateway" | "anthropic" | "openai" | "google";
   model: string;
   apiKey?: string;
 }

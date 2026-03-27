@@ -2,6 +2,14 @@ import type { ModelConfig } from "../types";
 
 export async function resolveModel(config: ModelConfig) {
   switch (config.provider) {
+    case "gateway": {
+      // Vercel AI Gateway — model IDs like "openai/gpt-5.4", "anthropic/claude-sonnet-4"
+      const { createOpenAI } = await import("@ai-sdk/openai");
+      return createOpenAI({
+        apiKey: config.apiKey || process.env.AI_GATEWAY_API_KEY,
+        baseURL: "https://api.gateway.ai.cloudflare.com/v1",
+      })(config.model);
+    }
     case "anthropic": {
       const { createAnthropic } = await import("@ai-sdk/anthropic");
       return createAnthropic({
@@ -26,6 +34,11 @@ export async function resolveModel(config: ModelConfig) {
 }
 
 export const AVAILABLE_MODELS = {
+  gateway: [
+    { id: "openai/gpt-5.4", name: "GPT-5.4 (Gateway)" },
+    { id: "anthropic/claude-sonnet-4-20250514", name: "Claude Sonnet 4 (Gateway)" },
+    { id: "openai/gpt-4o", name: "GPT-4o (Gateway)" },
+  ],
   anthropic: [
     { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4" },
     { id: "claude-haiku-4-20250414", name: "Claude Haiku 4" },
