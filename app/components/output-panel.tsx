@@ -13,6 +13,7 @@ function isToolPart(part: { type: string }): boolean {
 function extractFormattedOutput(
   messages: UIMessage[],
 ): { format: string; content: string } | null {
+  // First: check for explicit formatOutput tool result
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
     if (msg.role !== "assistant") continue;
@@ -28,6 +29,21 @@ function extractFormattedOutput(
       }
     }
   }
+
+  // Fallback: collect all assistant text parts as the output
+  const texts: string[] = [];
+  for (const msg of messages) {
+    if (msg.role !== "assistant") continue;
+    for (const part of msg.parts) {
+      if (part.type === "text" && part.text.trim()) {
+        texts.push(part.text);
+      }
+    }
+  }
+  if (texts.length > 0) {
+    return { format: "text", content: texts.join("\n\n") };
+  }
+
   return null;
 }
 

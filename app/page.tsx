@@ -12,7 +12,6 @@ import OutputPanel from "./components/output-panel";
 import SettingsPanel from "./components/settings-panel";
 import CsvUpload from "./components/csv-upload";
 import HistoryPanel from "./components/history-panel";
-import SkillViewer from "./components/skill-viewer";
 import SymbolColored from "@/components/shared/icons/symbol-colored";
 import { cn } from "@/utils/cn";
 
