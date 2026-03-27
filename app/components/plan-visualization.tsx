@@ -307,15 +307,20 @@ export default function PlanVisualization({
             return item.status === "complete" && item.content ? (
               <ScrapeResult key={i} url={item.url!} content={item.content} />
             ) : (
-              <div key={i} className="flex items-center gap-8 my-8 py-4 text-black-alpha-40">
-                <GlobeIcon />
-                <span className="text-label-medium">
-                  {item.type === "interact" ? "Interacting with" : "Scraping"} {item.url}...
-                </span>
-                {item.status === "running" && (
-                  <div className="w-4 h-4 rounded-full bg-heat-100 animate-pulse" />
-                )}
-              </div>
+              (() => {
+                const domain = item.url ? getDomain(item.url) : null;
+                return (
+                  <div key={i} className="flex items-center gap-8 my-8 py-4 text-black-alpha-40">
+                    {domain ? <Favicon domain={domain} /> : <GlobeIcon />}
+                    <span className="text-label-medium">
+                      {item.type === "interact" ? "Interacting with" : "Scraping"} {item.url}
+                    </span>
+                    {item.status === "running" && (
+                      <div className="w-4 h-4 rounded-full bg-heat-100 animate-pulse" />
+                    )}
+                  </div>
+                );
+              })()
             );
           case "bash":
             return item.status === "complete" ? (

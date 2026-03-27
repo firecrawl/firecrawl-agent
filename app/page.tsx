@@ -469,11 +469,12 @@ export default function AgentPage() {
         {/* Activity feed */}
         <PlanVisualization messages={messages} isRunning={isRunning} />
 
-        {/* Output */}
-        <OutputPanel messages={messages} />
-
-        {/* Skills reference */}
-        <SkillViewer />
+        {/* Output + Skills — only after completion */}
+        {!isRunning && messages.length > 0 && (
+          <>
+            <OutputPanel messages={messages} />
+          </>
+        )}
 
         {/* Follow-up input */}
         {!isRunning && messages.length > 0 && (

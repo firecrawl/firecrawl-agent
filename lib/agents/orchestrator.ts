@@ -53,11 +53,12 @@ export async function createOrchestrator(
 ${fcSystemPrompt ?? ""}
 
 Guidelines:
-- Plan your approach before acting
+- Think step by step. Narrate what you're doing and why — the user sees your text in real-time.
 - Use search to discover relevant pages when you don't have specific URLs
-- Use scrape to extract content from pages
+- Use scrape to extract content from pages. For targeted extraction, use the query parameter.
 - Use interact for pages that need JavaScript interaction (clicks, forms, pagination)
 - Use bashExec for data processing: jq, awk, sed, grep, sort — great for transforming scraped data
+- When scraping for specific data (pricing, headlines, etc.), use scrape with formats: ["json"] or with a query parameter to get targeted results
 - When done, use formatOutput to present results in the requested format
 - Load skills for domain expertise when relevant${skillCatalog}${schemaHint}${urlHint}${csvHint}`;
 
