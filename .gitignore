@@ -4,3 +4,4 @@ node_modules/
 .env
 *.tsbuildinfo
 next-env.d.ts
+.firecrawl/
