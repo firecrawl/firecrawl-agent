@@ -245,10 +245,14 @@ function extractTimeline(messages: UIMessage[]): TimelineItem[] {
             status,
           });
         } else if (toolName.startsWith("subagent_")) {
-          const result = (output as { result?: string }).result;
+          const result = (output as { result?: string; subAgent?: string; steps?: number }).result;
+          const agentName = (output as { subAgent?: string }).subAgent ?? toolName.replace("subagent_", "");
+          const steps = (output as { steps?: number }).steps;
           items.push({
             type: "subagent",
             text: result ? String(result) : String(input.task ?? ""),
+            skillName: agentName,
+            exitCode: steps ?? 0,
             status,
           });
         } else if (toolName === "formatOutput") {
@@ -336,11 +340,44 @@ export default function PlanVisualization({
             return <SkillLoad key={i} name={item.skillName!} />;
           case "subagent":
             return (
-              <div key={i} className="my-12 ml-16 pl-12 border-l-2 border-accent-amethyst/20">
-                <div className="text-label-small text-accent-amethyst mb-4">Sub-agent</div>
-                <div className="text-body-medium text-black-alpha-56 whitespace-pre-wrap">
-                  {item.text}
+              <div key={i} className="my-12 rounded-12 border border-accent-amethyst/15 bg-accent-amethyst/[0.03] overflow-hidden">
+                {/* Sub-agent header */}
+                <div className="flex items-center gap-8 px-14 py-10 border-b border-accent-amethyst/10">
+                  <div className="w-24 h-24 rounded-6 bg-accent-amethyst/10 flex-center flex-shrink-0">
+                    <svg fill="none" height="14" viewBox="0 0 24 24" width="14" className="text-accent-amethyst">
+                      <path d="M16 18l6-6-6-6M8 6l-6 6 6 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-label-small text-accent-amethyst font-medium">
+                      {item.skillName ?? "Sub-agent"}
+                    </div>
+                    {item.status === "running" && (
+                      <div className="text-body-small text-black-alpha-32">Running...</div>
+                    )}
+                    {item.status === "complete" && item.exitCode !== undefined && item.exitCode > 0 && (
+                      <div className="text-body-small text-black-alpha-32">
+                        Completed in {item.exitCode} step{item.exitCode !== 1 ? "s" : ""}
+                      </div>
+                    )}
+                  </div>
+                  {item.status === "running" && (
+                    <div className="w-5 h-5 rounded-full bg-accent-amethyst animate-pulse flex-shrink-0" />
+                  )}
+                  {item.status === "complete" && (
+                    <svg className="w-16 h-16 text-accent-forest flex-shrink-0" fill="none" viewBox="0 0 16 16">
+                      <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
                 </div>
+                {/* Sub-agent result */}
+                {item.status === "complete" && item.text && (
+                  <div className="px-14 py-10">
+                    <div className="text-body-medium text-black-alpha-56 whitespace-pre-wrap line-clamp-6">
+                      {item.text}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           case "format":
