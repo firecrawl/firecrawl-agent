@@ -4,7 +4,8 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { AgentConfig, ModelConfig } from "@/lib/types";
-import { AVAILABLE_MODELS, type Provider } from "@/lib/config/models";
+import { AVAILABLE_MODELS, PROVIDER_META, type Provider } from "@/lib/config/models";
+import ProviderModelIcon from "./components/provider-icon";
 import AgentInput from "./components/agent-input";
 import PlanVisualization from "./components/plan-visualization";
 import OutputPanel from "./components/output-panel";
@@ -29,20 +30,6 @@ const defaultConfig: AgentConfig = {
 interface SkillInfo {
   name: string;
   description: string;
-}
-
-function ModelIcon() {
-  return (
-    <svg fill="none" height="16" viewBox="0 0 24 24" width="16">
-      <path
-        d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-      />
-    </svg>
-  );
 }
 
 function SkillsIcon() {
@@ -189,12 +176,7 @@ function ModelDropdown({
     return () => document.removeEventListener("mousedown", handler);
   }, [onClose]);
 
-  const providers: { id: Provider; name: string }[] = [
-    { id: "gateway", name: "AI Gateway" },
-    { id: "anthropic", name: "Anthropic" },
-    { id: "openai", name: "OpenAI" },
-    { id: "google", name: "Google" },
-  ];
+  const providerKeys = Object.keys(PROVIDER_META) as Provider[];
 
   return (
     <div
@@ -205,28 +187,31 @@ function ModelDropdown({
           "0px 16px 32px -8px rgba(0,0,0,0.08), 0px 4px 12px -2px rgba(0,0,0,0.04)",
       }}
     >
-      {providers.map((provider) => {
-        const models = AVAILABLE_MODELS[provider.id];
+      {providerKeys.map((providerId) => {
+        const meta = PROVIDER_META[providerId];
+        const models = AVAILABLE_MODELS[providerId];
         return (
-          <div key={provider.id}>
-            <div className="text-label-x-small text-black-alpha-40 px-12 pt-8 pb-2">
-              {provider.name}
+          <div key={providerId}>
+            <div className="flex items-center gap-6 text-label-x-small text-black-alpha-40 px-12 pt-8 pb-2">
+              <ProviderModelIcon icon={meta.icon} size={14} />
+              {meta.name}
             </div>
             {models.map((m) => (
               <button
                 key={m.id}
                 type="button"
                 className={cn(
-                  "w-full text-left px-12 py-6 text-body-medium transition-all",
-                  value.provider === provider.id && value.model === m.id
+                  "w-full text-left px-12 py-6 text-body-medium transition-all flex items-center gap-8",
+                  value.provider === providerId && value.model === m.id
                     ? "bg-heat-8 text-heat-100"
                     : "hover:bg-black-alpha-2 text-accent-black",
                 )}
                 onClick={() => {
-                  onChange({ ...value, provider: provider.id, model: m.id });
+                  onChange({ ...value, provider: providerId, model: m.id });
                   onClose();
                 }}
               >
+                <ProviderModelIcon icon={m.icon} size={16} />
                 {m.name}
               </button>
             ))}
@@ -270,10 +255,11 @@ export default function AgentPage() {
     sendMessage({ text: config.prompt });
   };
 
-  const currentModelName =
-    AVAILABLE_MODELS[config.model.provider]?.find(
-      (m) => m.id === config.model.model,
-    )?.name ?? config.model.model;
+  const currentModel = AVAILABLE_MODELS[config.model.provider]?.find(
+    (m) => m.id === config.model.model,
+  );
+  const currentModelName = currentModel?.name ?? config.model.model;
+  const currentModelIcon = currentModel?.icon ?? "openai";
 
   // First screen: clean input bar like Google/Lovable
   if (!hasSubmitted) {
@@ -359,7 +345,7 @@ export default function AgentPage() {
                     setShowSkills(false);
                   }}
                 >
-                  <ModelIcon />
+                  <ProviderModelIcon icon={currentModelIcon} size={16} />
                   <span>{currentModelName}</span>
                 </button>
                 {showModel && (
