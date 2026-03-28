@@ -89,9 +89,9 @@ export function useACPChat() {
               if (event.toolCall) {
                 toolCalls.set(event.toolCall.id, {
                   toolName: event.toolCall.title,
-                  state: "partial-call",
+                  state: "call",
                   input: event.toolCall.rawInput,
-                  output: undefined,
+                  output: event.toolCall.rawOutput,
                 });
               }
               break;
@@ -99,9 +99,11 @@ export function useACPChat() {
               if (event.toolCall) {
                 const existing = toolCalls.get(event.toolCall.id);
                 if (existing) {
-                  existing.state = event.toolCall.status === "completed" ? "result" : event.toolCall.status === "errored" ? "result" : "call";
+                  const isDone = event.toolCall.status === "completed" || event.toolCall.status === "errored";
+                  existing.state = isDone ? "output-available" : "call";
                   existing.output = event.toolCall.rawOutput ?? existing.output;
                   existing.input = event.toolCall.rawInput ?? existing.input;
+                  if (event.toolCall.title) existing.toolName = event.toolCall.title;
                 }
               }
               break;
@@ -121,14 +123,17 @@ export function useACPChat() {
           }
 
           for (const [id, tc] of toolCalls) {
+            // Normalize tool name for part type (no spaces, lowercase)
+            const normalizedName = tc.toolName.toLowerCase().replace(/[^a-z0-9_]/g, "_");
             parts.push({
-              type: `tool-${tc.toolName}` as any,
+              type: `tool-${normalizedName}` as any,
               toolName: tc.toolName,
               toolCallId: id,
               state: tc.state,
               input: tc.input,
               args: tc.input,
               output: tc.output,
+              result: tc.output,
             } as any);
           }
 
