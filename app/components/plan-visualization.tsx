@@ -26,6 +26,27 @@ function GlobeIcon() {
   );
 }
 
+const FIRECRAWL_DOCS: Record<string, string> = {
+  search: "https://docs.firecrawl.dev/api-reference/endpoint/search",
+  scrape: "https://docs.firecrawl.dev/api-reference/endpoint/scrape",
+  interact: "https://docs.firecrawl.dev/api-reference/endpoint/interact",
+  skill: "https://docs.firecrawl.dev/features/agents",
+};
+
+function EndpointBadge({ type }: { type: "search" | "scrape" | "interact" | "skill" }) {
+  return (
+    <a
+      href={FIRECRAWL_DOCS[type]}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-mono-x-small text-black-alpha-48 bg-black-alpha-4 hover:bg-black-alpha-8 px-6 py-1 rounded-4 flex-shrink-0 transition-colors no-underline"
+      onClick={(e) => e.stopPropagation()}
+    >
+      /{type}
+    </a>
+  );
+}
+
 function isJsonContent(content: string): boolean {
   return content.trimStart().startsWith("```json") || content.trimStart().startsWith("```\n{");
 }
@@ -150,6 +171,7 @@ function SearchResults({ query, results, creditsUsed, isLatest }: { query: strin
         onClick={() => setUserToggled(collapsed)}
       >
         <SearchIcon />
+        <EndpointBadge type="search" />
         <span className="text-label-medium flex-1">Searched: &ldquo;{query}&rdquo;</span>
         <div className="flex items-center gap-6 flex-shrink-0">
           {results.length > 0 && (
@@ -231,9 +253,7 @@ function ScrapeResult({
         {domain ? <Favicon domain={domain} /> : <GlobeIcon />}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-6">
-            {isInteract && (
-              <span className="text-mono-x-small text-accent-bluetron bg-accent-bluetron/8 px-6 py-1 rounded-4 flex-shrink-0">interact</span>
-            )}
+            <EndpointBadge type={isInteract ? "interact" : "scrape"} />
             <span className="text-label-medium text-accent-black truncate">
               {pageTitle || url}
             </span>
@@ -299,7 +319,7 @@ function ScrapeResult({
         )}
 
         {answer && (
-          <div className="mx-14 mb-10 bg-heat-4 rounded-8 border border-heat-20 p-12">
+          <div className="mx-14 mb-10 bg-black-alpha-2 rounded-8 border border-border-faint p-12">
             <div className="text-body-medium text-accent-black leading-relaxed prose prose-sm max-w-none">
               <Streamdown plugins={{ code }}>{answer}</Streamdown>
             </div>
@@ -327,7 +347,7 @@ function ScrapeResult({
           </div>
         )}
 
-        {content && (
+        {content && !answer && (
           <div className="border-t border-border-faint bg-background-lighter p-14 max-h-500 overflow-auto">
             {isJsonContent(content) ? (
               <pre className="text-mono-small text-accent-black whitespace-pre-wrap">{extractJsonContent(content)}</pre>
@@ -351,17 +371,12 @@ function ScrapeResult({
 
 // --- Interact card (shows iframe while running) ---
 
-function InteractCard({ item, isLatest }: { item: TimelineItem; isLatest?: boolean }) {
+function InteractCard({ item }: { item: TimelineItem }) {
   const isRunning = item.status !== "complete";
-  const [userToggled, setUserToggled] = useState(false);
-  const autoCollapsed = useRef(false);
+  const [userCollapsed, setUserCollapsed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
-  if (!isLatest && !isRunning && !autoCollapsed.current) {
-    autoCollapsed.current = true;
-  }
-
-  const contentCollapsed = autoCollapsed.current && !userToggled;
-  const showLiveView = userToggled ? !isRunning ? false : true : isRunning;
+  const contentCollapsed = userCollapsed;
   const domain = item.url ? getDomain(item.url) : null;
 
   return (
@@ -373,14 +388,12 @@ function InteractCard({ item, isLatest }: { item: TimelineItem; isLatest?: boole
       <button
         type="button"
         className="w-full flex items-center gap-8 px-14 py-10 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
-        onClick={() => { if (!isRunning) { autoCollapsed.current = !contentCollapsed; setUserToggled(!contentCollapsed ? false : true); } }}
+        onClick={() => { if (!isRunning) setUserCollapsed(!contentCollapsed); }}
       >
         {domain ? <Favicon domain={domain} /> : <GlobeIcon />}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-6">
-            <span className="text-mono-x-small text-heat-100 bg-heat-4 px-6 py-1 rounded-4 flex-shrink-0">
-              interact
-            </span>
+            <EndpointBadge type="interact" />
             {isRunning && (
               <div className="w-5 h-5 rounded-full bg-heat-100 animate-pulse flex-shrink-0" />
             )}
@@ -424,47 +437,62 @@ function InteractCard({ item, isLatest }: { item: TimelineItem; isLatest?: boole
       {/* Collapsible body */}
       <div className={cn(
         "transition-all duration-300 overflow-hidden",
-        contentCollapsed ? "max-h-0 opacity-0" : "max-h-[2000px] opacity-100",
+        contentCollapsed ? "max-h-0 opacity-0" : "max-h-[4000px] opacity-100",
       )}>
-        {/* Interact output + live view side by side */}
-        {(item.interactOutput || item.liveViewUrl) && (
-          <div className="mx-14 mb-10 flex gap-8">
-            {item.interactOutput && (
-              <div className={cn(
-                "bg-black-alpha-2 rounded-8 border border-border-faint p-12",
-                item.liveViewUrl ? "flex-1 min-w-0" : "w-full",
-              )}>
-                <div className="text-body-small text-accent-black leading-relaxed">
-                  {item.interactOutput}
-                </div>
-              </div>
-            )}
-            {item.liveViewUrl && (
-              <div className={cn(
-                "flex flex-col gap-6 flex-shrink-0",
-                item.interactOutput ? "w-[280px]" : "w-full",
-              )}>
-                {(isRunning || userToggled) && (
-                  <div className="rounded-8 border border-border-faint overflow-hidden bg-white" style={{ aspectRatio: "16/10" }}>
-                    <iframe
-                      src={item.liveViewUrl}
-                      className="w-full h-full border-0"
-                      title="Live browser view"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
+        {/* Expand toggle */}
+        {!isRunning && (item.interactOutput || item.content) && (
+          <div className="mx-14 mb-6 flex justify-end">
+            <button
+              type="button"
+              className="flex items-center gap-4 text-mono-x-small text-black-alpha-32 hover:text-accent-black transition-colors"
+              onClick={() => setExpanded(!expanded)}
+            >
+              <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                {expanded
+                  ? <><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" /></>
+                  : <><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></>
+                }
+              </svg>
+              {expanded ? "Compact" : "Expand"}
+            </button>
           </div>
         )}
 
-        {item.content && item.status === "complete" && (
-          <div className="border-t border-border-faint bg-background-lighter p-14 max-h-300 overflow-auto">
-            {isJsonContent(item.content) ? (
-              <pre className="text-mono-small text-accent-black whitespace-pre-wrap">{extractJsonContent(item.content)}</pre>
-            ) : (
-              <div className="text-body-small text-black-alpha-56 leading-relaxed prose prose-sm max-w-none">
-                <Streamdown plugins={{ code }}>{item.content}</Streamdown>
+        {/* Live view -- only while running and URL available (iframe has its own loader) */}
+        {isRunning && item.liveViewUrl && (
+          <div className="mx-14 mb-10">
+            <div className="rounded-8 border border-border-faint overflow-hidden bg-white" style={{ aspectRatio: "16/10" }}>
+              <iframe
+                src={item.liveViewUrl}
+                className="w-full h-full border-0"
+                title="Live browser view"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Output + content -- shown when complete */}
+        {!isRunning && (item.interactOutput || item.content) && (
+          <div className={cn("mx-14 mb-10", expanded ? "flex flex-col gap-8" : "flex flex-col gap-8")}>
+            {item.interactOutput && (
+              <div className="bg-black-alpha-2 rounded-8 border border-border-faint p-12">
+                <div className="text-body-small text-accent-black leading-relaxed prose prose-sm max-w-none prose-headings:text-accent-black prose-a:text-heat-100 prose-strong:text-accent-black">
+                  <Streamdown plugins={{ code }}>{item.interactOutput}</Streamdown>
+                </div>
+              </div>
+            )}
+            {item.content && (
+              <div className={cn(
+                "rounded-8 border border-border-faint bg-background-lighter p-14 overflow-auto",
+                expanded ? "max-h-[600px]" : "max-h-300",
+              )}>
+                {isJsonContent(item.content) ? (
+                  <pre className="text-mono-small text-accent-black whitespace-pre-wrap">{extractJsonContent(item.content)}</pre>
+                ) : (
+                  <div className="text-body-small text-accent-black leading-relaxed prose prose-sm max-w-none prose-headings:text-accent-black prose-a:text-heat-100 prose-strong:text-accent-black">
+                    <Streamdown plugins={{ code }}>{item.content}</Streamdown>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -717,13 +745,62 @@ function BashResult({ command, stdout, stderr, exitCode }: { command: string; st
 
 // --- Skill load rendering ---
 
+const SHORT_TEXT_THRESHOLD = 200;
+
+function TextBlock({ text, isLatest }: { text: string; isLatest: boolean }) {
+  const isShort = text.length < SHORT_TEXT_THRESHOLD;
+  const [collapsed, setCollapsed] = useState(!isLatest && !isShort);
+  const preview = useMemo(() => {
+    const firstLine = text.split("\n").find((l) => l.trim() && !l.startsWith("#"))?.trim() ?? text.slice(0, 100);
+    return firstLine.length > 120 ? firstLine.slice(0, 120) + "..." : firstLine;
+  }, [text]);
+
+  if (isShort) {
+    return (
+      <div className="text-body-large text-accent-black leading-relaxed my-12 prose prose-sm max-w-none prose-headings:text-accent-black prose-a:text-heat-100 prose-strong:text-accent-black prose-code:text-heat-100 prose-code:bg-heat-4 prose-code:px-4 prose-code:py-1 prose-code:rounded-4">
+        <Streamdown plugins={{ code }}>{text}</Streamdown>
+      </div>
+    );
+  }
+
+  return (
+    <div className="my-12 rounded-10 border border-border-faint overflow-hidden">
+      <button
+        type="button"
+        className="w-full flex items-center gap-10 px-14 py-10 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
+        onClick={() => setCollapsed(!collapsed)}
+      >
+        <svg fill="none" height="16" viewBox="0 0 24 24" width="16" className="flex-shrink-0 text-black-alpha-32">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
+          <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
+        </svg>
+        <span className="flex-1 min-w-0 text-body-small text-black-alpha-48 truncate">
+          {collapsed ? preview : "Response"}
+        </span>
+        <span className="text-mono-x-small text-black-alpha-24 bg-black-alpha-4 px-6 py-1 rounded-4 flex-shrink-0">
+          {(text.length / 1000).toFixed(1)}k
+        </span>
+        <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24", collapsed && "-rotate-90")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      <div className={cn(
+        "transition-all duration-300 overflow-hidden",
+        collapsed ? "max-h-0 opacity-0" : "max-h-[4000px] opacity-100",
+      )}>
+        <div className="border-t border-border-faint p-14 max-h-[600px] overflow-auto text-body-large text-accent-black leading-relaxed prose prose-sm max-w-none prose-headings:text-accent-black prose-a:text-heat-100 prose-strong:text-accent-black prose-code:text-heat-100 prose-code:bg-heat-4 prose-code:px-4 prose-code:py-1 prose-code:rounded-4">
+          <Streamdown plugins={{ code }}>{text}</Streamdown>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SkillLoad({ name, description, status }: { name: string; description?: string; status: "running" | "complete" }) {
   return (
-    <div className="my-12 rounded-10 border border-accent-forest/15 bg-accent-forest/[0.03] overflow-hidden">
+    <div className="my-12 rounded-10 border border-border-faint overflow-hidden">
       <div className="flex items-center gap-10 px-14 py-10">
-        <div className="w-28 h-28 rounded-8 bg-accent-forest/10 flex-center flex-shrink-0">
-          <SkillIcon />
-        </div>
+        <EndpointBadge type="skill" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-6">
             <span className="text-label-medium text-accent-black">{name}</span>
@@ -740,9 +817,7 @@ function SkillLoad({ name, description, status }: { name: string; description?: 
             <div className="text-body-small text-black-alpha-40 mt-1">{description}</div>
           )}
         </div>
-        <span className="text-mono-x-small text-accent-forest/60 bg-accent-forest/8 px-8 py-2 rounded-4 flex-shrink-0">
-          skill
-        </span>
+        <SkillIcon />
       </div>
     </div>
   );
@@ -972,17 +1047,22 @@ function extractTimeline(messages: UIMessage[]): TimelineItem[] {
   }
   // Propagate liveViewUrl from completed interact items to running ones
   const knownLiveViewUrls = new Map<string, string>();
+  let lastKnownLiveViewUrl: string | undefined;
   for (const item of items) {
     if (item.type === "interact" && item.liveViewUrl && item.status === "complete") {
       const domain = item.url ? getDomain(item.url) : null;
       if (domain) knownLiveViewUrls.set(domain, item.liveViewUrl);
+      lastKnownLiveViewUrl = item.liveViewUrl;
     }
   }
   for (const item of items) {
     if (item.type === "interact" && !item.liveViewUrl) {
       const domain = item.url ? getDomain(item.url) : null;
+      // Try same-domain first, then fall back to any prior interact's liveViewUrl
       if (domain && knownLiveViewUrls.has(domain)) {
         item.liveViewUrl = knownLiveViewUrls.get(domain);
+      } else if (lastKnownLiveViewUrl) {
+        item.liveViewUrl = lastKnownLiveViewUrl;
       }
     }
   }
@@ -995,13 +1075,23 @@ function extractTimeline(messages: UIMessage[]): TimelineItem[] {
 export default function PlanVisualization({
   messages,
   isRunning,
+  preloadedSkills,
 }: {
   messages: UIMessage[];
   isRunning: boolean;
+  preloadedSkills?: string[];
 }) {
   const timeline = extractTimeline(messages);
 
-  if (timeline.length === 0 && !isRunning) {
+  // Check if any skill load_skill calls already exist in timeline
+  const loadedSkillNames = new Set(
+    timeline.filter((t) => t.type === "skill").map((t) => t.skillName)
+  );
+
+  // Show preloaded skills that haven't appeared in the real timeline yet
+  const pendingSkills = (preloadedSkills ?? []).filter((s) => !loadedSkillNames.has(s));
+
+  if (timeline.length === 0 && !isRunning && pendingSkills.length === 0) {
     return (
       <div className="flex items-center justify-center py-40">
         <div className="text-body-large text-black-alpha-24">
@@ -1013,14 +1103,15 @@ export default function PlanVisualization({
 
   return (
     <div>
+      {/* Pre-loaded skills shown as loading before real timeline */}
+      {isRunning && pendingSkills.map((skillName) => (
+        <SkillLoad key={`preload-${skillName}`} name={skillName} status="running" />
+      ))}
+
       {timeline.map((item, i) => {
         switch (item.type) {
           case "text":
-            return (
-              <div key={i} className="text-body-large text-accent-black leading-relaxed my-12 prose prose-sm max-w-none prose-headings:text-accent-black prose-a:text-heat-100 prose-strong:text-accent-black prose-code:text-heat-100 prose-code:bg-heat-4 prose-code:px-4 prose-code:py-1 prose-code:rounded-4">
-                <Streamdown plugins={{ code }}>{item.text!}</Streamdown>
-              </div>
-            );
+            return <TextBlock key={i} text={item.text!} isLatest={i === timeline.length - 1} />;
           case "search":
             return (
               <SearchResults
@@ -1059,7 +1150,7 @@ export default function PlanVisualization({
               })()
             );
           case "interact":
-            return <InteractCard key={i} item={item} isLatest={i === timeline.length - 1} />;
+            return <InteractCard key={i} item={item} />;
           case "bash":
             return item.status === "complete" ? (
               <BashResult key={i} command={item.command!} stdout={item.stdout!} stderr={item.stderr!} exitCode={item.exitCode!} />
@@ -1083,11 +1174,9 @@ export default function PlanVisualization({
 
       {/* Running indicator */}
       {isRunning && (
-        <div className="flex items-center gap-8 my-12 py-4">
-          <div className="relative w-18 h-18 flex-shrink-0">
-            <div className="absolute inset-0 rounded-full border-2 border-black-alpha-8 border-t-heat-100 animate-spin" />
-          </div>
-          <span className="text-body-medium text-black-alpha-32">Working...</span>
+        <div className="flex items-center gap-6 my-8 px-4">
+          <div className="w-12 h-12 rounded-full border-2 border-black-alpha-8 border-t-heat-100 animate-spin flex-shrink-0" />
+          <span className="text-body-small text-black-alpha-24">Working...</span>
         </div>
       )}
 

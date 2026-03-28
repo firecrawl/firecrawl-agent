@@ -20,11 +20,11 @@ function GearIcon() {
 }
 
 const PROVIDERS = [
-  { id: "firecrawl", label: "Firecrawl", icon: "openai", envVar: "FIRECRAWL_API_KEY", placeholder: "fc-...", description: "Required. Powers search, scrape, and interact tools.", required: true, hasModels: false },
+  { id: "firecrawl", label: "Firecrawl", icon: "firecrawl", envVar: "FIRECRAWL_API_KEY", placeholder: "fc-...", description: "Required. Powers search, scrape, and interact tools.", required: true, hasModels: false },
   { id: "anthropic", label: "Anthropic", icon: "anthropic", envVar: "ANTHROPIC_API_KEY", placeholder: "sk-ant-...", description: "Claude models for orchestration, planning, and export.", required: false, hasModels: true, provider: "anthropic" as Provider },
   { id: "openai", label: "OpenAI", icon: "openai", envVar: "OPENAI_API_KEY", placeholder: "sk-...", description: "GPT and o-series models.", required: false, hasModels: true, provider: "openai" as Provider },
   { id: "google", label: "Google AI", icon: "gemini", envVar: "GOOGLE_GENERATIVE_AI_API_KEY", placeholder: "AI...", description: "Gemini models.", required: false, hasModels: true, provider: "google" as Provider },
-  { id: "gateway", label: "AI Gateway", icon: "openai", envVar: "AI_GATEWAY_API_KEY", placeholder: "vck_...", description: "Vercel AI Gateway. Access multiple providers through a single key.", required: false, hasModels: true, provider: "gateway" as Provider },
+  { id: "gateway", label: "AI Gateway", icon: "vercel", envVar: "AI_GATEWAY_API_KEY", placeholder: "vck_...", description: "Vercel AI Gateway. Access multiple providers through a single key.", required: false, hasModels: true, provider: "gateway" as Provider },
 ];
 
 const OPERATIONS = [
@@ -94,8 +94,9 @@ function ProviderView({
         <div className="flex items-center gap-12 mb-8">
           <ProviderModelIcon icon={provider.icon} size={24} />
           <h2 className="text-title-h5 text-accent-black">{provider.label}</h2>
-          {configured && <span className="text-label-x-small text-accent-forest bg-accent-forest/8 px-8 py-3 rounded-8">Connected</span>}
+          {configured && <span className="text-label-x-small text-accent-forest bg-accent-forest/8 px-8 py-3 rounded-8">API key detected</span>}
           {!configured && provider.required && <span className="text-label-x-small text-heat-100 bg-heat-100/8 px-8 py-3 rounded-8">Required</span>}
+          {!configured && !provider.required && <span className="text-label-x-small text-black-alpha-32 bg-black-alpha-4 px-8 py-3 rounded-8">Not configured</span>}
         </div>
         <p className="text-body-medium text-black-alpha-48">{provider.description}</p>
       </div>

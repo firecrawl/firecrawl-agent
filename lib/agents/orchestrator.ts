@@ -111,7 +111,8 @@ You gather context iteratively through conversation. The user will tell you what
 ## Sub-agents and export
 - You have export sub-agents available (subagent_export_*). Each is a mini version of you with the full toolkit.
 - When the user asks for a specific format (JSON, CSV, report, slides, etc.), delegate to the matching export sub-agent and pass ALL collected data as the task.
-- If you have no matching sub-agent tool, call formatOutput directly.${schemaHint}${urlHint}${uploadHint}`;
+- If you have no matching sub-agent tool, call formatOutput directly.
+- IMPORTANT: For large datasets, always write the formatted output to a file in the bash filesystem FIRST (e.g. /data/export.json, /data/export.csv) using bashExec, then pass the content to formatOutput. This keeps context lean. Use printf or heredoc for writing, jq for JSON formatting, and awk for CSV generation.${schemaHint}${urlHint}${uploadHint}`;
 
   return new ToolLoopAgent({
     model,

@@ -9,6 +9,9 @@ import { getFirecrawlKey } from "@/lib/config/keys";
 
 export const maxDuration = 300;
 
+const DEFAULT_MAX_STEPS = 15;
+const MAX_STEPS_LIMIT = 50;
+
 /**
  * POST /api/query
  *
@@ -43,7 +46,7 @@ export async function POST(req: Request) {
     provider = "anthropic",
     urls,
     schema,
-    maxSteps = 15,
+    maxSteps: rawMaxSteps,
     stream = false,
   } = body as {
     prompt: string;
@@ -54,6 +57,8 @@ export async function POST(req: Request) {
     maxSteps?: number;
     stream?: boolean;
   };
+
+  const maxSteps = Math.min(Math.max(1, rawMaxSteps ?? DEFAULT_MAX_STEPS), MAX_STEPS_LIMIT);
 
   if (!prompt) {
     return Response.json({ error: "prompt is required" }, { status: 400 });

@@ -14,6 +14,7 @@ import FileUpload from "./components/file-upload";
 import HistoryPanel from "./components/history-panel";
 import { Streamdown } from "streamdown";
 import Sidebar from "./components/sidebar";
+import ExportSidebar from "./components/export-modal";
 import SymbolColored from "@/components/shared/icons/symbol-colored";
 import Link from "next/link";
 import { cn } from "@/utils/cn";
@@ -61,6 +62,56 @@ const defaultConfig: AgentConfig = {
   subAgents: [],
   maxSteps: 20,
 };
+
+const PLACEHOLDER_PHRASES = [
+  "What data do you want to extract?",
+  "Compare pricing across competitor sites...",
+  "Scrape job listings and export as CSV...",
+  "Research a company and summarize findings...",
+  "Monitor product prices across stores...",
+  "Extract structured data from any webpage...",
+  "Build a lead list with company details...",
+  "Audit a site for SEO issues...",
+];
+
+function useTypewriter(phrases: string[], typingSpeed = 50, pauseMs = 2000, deleteSpeed = 30) {
+  const [display, setDisplay] = useState("");
+  const idx = useRef(0);
+  const charIdx = useRef(0);
+  const deleting = useRef(false);
+  const paused = useRef(false);
+
+  useEffect(() => {
+    const tick = () => {
+      const phrase = phrases[idx.current];
+      if (paused.current) return;
+
+      if (!deleting.current) {
+        charIdx.current++;
+        setDisplay(phrase.slice(0, charIdx.current));
+        if (charIdx.current === phrase.length) {
+          paused.current = true;
+          setTimeout(() => {
+            paused.current = false;
+            deleting.current = true;
+          }, pauseMs);
+        }
+      } else {
+        charIdx.current--;
+        setDisplay(phrase.slice(0, charIdx.current));
+        if (charIdx.current === 0) {
+          deleting.current = false;
+          idx.current = (idx.current + 1) % phrases.length;
+        }
+      }
+    };
+
+    const interval = setInterval(tick, deleting.current ? deleteSpeed : typingSpeed);
+    return () => clearInterval(interval);
+  }, [phrases, typingSpeed, pauseMs, deleteSpeed]);
+
+  return display;
+}
 
 const EXAMPLES = [
   "Search for the top 5 open-source LLM frameworks, scrape each repo, and compare stars, language, and license",
@@ -365,6 +416,7 @@ function ModelDropdown({
 
 export default function AgentPage() {
   const [config, setConfig] = useState<AgentConfig>(defaultConfig);
+  const typingPlaceholder = useTypewriter(PLACEHOLDER_PHRASES);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [followUp, setFollowUp] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -379,9 +431,9 @@ export default function AgentPage() {
   const [savedSkillPath, setSavedSkillPath] = useState<string | null>(null);
   const [generatedSkillContent, setGeneratedSkillContent] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [studioCollapsed, setStudioCollapsed] = useState(true);
+  const [exportCollapsed, setExportCollapsed] = useState(true);
   const [generatingFormat, setGeneratingFormat] = useState<string | null>(null);
-  const [generatedOutputs, setGeneratedOutputs] = useState<Record<string, { format: string; content: string }>>({});
+  const [requestedExports, setRequestedExports] = useState<{ formatId: string; outputCountAtRequest: number }[]>([]);
   const [planMode, setPlanMode] = useState(false);
   const [planText, setPlanText] = useState<string | null>(null);
   const [planLoading, setPlanLoading] = useState(false);
@@ -421,6 +473,7 @@ export default function AgentPage() {
   const stop = isACP ? acpChat.stop : sdkChat.stop;
 
   const sendMessage = useCallback((opts: { text: string }) => {
+    setSidebarCollapsed(true);
     if (isACP) {
       acpChat.sendMessage({
         text: opts.text,
@@ -501,54 +554,13 @@ export default function AgentPage() {
         .then((r) => r.json())
         .then((d) => setSuggestions(d.suggestions ?? []))
         .catch(() => setSuggestions([]));
+
+      // Auto-expand export panel when agent finishes
+      setExportCollapsed(false);
+      if (generatingFormat) setGeneratingFormat(null);
     }
     prevIsRunning.current = isRunning;
-
-    // Keep export panel collapsed -- user opens it when ready
-
-    // Capture formatOutput results when agent finishes
-    if (prevIsRunning.current === false && !isRunning && generatingFormat) {
-      for (let i = messages.length - 1; i >= 0; i--) {
-        const msg = messages[i];
-        if (msg.role !== "assistant") continue;
-        for (const part of msg.parts) {
-          const p = part as Record<string, unknown>;
-          const toolName = (p.toolName ?? (part.type as string).replace("tool-", "")) as string;
-          if (toolName === "formatOutput" && (p.state === "output-available" || p.state === "result") && p.output) {
-            const output = p.output as { format: string; content: string };
-            if (output.content) {
-              setGeneratedOutputs((prev) => ({ ...prev, [generatingFormat]: output }));
-              setGeneratingFormat(null);
-              break;
-            }
-          }
-        }
-        if (!generatingFormat) break;
-      }
-    }
   }, [isRunning, messages, config.prompt, generatingFormat]);
-
-  // Also watch for formatOutput completing mid-stream
-  useEffect(() => {
-    if (!generatingFormat || isRunning) return;
-    // Agent stopped, check for output
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i];
-      if (msg.role !== "assistant") continue;
-      for (const part of msg.parts) {
-        const p = part as Record<string, unknown>;
-        const toolName = (p.toolName ?? (part.type as string).replace("tool-", "")) as string;
-        if (toolName === "formatOutput" && (p.state === "output-available" || p.state === "result") && p.output) {
-          const output = p.output as { format: string; content: string };
-          if (output.content) {
-            setGeneratedOutputs((prev) => ({ ...prev, [generatingFormat]: output }));
-            setGeneratingFormat(null);
-            return;
-          }
-        }
-      }
-    }
-  }, [messages, isRunning, generatingFormat]);
 
   const handleSaveSkill = async () => {
     if (!skillName.trim() || savingSkill) return;
@@ -672,7 +684,7 @@ export default function AgentPage() {
           <div className="px-20 pt-16 pb-8">
             <textarea
               className="w-full bg-transparent text-body-large text-accent-black placeholder:text-black-alpha-32 focus:outline-none resize-none"
-              placeholder="Describe your idea..."
+              placeholder={typingPlaceholder || "What data do you want to extract?"}
               rows={2}
               autoFocus
               value={config.prompt}
@@ -958,26 +970,20 @@ export default function AgentPage() {
         />
 
       <div className="flex-1 overflow-y-auto">
-      <div className={cn("mx-auto px-20 py-24 transition-all duration-200", sidebarCollapsed || studioCollapsed ? "max-w-900" : "max-w-700")}>
+      <div className={cn("mx-auto px-20 py-24 transition-all duration-200", sidebarCollapsed ? "max-w-900" : "max-w-700")}>
         {/* Query display */}
         <div className="mb-20">
-          <div className="text-title-h4 text-accent-black mb-6">
+          <div className="text-title-h4 text-accent-black">
             {config.prompt}
           </div>
-          <div className="flex items-center gap-8 text-body-small text-black-alpha-40">
-            <ProviderModelIcon icon={currentModelIcon} size={14} />
+          <div className="flex items-center justify-end gap-6 mt-8 text-body-small text-black-alpha-32">
+            <ProviderModelIcon icon={currentModelIcon} size={12} />
             <span>{currentModelName}</span>
-            {config.skills.length > 0 && (
-              <>
-                <span className="text-black-alpha-16">·</span>
-                <span>{config.skills.length} skill{config.skills.length > 1 ? "s" : ""}</span>
-              </>
-            )}
           </div>
         </div>
 
         {/* Activity feed */}
-        <PlanVisualization messages={messages} isRunning={isRunning} />
+        <PlanVisualization messages={messages} isRunning={isRunning} preloadedSkills={config.skills.length > 0 ? config.skills : undefined} />
 
         {/* Bottom section */}
         {!isRunning && messages.length > 0 && (
@@ -1095,172 +1101,21 @@ export default function AgentPage() {
       </div>
       </div>
 
-      {/* Export panel -- right side */}
+      {/* Export sidebar -- right side, mirrors left sidebar */}
       {messages.length > 0 && (
-        <div className={cn(
-          "h-full border-l border-border-faint bg-background-base flex flex-col flex-shrink-0 overflow-hidden transition-all duration-200",
-          studioCollapsed ? "w-48" : "w-280",
-        )}>
-          <div className={cn("px-16 pt-14 pb-6 flex items-center", studioCollapsed ? "justify-center px-8" : "gap-8")}>
-            {!studioCollapsed && <h3 className="text-label-medium text-accent-black flex-1">Export</h3>}
-            <button
-              type="button"
-              className="p-6 rounded-6 text-black-alpha-40 hover:bg-black-alpha-4 hover:text-accent-black transition-all flex-shrink-0"
-              onClick={() => setStudioCollapsed(!studioCollapsed)}
-            >
-              <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                {studioCollapsed ? <path d="M15 18l-6-6 6-6" /> : <path d="M9 18l6-6-6-6" />}
-              </svg>
-            </button>
-          </div>
-
-          {!studioCollapsed && <div className="px-12 pb-16 flex flex-col gap-10 overflow-y-auto flex-1 scrollbar-hide" style={{ scrollbarWidth: "none" }}>
-            {/* 2-column grid of export cards */}
-            <div className="grid grid-cols-2 gap-6">
-              {([
-                { id: "json", label: "JSON", color: "bg-heat-4 border-heat-20 hover:border-heat-40", prompt: "Format all the collected data as clean, structured JSON. Use camelCase keys, keep it flat where practical, include all data points.", icon: <svg fill="none" height="18" viewBox="0 0 24 24" width="18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H7a2 2 0 00-2 2v5a2 2 0 01-2 2 2 2 0 012 2v5a2 2 0 002 2h1M16 3h1a2 2 0 012 2v5a2 2 0 002 2 2 2 0 00-2 2v5a2 2 0 01-2 2h-1" /></svg> },
-                { id: "csv", label: "CSV", color: "bg-accent-forest/[0.04] border-accent-forest/15 hover:border-accent-forest/30", prompt: "Format all the collected data as a CSV table. One row per entity, consistent columns, human-readable headers, include source URLs.", icon: <svg fill="none" height="18" viewBox="0 0 24 24" width="18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M3 12h18M3 18h18M9 6v12M15 6v12" /></svg> },
-                { id: "markdown", label: "Report", color: "bg-accent-amethyst/[0.04] border-accent-amethyst/15 hover:border-accent-amethyst/30", prompt: "Format all the collected data as a structured markdown report with executive summary, findings organized by topic, tables for comparisons, key takeaways, and sources.", icon: <svg fill="none" height="18" viewBox="0 0 24 24" width="18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" /><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" /></svg> },
-                { id: "html", label: "HTML", color: "bg-[#fff4e6] border-[#ffe0b2] hover:border-[#ffcc80]", prompt: "Format all the collected data as a styled HTML document with inline CSS, clean tables, sans-serif font, responsive layout. Include all data and source links.", icon: <svg fill="none" height="18" viewBox="0 0 24 24" width="18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6" /></svg> },
-                { id: "slides", label: "Slides", color: "bg-[#f3e8ff] border-[#d8b4fe] hover:border-[#c084fc]", prompt: "Structure all the collected data as a slide deck outline with 5-12 slides. Each slide: title, 3-5 bullet points, speaker notes. Include title slide, agenda, findings, comparison slides, and takeaways.", icon: <svg fill="none" height="18" viewBox="0 0 24 24" width="18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg> },
-                { id: "spreadsheet", label: "Spreadsheet", color: "bg-[#ecfdf5] border-[#a7f3d0] hover:border-[#6ee7b7]", prompt: "Structure all the collected data as a multi-sheet spreadsheet. Main sheet with all entities, additional sheets for breakdowns. Include typed columns, summary rows, and a sources sheet.", icon: <svg fill="none" height="18" viewBox="0 0 24 24" width="18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M3 15h18M9 3v18" /></svg> },
-                { id: "pdf", label: "PDF", color: "bg-[#fef2f2] border-[#fecaca] hover:border-[#fca5a5]", prompt: "Structure all the collected data as a print-ready document with table of contents, numbered sections, clean tables, page-break hints between sections, and footnoted sources.", icon: <svg fill="none" height="18" viewBox="0 0 24 24" width="18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" /><path d="M14 2v6h6" /></svg> },
-                { id: "document", label: "Document", color: "bg-[#eff6ff] border-[#bfdbfe] hover:border-[#93c5fd]", prompt: "Structure all the collected data as a formal document with title page, executive summary, introduction, findings, analysis, recommendations, and appendix with sources.", icon: <svg fill="none" height="18" viewBox="0 0 24 24" width="18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5" /></svg> },
-              ]).map((card) => {
-                const isGen = generatingFormat === card.id;
-                const done = !!generatedOutputs[card.id];
-                return (
-                  <button
-                    key={card.id}
-                    type="button"
-                    disabled={isGen || isRunning}
-                    className={cn(
-                      "flex flex-col items-start gap-6 px-12 py-10 rounded-10 border transition-all",
-                      card.color,
-                      done && "shadow-sm",
-                      (isGen || (isRunning && !done)) && "opacity-60 cursor-wait",
-                    )}
-                    onClick={() => {
-                      if (isGen || isRunning) return;
-                      setSidebarCollapsed(true);
-                      setGeneratingFormat(card.id);
-                      sendMessage({ text: card.prompt });
-                    }}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <span className="text-black-alpha-48">{card.icon}</span>
-                      {isGen ? (
-                        <div className="w-12 h-12 rounded-full border-2 border-heat-40 border-t-transparent animate-spin" />
-                      ) : done ? (
-                        <svg className="w-14 h-14 text-accent-forest" fill="none" viewBox="0 0 16 16"><path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                      ) : (
-                        <svg fill="none" height="14" viewBox="0 0 24 24" width="14" className="text-black-alpha-20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
-                      )}
-                    </div>
-                    <span className="text-label-small text-accent-black">{card.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Save as Skill -- full width below grid */}
-            {!generatedSkillContent ? (
-              showSaveSkill ? (
-                <div className="flex flex-col gap-6">
-                  <input
-                    className="w-full px-12 py-8 rounded-8 border border-border-faint text-body-small text-accent-black placeholder:text-black-alpha-24 focus:outline-none focus:border-accent-forest transition-colors"
-                    placeholder="Skill name..."
-                    value={skillName}
-                    onChange={(e) => setSkillName(e.target.value)}
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && skillName.trim() && !savingSkill) { e.preventDefault(); handleSaveSkill(); }
-                      if (e.key === "Escape") { setShowSaveSkill(false); setSkillName(""); }
-                    }}
-                  />
-                  <div className="flex gap-4">
-                    <button type="button" className="flex-1 px-10 py-6 rounded-8 text-label-small text-black-alpha-48 hover:bg-black-alpha-4 transition-all" onClick={() => { setShowSaveSkill(false); setSkillName(""); }}>Cancel</button>
-                    <button
-                      type="button"
-                      className={cn("flex-1 px-10 py-6 rounded-8 text-label-small transition-all", skillName.trim() && !savingSkill ? "bg-accent-forest text-white hover:bg-accent-forest/90" : "bg-black-alpha-8 text-black-alpha-24 cursor-not-allowed")}
-                      disabled={!skillName.trim() || savingSkill}
-                      onClick={handleSaveSkill}
-                    >{savingSkill ? "Generating..." : "Generate"}</button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className="w-full flex items-center gap-8 px-12 py-10 rounded-10 border border-accent-forest/15 bg-accent-forest/[0.04] hover:border-accent-forest/30 transition-all"
-                  onClick={() => { setShowSaveSkill(true); setSavedSkillPath(null); setGeneratedSkillContent(null); }}
-                >
-                  <svg fill="none" height="18" viewBox="0 0 24 24" width="18" className="text-accent-forest" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
-                  </svg>
-                  <div>
-                    <div className="text-label-small text-accent-black">Save as Skill</div>
-                    <div className="text-body-small text-black-alpha-32">Reusable workflow</div>
-                  </div>
-                  <svg fill="none" height="14" viewBox="0 0 24 24" width="14" className="ml-auto text-black-alpha-20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
-                </button>
-              )
-            ) : (
-              <div className="rounded-10 border border-accent-forest/20 bg-accent-forest/[0.02] overflow-hidden">
-                <div className="flex items-center justify-between px-12 py-8 border-b border-accent-forest/10">
-                  <div className="flex items-center gap-6">
-                    <svg className="w-14 h-14 text-accent-forest" fill="none" viewBox="0 0 16 16"><path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                    <span className="text-label-small text-accent-black">Skill saved</span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <button type="button" className="p-3 rounded-4 text-black-alpha-32 hover:bg-black-alpha-4 hover:text-accent-black transition-all" onClick={() => { const blob = new Blob([generatedSkillContent], { type: "text/markdown" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `${skillName || "skill"}.md`; a.click(); URL.revokeObjectURL(url); }}>
-                      <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
-                    </button>
-                    <button type="button" className="p-3 rounded-4 text-black-alpha-32 hover:bg-black-alpha-4 hover:text-accent-black transition-all" onClick={() => { setGeneratedSkillContent(null); setShowSaveSkill(false); setSkillName(""); setSavedSkillPath(null); }}>
-                      <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
-                    </button>
-                  </div>
-                </div>
-                <div className="p-12 max-h-200 overflow-auto">
-                  <pre className="text-mono-x-small text-accent-black whitespace-pre-wrap leading-relaxed">{generatedSkillContent}</pre>
-                </div>
-              </div>
-            )}
-
-            {/* API snippet */}
-            <div className="mt-2">
-              <div className="flex items-center gap-6 mb-6">
-                <svg fill="none" height="14" viewBox="0 0 24 24" width="14" className="text-black-alpha-32" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M16 18l6-6-6-6M8 6l-6 6 6 6" />
-                </svg>
-                <span className="text-label-small text-black-alpha-40">API</span>
-                <button
-                  type="button"
-                  className="ml-auto p-3 rounded-4 text-black-alpha-24 hover:text-accent-black hover:bg-black-alpha-4 transition-all"
-                  title="Copy to clipboard"
-                  onClick={() => {
-                    const snippet = `curl -X POST ${typeof window !== "undefined" ? window.location.origin : ""}/api/query \\
-  -H "Content-Type: application/json" \\
-  -d '${JSON.stringify({ prompt: config.prompt, model: config.model, stream: false }, null, 2).replace(/'/g, "'\\''")}'`;
-                    navigator.clipboard.writeText(snippet);
-                  }}
-                >
-                  <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="9" y="9" width="13" height="13" rx="2" />
-                    <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                  </svg>
-                </button>
-              </div>
-              <div className="rounded-8 bg-black-alpha-4 p-10 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-                <pre className="text-mono-x-small text-black-alpha-48 whitespace-pre leading-relaxed">{`curl -X POST /api/query \\
-  -H "Content-Type: application/json" \\
-  -d '{
-  "prompt": ${JSON.stringify(config.prompt.slice(0, 60) + (config.prompt.length > 60 ? "..." : ""))},
-  "stream": false
-}'`}</pre>
-              </div>
-            </div>
-          </div>}
-        </div>
+        <ExportSidebar
+          collapsed={exportCollapsed}
+          onToggleCollapse={() => setExportCollapsed(!exportCollapsed)}
+          onExport={(formatId, prompt, currentOutputCount) => {
+            setGeneratingFormat(formatId);
+            setRequestedExports((prev) => [...prev, { formatId, outputCountAtRequest: currentOutputCount }]);
+            sendMessage({ text: prompt });
+          }}
+          generatingFormat={generatingFormat ?? ""}
+          requestedExports={requestedExports}
+          messages={messages}
+          isRunning={isRunning}
+        />
       )}
 
       </div>
