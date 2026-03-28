@@ -307,6 +307,7 @@ export default function AgentPage() {
   const [savedSkillPath, setSavedSkillPath] = useState<string | null>(null);
   const [generatedSkillContent, setGeneratedSkillContent] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [studioCollapsed, setStudioCollapsed] = useState(false);
 
 
   const [acpAgents, setAcpAgents] = useState<{ name: string; bin: string; displayName: string; available: boolean }[]>([]);
@@ -668,7 +669,7 @@ export default function AgentPage() {
         />
 
       <div className="flex-1 overflow-y-auto">
-      <div className={cn("mx-auto px-20 py-24 transition-all duration-200", sidebarCollapsed ? "max-w-900" : "max-w-700")}>
+      <div className={cn("mx-auto px-20 py-24 transition-all duration-200", sidebarCollapsed || studioCollapsed ? "max-w-900" : "max-w-700")}>
         {/* Query display */}
         <div className="mb-20">
           <div className="text-title-h4 text-accent-black mb-6">
@@ -783,12 +784,25 @@ export default function AgentPage() {
 
       {/* Studio panel -- right side, appears after agent finishes */}
       {!isRunning && messages.length > 0 && (
-        <div className="w-260 h-full border-l border-border-faint bg-background-base flex flex-col flex-shrink-0 overflow-y-auto">
-          <div className="px-16 pt-16 pb-8">
-            <h3 className="text-label-medium text-accent-black">Studio</h3>
+        <div className={cn(
+          "h-full border-l border-border-faint bg-background-base flex flex-col flex-shrink-0 overflow-hidden transition-all duration-200",
+          studioCollapsed ? "w-48" : "w-260",
+        )}>
+          <div className={cn("p-12 flex items-center", studioCollapsed ? "justify-center" : "gap-8")}>
+            {!studioCollapsed && <h3 className="text-label-medium text-accent-black flex-1">Studio</h3>}
+            <button
+              type="button"
+              className="p-6 rounded-6 text-black-alpha-40 hover:bg-black-alpha-4 hover:text-accent-black transition-all flex-shrink-0"
+              onClick={() => setStudioCollapsed(!studioCollapsed)}
+              title={studioCollapsed ? "Expand studio" : "Collapse studio"}
+            >
+              <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                {studioCollapsed ? <path d="M15 18l-6-6 6-6" /> : <path d="M9 18l6-6-6-6" />}
+              </svg>
+            </button>
           </div>
 
-          <div className="px-12 pb-16 flex flex-col gap-6">
+          {!studioCollapsed && <div className="px-12 pb-16 flex flex-col gap-6 overflow-y-auto">
             {/* Export cards */}
             {([
               { id: "json" as const, label: "JSON", desc: "Structured data", color: "bg-heat-4 border-heat-20 hover:border-heat-40", icon: <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H7a2 2 0 00-2 2v5a2 2 0 01-2 2 2 2 0 012 2v5a2 2 0 002 2h1M16 3h1a2 2 0 012 2v5a2 2 0 002 2 2 2 0 00-2 2v5a2 2 0 01-2 2h-1" /></svg> },
@@ -918,7 +932,7 @@ export default function AgentPage() {
                 </div>
               </div>
             )}
-          </div>
+          </div>}
         </div>
       )}
 
