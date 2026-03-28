@@ -859,6 +859,7 @@ interface TimelineItem {
   subagentTask?: string;
   subagentSteps?: SubagentStep[];
   // format output
+  formatType?: string;
   formatData?: { format: string; content: string };
   // status
   status: "running" | "complete";
@@ -1040,8 +1041,10 @@ function extractTimeline(messages: UIMessage[]): TimelineItem[] {
           });
         } else if (toolName === "formatOutput") {
           const fmtOutput = output as { format?: string; content?: string } | undefined;
+          const fmt = (input.format as string) ?? fmtOutput?.format ?? "text";
           items.push({
             type: "format",
+            formatType: fmt,
             formatData: fmtOutput?.content ? { format: fmtOutput.format ?? "text", content: fmtOutput.content } : undefined,
             status,
           });
@@ -1161,26 +1164,30 @@ export default function PlanVisualization({
             return item.status === "complete" ? (
               <BashResult key={i} command={item.command!} stdout={item.stdout!} stderr={item.stderr!} exitCode={item.exitCode!} />
             ) : (
-              <div key={i} className="flex items-center gap-8 my-8 py-4 text-black-alpha-40">
-                <TerminalIcon />
-                <code className="text-mono-small">{item.command}</code>
-                <div className="w-4 h-4 rounded-full bg-heat-100 animate-pulse" />
+              <div key={i} className="my-8 rounded-10 border border-border-faint overflow-hidden">
+                <div className="flex items-center gap-8 px-14 py-8">
+                  <div className="w-24 h-24 rounded-6 bg-black-alpha-4 flex-center flex-shrink-0">
+                    <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className="text-black-alpha-40" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-label-small text-accent-black">Using Firecrawl&apos;s computer</div>
+                    <div className="text-mono-x-small text-black-alpha-24 truncate">{describeBashAction(item.command ?? "").label}</div>
+                  </div>
+                  <div className="w-10 h-10 rounded-full border-2 border-heat-100 border-t-transparent animate-spin flex-shrink-0" />
+                </div>
               </div>
             );
           case "skill":
             return <SkillLoad key={i} name={item.skillName!} description={item.text} status={item.status} />;
           case "subagent":
             return <SubAgentCard key={i} item={item} />;
-          case "format":
-            if (!item.formatData) {
-              return (
-                <div key={i} className="flex items-center gap-6 my-8 px-4">
-                  <div className="w-12 h-12 rounded-full border-2 border-black-alpha-8 border-t-heat-100 animate-spin flex-shrink-0" />
-                  <span className="text-body-small text-black-alpha-24">Formatting output...</span>
-                </div>
-              );
-            }
-            return null;
+          case "format": {
+            const fmtLabel: Record<string, string> = { csv: "CSV", json: "JSON", text: "Report" };
+            const skillLabel = fmtLabel[item.formatType ?? "text"] ?? "Export";
+            return <SkillLoad key={i} name={`${skillLabel} Skill`} description={item.status === "running" ? "Formatting output..." : "Output ready"} status={item.status} />;
+          }
           default:
             return null;
         }
