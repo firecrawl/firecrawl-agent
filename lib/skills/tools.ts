@@ -5,7 +5,7 @@ import path from "path";
 import type { SkillMetadata } from "../types";
 import { parseSkillBody } from "./parser";
 
-export function createSkillTools(skills: SkillMetadata[]) {
+export function createSkillTools(skills: SkillMetadata[], customInstructions?: Record<string, string>) {
   const skillMap = new Map(skills.map((s) => [s.name, s]));
 
   const catalogDescription = skills.length
@@ -25,7 +25,12 @@ export function createSkillTools(skills: SkillMetadata[]) {
           path.join(skill.directory, "SKILL.md"),
           "utf-8",
         );
-        return { name: skill.name, instructions: parseSkillBody(content) };
+        let instructions = parseSkillBody(content);
+        const custom = customInstructions?.[name];
+        if (custom) {
+          instructions += `\n\n## Custom Instructions\n${custom}`;
+        }
+        return { name: skill.name, instructions };
       },
     }),
 

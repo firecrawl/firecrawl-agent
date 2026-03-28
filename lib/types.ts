@@ -14,6 +14,7 @@ export interface AgentConfig {
   subAgentModel?: ModelConfig;
   operationModels?: Record<string, ModelConfig>;
   skills: string[];
+  skillInstructions?: Record<string, string>;
   subAgents: SubAgentConfig[];
   maxSteps?: number;
 }

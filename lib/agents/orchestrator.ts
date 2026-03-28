@@ -18,7 +18,7 @@ export async function createOrchestrator(
   const { systemPrompt: fcSystemPrompt, ...fcTools } = FirecrawlTools({
     apiKey: firecrawlApiKey,
   });
-  const skillTools = createSkillTools(skills);
+  const skillTools = createSkillTools(skills, config.skillInstructions);
 
   // Resolve sub-agent model (falls back to orchestrator model)
   const subAgentModelResolved = config.subAgentModel
@@ -31,6 +31,7 @@ export async function createOrchestrator(
     firecrawlApiKey,
     skills,
     subAgentModelResolved,
+    config.skillInstructions,
   );
 
   // Skill catalog for system prompt (~100 tokens per skill)

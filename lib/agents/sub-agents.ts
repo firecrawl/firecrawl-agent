@@ -83,6 +83,7 @@ function buildFullToolset(
   firecrawlApiKey: string,
   skills: SkillMetadata[],
   enabledTools?: ("search" | "scrape" | "interact" | "map")[],
+  customInstructions?: Record<string, string>,
 ): ToolSet {
   const fcToolOptions: Record<string, unknown> = { apiKey: firecrawlApiKey };
   if (enabledTools) {
@@ -91,7 +92,7 @@ function buildFullToolset(
     if (!enabledTools.includes("interact")) fcToolOptions.interact = false;
   }
   const { systemPrompt: _, ...fcTools } = FirecrawlTools(fcToolOptions);
-  const skillTools = createSkillTools(skills);
+  const skillTools = createSkillTools(skills, customInstructions);
   return { ...fcTools, ...skillTools, formatOutput, bashExec };
 }
 
@@ -100,6 +101,7 @@ export async function createSubAgentTools(
   firecrawlApiKey: string,
   skills: SkillMetadata[],
   parentModel?: Awaited<ReturnType<typeof resolveModel>>,
+  customInstructions?: Record<string, string>,
 ): Promise<ToolSet> {
   const subAgentTools: ToolSet = {};
   const skillCatalog = buildSkillCatalog(skills);
@@ -107,7 +109,7 @@ export async function createSubAgentTools(
   // User-configured sub-agents
   for (const config of configs) {
     const model = await resolveModel(config.model);
-    const tools = buildFullToolset(firecrawlApiKey, skills, config.tools);
+    const tools = buildFullToolset(firecrawlApiKey, skills, config.tools, customInstructions);
 
     let preloadedSkills = "";
     for (const skillName of config.skills) {
@@ -135,7 +137,7 @@ When finished, write a clear summary of what you found.${preloadedSkills}`,
 
   // Built-in sub-agents (export formatters, etc.)
   const builtinModel = parentModel ?? await resolveModel({ provider: "anthropic", model: "claude-sonnet-4-5-20250514" });
-  const builtinTools = buildFullToolset(firecrawlApiKey, skills);
+  const builtinTools = buildFullToolset(firecrawlApiKey, skills, undefined, customInstructions);
 
   for (const builtin of BUILTIN_SUBAGENTS) {
     const preloadedSkill = await loadSkillContent(builtin.skill, skills);
