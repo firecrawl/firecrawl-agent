@@ -55,6 +55,8 @@ const FORMATS = [
 
 // --- Helpers ---
 
+let jobCounter = 0;
+
 function getOutputMeta(content: string, formatId: string) {
   const isHtml = /^\s*<!doctype\s+html|^\s*<html/i.test(content.trim());
   const isCsv = formatId === "csv" || formatId === "spreadsheet";
@@ -266,6 +268,103 @@ interface ExportJob {
   error?: string;
 }
 
+function JobCard({ job, onFullscreen, onRemove }: { job: ExportJob; onFullscreen: () => void; onRemove: () => void }) {
+  const [mounted, setMounted] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const formatDef = FORMATS.find((f) => f.id === job.formatId);
+
+  useEffect(() => { requestAnimationFrame(() => setMounted(true)); }, []);
+
+  const handleRemove = () => {
+    setRemoving(true);
+    setTimeout(onRemove, 200);
+  };
+
+  const { ext } = job.content ? getOutputMeta(job.content, job.formatId) : { ext: "" };
+  const isDone = job.status === "done" && !!job.content;
+
+  return (
+    <div
+      className={cn(
+        "rounded-8 border overflow-hidden transition-all duration-200",
+        mounted && !removing ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8",
+        isDone ? "border-border-faint hover:border-black-alpha-16" : "border-border-faint",
+      )}
+    >
+      <button
+        type="button"
+        className={cn(
+          "w-full flex items-center gap-8 px-10 py-8 text-left transition-colors",
+          isDone && "cursor-pointer hover:bg-black-alpha-2",
+        )}
+        onClick={() => { if (isDone) setExpanded(!expanded); }}
+        disabled={!isDone}
+      >
+        {formatDef && <span className="flex-shrink-0 text-black-alpha-40">{formatDef.icon}</span>}
+        <span className="text-body-small text-accent-black flex-1 truncate">{job.label}</span>
+
+        {job.status === "running" && (
+          <div className="w-10 h-10 rounded-full border-2 border-heat-100 border-t-transparent animate-spin flex-shrink-0" />
+        )}
+        {job.status === "error" && (
+          <>
+            <span className="text-mono-x-small text-accent-crimson">failed</span>
+            <span
+              role="button"
+              tabIndex={0}
+              className="p-4 rounded-4 text-black-alpha-24 hover:text-accent-black hover:bg-black-alpha-4 transition-all"
+              onClick={(e) => { e.stopPropagation(); handleRemove(); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); handleRemove(); } }}
+              title="Dismiss"
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+            </span>
+          </>
+        )}
+        {isDone && (
+          <>
+            <span
+              role="button"
+              tabIndex={0}
+              className="p-4 rounded-4 text-black-alpha-24 hover:text-accent-black hover:bg-black-alpha-4 transition-all"
+              onClick={(e) => { e.stopPropagation(); download(job.content!, `export.${ext}`); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); download(job.content!, `export.${ext}`); } }}
+              title="Download"
+            >
+              <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+            </span>
+            <span
+              role="button"
+              tabIndex={0}
+              className="p-4 rounded-4 text-black-alpha-24 hover:text-accent-black hover:bg-black-alpha-4 transition-all"
+              onClick={(e) => { e.stopPropagation(); onFullscreen(); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onFullscreen(); } }}
+              title="Fullscreen"
+            >
+              <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
+            </span>
+            <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24 flex-shrink-0", expanded && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 9l6 6 6-6" /></svg>
+          </>
+        )}
+      </button>
+
+      <div
+        className={cn(
+          "transition-all duration-200 overflow-hidden",
+          expanded ? "max-h-[400px] opacity-100" : "max-h-0 opacity-0",
+        )}
+      >
+        {job.content && (
+          <div className="border-t border-border-faint">
+            <OutputContent content={job.content} formatId={job.formatId} maxH="max-h-[350px]" />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // --- Export Sidebar ---
 
 interface ExportSidebarProps {
@@ -276,18 +375,19 @@ interface ExportSidebarProps {
 
 export default function ExportSidebar({ collapsed, onToggleCollapse, messages }: ExportSidebarProps) {
   const [jobs, setJobs] = useState<ExportJob[]>([]);
-  const [expandedJob, setExpandedJob] = useState<string | null>(null);
   const [fullscreenJob, setFullscreenJob] = useState<ExportJob | null>(null);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
 
   const runExport = useCallback((formatId: string) => {
     const format = FORMATS.find((f) => f.id === formatId);
     if (!format) return;
 
-    const jobId = `${formatId}-${Date.now()}`;
+    const jobId = `${formatId}-${++jobCounter}`;
     const newJob: ExportJob = { id: jobId, formatId, label: format.label, status: "running" };
     setJobs((prev) => [newJob, ...prev]);
 
-    const context = extractConversationContext(messages);
+    const context = extractConversationContext(messagesRef.current);
     const fullPrompt = `${format.prompt}\n\nHere is the conversation data to format:\n\n${context}`;
 
     fetch("/api/query", {
@@ -306,9 +406,14 @@ export default function ExportSidebar({ collapsed, onToggleCollapse, messages }:
           j.id === jobId ? { ...j, status: "error", error: err.message } : j
         ));
       });
-  }, [messages]);
+  }, []);
 
-  const hasJobs = jobs.length > 0;
+  const removeJob = useCallback((id: string) => {
+    setJobs((prev) => prev.filter((j) => j.id !== id));
+  }, []);
+
+  const runningCount = jobs.filter((j) => j.status === "running").length;
+  const doneCount = jobs.filter((j) => j.status === "done").length;
 
   return (
     <>
@@ -331,79 +436,50 @@ export default function ExportSidebar({ collapsed, onToggleCollapse, messages }:
           {!collapsed && (
             <span className="text-label-small text-black-alpha-48 flex-1">Export</span>
           )}
-          {!collapsed && jobs.filter((j) => j.status === "running").length > 0 && (
+          {!collapsed && runningCount > 0 && (
             <div className="w-10 h-10 rounded-full border-2 border-heat-100 border-t-transparent animate-spin flex-shrink-0" />
           )}
-          {!collapsed && jobs.filter((j) => j.status === "done").length > 0 && (
+          {!collapsed && doneCount > 0 && (
             <span className="text-mono-x-small text-accent-forest bg-accent-forest/8 px-6 py-1 rounded-4">
-              {jobs.filter((j) => j.status === "done").length}
+              {doneCount}
             </span>
           )}
         </div>
 
         {!collapsed && (
-          <div className="flex-1 overflow-y-auto px-8 pb-12">
-
-            {/* Generated jobs */}
-            {hasJobs && (
-              <div className="mb-12">
-                <div className="text-mono-x-small text-black-alpha-24 uppercase tracking-wider px-12 mb-6">Generated</div>
-                <div className="flex flex-col gap-4">
-                  {jobs.map((job) => {
-                    const formatDef = FORMATS.find((f) => f.id === job.formatId);
-                    const isOpen = expandedJob === job.id;
-
-                    return (
-                      <div key={job.id} className="rounded-8 border border-border-faint overflow-hidden">
-                        <div className="flex items-center gap-8 px-10 py-8">
-                          {formatDef && <span className="flex-shrink-0 text-black-alpha-40">{formatDef.icon}</span>}
-                          <span className="text-body-small text-accent-black flex-1 truncate">{job.label}</span>
-                          {job.status === "running" && (
-                            <div className="w-10 h-10 rounded-full border-2 border-heat-100 border-t-transparent animate-spin flex-shrink-0" />
-                          )}
-                          {job.status === "error" && (
-                            <span className="text-mono-x-small text-accent-crimson">failed</span>
-                          )}
-                          {job.status === "done" && job.content && (
-                            <>
-                              <button type="button" className="p-4 rounded-4 text-black-alpha-24 hover:text-accent-black hover:bg-black-alpha-4 transition-all" onClick={() => setFullscreenJob(job)} title="Fullscreen">
-                                <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
-                              </button>
-                              <button type="button" className="p-4 rounded-4 text-black-alpha-24 hover:text-accent-black hover:bg-black-alpha-4 transition-all" onClick={() => setExpandedJob(isOpen ? null : job.id)}>
-                                <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform", isOpen && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 9l6 6 6-6" /></svg>
-                              </button>
-                              <button type="button" className="p-4 rounded-4 text-black-alpha-24 hover:text-accent-black hover:bg-black-alpha-4 transition-all" onClick={() => { const { ext } = getOutputMeta(job.content!, job.formatId); download(job.content!, `export.${ext}`); }} title="Download">
-                                <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
-                              </button>
-                            </>
-                          )}
-                        </div>
-                        {isOpen && job.content && (
-                          <div className="border-t border-border-faint">
-                            <OutputContent content={job.content} formatId={job.formatId} maxH="max-h-[350px]" />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Export format buttons */}
-            <div className="mb-8">
-              <div className="text-mono-x-small text-black-alpha-24 uppercase tracking-wider px-12 mb-6">Export as</div>
-              <div className="flex flex-col gap-1">
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Format scroll menu */}
+            <div className="flex-shrink-0 px-8 pb-10">
+              <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none">
                 {FORMATS.map((f) => (
                   <button
                     key={f.id}
                     type="button"
-                    className="w-full text-left px-12 py-6 rounded-8 transition-all flex items-center gap-8 hover:bg-black-alpha-2"
+                    className="flex items-center gap-6 px-10 py-6 rounded-8 text-body-small text-black-alpha-56 bg-black-alpha-2 hover:bg-black-alpha-4 hover:text-accent-black transition-all whitespace-nowrap flex-shrink-0"
                     onClick={() => runExport(f.id)}
                   >
-                    <span className="flex-shrink-0 text-black-alpha-40">{f.icon}</span>
-                    <span className="text-body-small flex-1 truncate text-accent-black">{f.label}</span>
+                    <span className="flex-shrink-0">{f.icon}</span>
+                    {f.label}
                   </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Job list */}
+            <div className="flex-1 overflow-y-auto px-8 pb-12">
+              {jobs.length === 0 && (
+                <div className="text-body-small text-black-alpha-24 text-center py-20">
+                  Choose a format above to export
+                </div>
+              )}
+              <div className="flex flex-col gap-4">
+                {jobs.map((job) => (
+                  <JobCard
+                    key={job.id}
+                    job={job}
+                    onFullscreen={() => setFullscreenJob(job)}
+                    onRemove={() => removeJob(job.id)}
+                  />
                 ))}
               </div>
             </div>
