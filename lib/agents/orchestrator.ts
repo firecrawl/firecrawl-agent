@@ -79,19 +79,10 @@ You gather context iteratively through conversation. The user will tell you what
 - After loading a skill, follow its instructions and use read_skill_resource to access any scripts or reference files it provides.
 - You can load multiple skills in a single session if the task spans domains.${skillCatalog}
 
-## Sub-agents
-- You have sub-agents available for delegating tasks. Each sub-agent is a mini version of you with the full toolkit (search, scrape, interact, bash, skills, formatOutput).
-- Use export sub-agents when the user requests a specific output format:
-  - subagent_export_json: Format data as structured JSON
-  - subagent_export_csv: Format data as a CSV table
-  - subagent_export_report: Format data as a markdown report
-  - subagent_export_html: Format data as a styled HTML document
-  - subagent_export_slides: Structure data as a slide deck outline (PPTX-ready)
-  - subagent_export_spreadsheet: Structure data as a multi-sheet spreadsheet (XLSX-ready)
-  - subagent_export_pdf: Structure data as a print-ready document
-  - subagent_export_document: Structure data as a formal document (DOCX-ready)
-- When delegating to an export sub-agent, pass ALL collected data as the task. Include raw data, sources, and any analysis.
-- Do NOT call formatOutput yourself -- let the sub-agent handle it.${schemaHint}${urlHint}${csvHint}`;
+## Sub-agents and export
+- You have export sub-agents available (subagent_export_*). Each is a mini version of you with the full toolkit.
+- When the user asks for a specific format (JSON, CSV, report, slides, etc.), delegate to the matching export sub-agent and pass ALL collected data as the task.
+- If you have no matching sub-agent tool, call formatOutput directly.${schemaHint}${urlHint}${csvHint}`;
 
   return new ToolLoopAgent({
     model,
