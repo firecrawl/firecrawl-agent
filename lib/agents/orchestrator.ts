@@ -20,12 +20,17 @@ export async function createOrchestrator(
   });
   const skillTools = createSkillTools(skills);
 
+  // Resolve sub-agent model (falls back to orchestrator model)
+  const subAgentModelResolved = config.subAgentModel
+    ? await resolveModel(config.subAgentModel)
+    : model;
+
   // All sub-agents (user-configured + built-in exports) get the full toolkit
   const subAgentTools = await createSubAgentTools(
     config.subAgents,
     firecrawlApiKey,
     skills,
-    model,
+    subAgentModelResolved,
   );
 
   // Skill catalog for system prompt (~100 tokens per skill)

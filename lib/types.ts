@@ -11,6 +11,8 @@ export interface AgentConfig {
   csvContext?: string;
   uploads?: UploadedFile[];
   model: ModelConfig;
+  subAgentModel?: ModelConfig;
+  operationModels?: Record<string, ModelConfig>;
   skills: string[];
   subAgents: SubAgentConfig[];
   maxSteps?: number;
