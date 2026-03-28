@@ -448,14 +448,14 @@ export default function ExportSidebar({ collapsed, onToggleCollapse, messages }:
 
         {!collapsed && (
           <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Format scroll menu */}
+            {/* Format grid */}
             <div className="flex-shrink-0 px-8 pb-10">
-              <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none">
+              <div className="grid grid-cols-2 gap-4">
                 {FORMATS.map((f) => (
                   <button
                     key={f.id}
                     type="button"
-                    className="flex items-center gap-6 px-10 py-6 rounded-8 text-body-small text-black-alpha-56 bg-black-alpha-2 hover:bg-black-alpha-4 hover:text-accent-black transition-all whitespace-nowrap flex-shrink-0"
+                    className="flex items-center gap-6 px-10 py-6 rounded-8 text-body-small text-black-alpha-56 bg-black-alpha-2 hover:bg-black-alpha-4 hover:text-accent-black transition-all whitespace-nowrap"
                     onClick={() => runExport(f.id)}
                   >
                     <span className="flex-shrink-0">{f.icon}</span>
