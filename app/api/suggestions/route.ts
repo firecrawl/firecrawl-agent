@@ -1,5 +1,6 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
+import { getKey } from "@/lib/config/keys";
 
 export async function POST(req: Request) {
   const { prompt, summary } = (await req.json()) as {
@@ -7,7 +8,7 @@ export async function POST(req: Request) {
     summary: string;
   };
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = getKey("anthropic");
   if (!apiKey) {
     return Response.json({ suggestions: [] });
   }

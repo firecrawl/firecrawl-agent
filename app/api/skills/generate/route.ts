@@ -2,13 +2,14 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
 import fs from "fs/promises";
 import path from "path";
+import { getKey } from "@/lib/config/keys";
 
 const SKILLS_DIR = path.join(process.cwd(), ".agents", "skills");
 
 export async function POST(req: Request) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = getKey("anthropic");
   if (!apiKey) {
-    return Response.json({ error: "ANTHROPIC_API_KEY not set" }, { status: 500 });
+    return Response.json({ error: "ANTHROPIC_API_KEY not configured. Add it in Settings." }, { status: 500 });
   }
 
   let body: { name: string; messages: unknown[]; prompt: string };

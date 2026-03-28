@@ -2,6 +2,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
 import type { AgentConfig } from "@/lib/types";
 import { discoverSkills } from "@/lib/skills/discovery";
+import { getKey } from "@/lib/config/keys";
 
 export const maxDuration = 60;
 
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
     : "";
 
   const anthropic = createAnthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
+    apiKey: getKey("anthropic"),
   });
 
   const { text } = await generateText({

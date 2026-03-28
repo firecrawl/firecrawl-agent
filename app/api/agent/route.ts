@@ -1,6 +1,7 @@
 import { createAgentUIStreamResponse } from "ai";
 import { createOrchestrator } from "@/lib/agents/orchestrator";
 import type { AgentConfig } from "@/lib/types";
+import { getFirecrawlKey } from "@/lib/config/keys";
 
 export const maxDuration = 300;
 
@@ -10,10 +11,10 @@ export async function POST(req: Request) {
     config: AgentConfig;
   };
 
-  const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
+  const firecrawlApiKey = getFirecrawlKey();
   if (!firecrawlApiKey) {
     return new Response(
-      JSON.stringify({ error: "FIRECRAWL_API_KEY is not configured" }),
+      JSON.stringify({ error: "FIRECRAWL_API_KEY is not configured. Add it in Settings." }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }

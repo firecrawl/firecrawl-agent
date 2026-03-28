@@ -1,10 +1,11 @@
 import { generateText, stepCountIs, ToolLoopAgent } from "ai";
 import { FirecrawlTools } from "firecrawl-aisdk";
-import { resolveModel } from "@/lib/config/models";
+import { resolveModel } from "@/lib/config/resolve-model";
 import { formatOutput } from "@/lib/agents/tools";
 import { bashExec } from "@/lib/agents/bash-tool";
 import { createSkillTools } from "@/lib/skills/tools";
 import { discoverSkills } from "@/lib/skills/discovery";
+import { getFirecrawlKey } from "@/lib/config/keys";
 
 export const maxDuration = 300;
 
@@ -59,9 +60,9 @@ export async function POST(req: Request) {
     return Response.json({ error: "prompt is required" }, { status: 400 });
   }
 
-  const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
+  const firecrawlApiKey = getFirecrawlKey();
   if (!firecrawlApiKey) {
-    return Response.json({ error: "FIRECRAWL_API_KEY is not configured" }, { status: 500 });
+    return Response.json({ error: "FIRECRAWL_API_KEY is not configured. Add it in Settings." }, { status: 500 });
   }
 
   try {

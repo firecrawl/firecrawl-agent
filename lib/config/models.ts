@@ -1,38 +1,3 @@
-import type { ModelConfig } from "../types";
-
-export async function resolveModel(config: ModelConfig) {
-  switch (config.provider) {
-    case "gateway": {
-      const { createOpenAI } = await import("@ai-sdk/openai");
-      const provider = createOpenAI({
-        apiKey: config.apiKey || process.env.AI_GATEWAY_API_KEY,
-        baseURL: "https://ai-gateway.vercel.sh/v1",
-      });
-      return provider.chat(config.model);
-    }
-    case "anthropic": {
-      const { createAnthropic } = await import("@ai-sdk/anthropic");
-      return createAnthropic({
-        apiKey: config.apiKey || process.env.ANTHROPIC_API_KEY,
-      })(config.model);
-    }
-    case "openai": {
-      const { createOpenAI } = await import("@ai-sdk/openai");
-      return createOpenAI({
-        apiKey: config.apiKey || process.env.OPENAI_API_KEY,
-      })(config.model);
-    }
-    case "google": {
-      const { createGoogleGenerativeAI } = await import("@ai-sdk/google");
-      return createGoogleGenerativeAI({
-        apiKey: config.apiKey || process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-      })(config.model);
-    }
-    default:
-      throw new Error(`Unsupported provider: ${config.provider}`);
-  }
-}
-
 export const AVAILABLE_MODELS = {
   gateway: [
     { id: "openai/gpt-5.4", name: "GPT-5.4", icon: "openai" },

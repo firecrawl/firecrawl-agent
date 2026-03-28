@@ -2,7 +2,7 @@ import { ToolLoopAgent, tool, stepCountIs, type ToolSet } from "ai";
 import { z } from "zod";
 import { FirecrawlTools } from "firecrawl-aisdk";
 import type { SubAgentConfig, SkillMetadata } from "../types";
-import { resolveModel } from "../config/models";
+import { resolveModel } from "../config/resolve-model";
 import { createSkillTools } from "../skills/tools";
 import { parseSkillBody } from "../skills/parser";
 import { formatOutput } from "./tools";

@@ -1,7 +1,7 @@
 import { ToolLoopAgent, stepCountIs } from "ai";
 import { FirecrawlTools } from "firecrawl-aisdk";
 import type { AgentConfig } from "../types";
-import { resolveModel } from "../config/models";
+import { resolveModel } from "../config/resolve-model";
 import { createSkillTools } from "../skills/tools";
 import { createSubAgentTools } from "./sub-agents";
 import { formatOutput } from "./tools";
