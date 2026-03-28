@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import type { UIMessage } from "ai";
 import { Streamdown } from "streamdown";
 import { createCodePlugin } from "@streamdown/code";
@@ -131,15 +131,23 @@ function SearchResultItem({ result }: { result: SearchResult }) {
   );
 }
 
-function SearchResults({ query, results, creditsUsed }: { query: string; results: SearchResult[]; creditsUsed?: number }) {
-  const [collapsed, setCollapsed] = useState(false);
+function SearchResults({ query, results, creditsUsed, isLatest }: { query: string; results: SearchResult[]; creditsUsed?: number; isLatest?: boolean }) {
+  const [userToggled, setUserToggled] = useState<boolean | null>(null);
+  const autoCollapsed = useRef(false);
+
+  // Auto-collapse when no longer the latest item
+  if (!isLatest && !autoCollapsed.current && userToggled === null) {
+    autoCollapsed.current = true;
+  }
+
+  const collapsed = userToggled !== null ? !userToggled : autoCollapsed.current;
 
   return (
     <div className="my-12">
       <button
         type="button"
         className="flex items-center gap-8 mb-8 text-black-alpha-40 w-full text-left hover:text-black-alpha-56 transition-colors"
-        onClick={() => setCollapsed(!collapsed)}
+        onClick={() => setUserToggled(collapsed)}
       >
         <SearchIcon />
         <span className="text-label-medium flex-1">Searched: &ldquo;{query}&rdquo;</span>
@@ -159,13 +167,14 @@ function SearchResults({ query, results, creditsUsed }: { query: string; results
           </svg>
         </div>
       </button>
-      {!collapsed && (
-        <div className="flex flex-col gap-4 ml-26">
-          {results.map((r, i) => (
-            <SearchResultItem key={i} result={r} />
-          ))}
-        </div>
-      )}
+      <div className={cn(
+        "flex flex-col gap-4 ml-26 transition-all duration-300 overflow-hidden",
+        collapsed ? "max-h-0 opacity-0" : "max-h-[2000px] opacity-100",
+      )}>
+        {results.map((r, i) => (
+          <SearchResultItem key={i} result={r} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -184,6 +193,7 @@ function ScrapeResult({
   liveViewUrl,
   interactOutput,
   isInteract,
+  isLatest,
 }: {
   url: string;
   content: string;
@@ -196,11 +206,19 @@ function ScrapeResult({
   liveViewUrl?: string;
   interactOutput?: string;
   isInteract?: boolean;
+  isLatest?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [userToggled, setUserToggled] = useState<boolean | null>(null);
+  const autoCollapsed = useRef(false);
   const [showLiveView, setShowLiveView] = useState(false);
   const domain = getDomain(url);
   const hasContent = !!(content || answer || interactOutput);
+
+  if (!isLatest && !autoCollapsed.current && userToggled === null) {
+    autoCollapsed.current = true;
+  }
+
+  const expanded = userToggled !== null ? userToggled : !autoCollapsed.current;
 
   return (
     <div className={cn("my-12 rounded-10 border overflow-hidden transition-all", expanded ? "border-heat-40 shadow-sm" : "border-border-faint hover:border-black-alpha-16")}>
@@ -208,7 +226,7 @@ function ScrapeResult({
       <button
         type="button"
         className="w-full flex items-center gap-8 px-14 py-10 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => { autoCollapsed.current = expanded; setUserToggled(expanded ? false : true); }}
       >
         {domain ? <Favicon domain={domain} /> : <GlobeIcon />}
         <div className="flex-1 min-w-0">
@@ -267,88 +285,82 @@ function ScrapeResult({
         </div>
       </button>
 
-      {/* Interact output -- always visible */}
-      {interactOutput && (
-        <div className="mx-14 mb-10 bg-accent-bluetron/[0.04] rounded-8 border border-accent-bluetron/15 p-12">
-          <div className="text-body-medium text-accent-black leading-relaxed prose prose-sm max-w-none">
-            <Streamdown plugins={{ code }}>{interactOutput}</Streamdown>
-          </div>
-        </div>
-      )}
-
-      {/* Answer (direct query result) -- always visible */}
-      {answer && (
-        <div className="mx-14 mb-10 bg-heat-4 rounded-8 border border-heat-20 p-12">
-          <div className="text-body-medium text-accent-black leading-relaxed prose prose-sm max-w-none">
-            <Streamdown plugins={{ code }}>{answer}</Streamdown>
-          </div>
-        </div>
-      )}
-
-      {/* Live view button + iframe */}
-      {liveViewUrl && (
-        <div className="mx-14 mb-10">
-          <button
-            type="button"
-            className="inline-flex items-center gap-6 px-10 py-5 rounded-6 text-label-small text-accent-bluetron bg-accent-bluetron/8 hover:bg-accent-bluetron/15 transition-all"
-            onClick={(e) => { e.stopPropagation(); setShowLiveView(!showLiveView); }}
-          >
-            <svg fill="none" height="14" viewBox="0 0 24 24" width="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-              <path d="M8 21h8M12 17v4" />
-            </svg>
-            {showLiveView ? "Hide live view" : "Show live view"}
-          </button>
-          {showLiveView && (
-            <div className="mt-8 rounded-8 border border-accent-bluetron/20 overflow-hidden">
-              <iframe
-                src={liveViewUrl}
-                className="w-full border-0"
-                style={{ height: 500 }}
-                title="Live browser view"
-              />
+      {/* Collapsible body */}
+      <div className={cn(
+        "transition-all duration-300 overflow-hidden",
+        expanded ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0",
+      )}>
+        {interactOutput && (
+          <div className="mx-14 mb-10 bg-accent-bluetron/[0.04] rounded-8 border border-accent-bluetron/15 p-12">
+            <div className="text-body-medium text-accent-black leading-relaxed prose prose-sm max-w-none">
+              <Streamdown plugins={{ code }}>{interactOutput}</Streamdown>
             </div>
-          )}
-        </div>
-      )}
-
-      {/* Expanded: full content */}
-      {expanded && content && (
-        <div className="border-t border-border-faint bg-background-lighter p-14 max-h-500 overflow-auto">
-          {isJsonContent(content) ? (
-            <pre className="text-mono-small text-accent-black whitespace-pre-wrap">{extractJsonContent(content)}</pre>
-          ) : (
-            <div className="text-body-small text-black-alpha-56 leading-relaxed prose prose-sm max-w-none prose-headings:text-black-alpha-56 prose-a:text-heat-100">
-              <Streamdown plugins={{ code }}>{content}</Streamdown>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Collapsed: show snippet + click hint */}
-      {!expanded && content && !answer && !interactOutput && (
-        <div className="px-14 pb-10">
-          <div className="text-body-small text-black-alpha-32 line-clamp-2">
-            {extractJsonContent(content).slice(0, 200).replace(/[#*_`>\[\]]/g, "")}
           </div>
-          <div className="text-label-x-small text-heat-100 mt-4">Click to expand scraped content</div>
-        </div>
-      )}
-      {!hasContent && (
-        <div className="px-14 pb-10">
-          <div className="text-body-small text-black-alpha-24 italic">No content returned</div>
-        </div>
-      )}
+        )}
+
+        {answer && (
+          <div className="mx-14 mb-10 bg-heat-4 rounded-8 border border-heat-20 p-12">
+            <div className="text-body-medium text-accent-black leading-relaxed prose prose-sm max-w-none">
+              <Streamdown plugins={{ code }}>{answer}</Streamdown>
+            </div>
+          </div>
+        )}
+
+        {liveViewUrl && (
+          <div className="mx-14 mb-10">
+            <button
+              type="button"
+              className="inline-flex items-center gap-6 px-10 py-5 rounded-6 text-label-small text-accent-bluetron bg-accent-bluetron/8 hover:bg-accent-bluetron/15 transition-all"
+              onClick={(e) => { e.stopPropagation(); setShowLiveView(!showLiveView); }}
+            >
+              <svg fill="none" height="14" viewBox="0 0 24 24" width="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                <path d="M8 21h8M12 17v4" />
+              </svg>
+              {showLiveView ? "Hide live view" : "Show live view"}
+            </button>
+            {showLiveView && (
+              <div className="mt-8 rounded-8 border border-accent-bluetron/20 overflow-hidden">
+                <iframe src={liveViewUrl} className="w-full border-0" style={{ height: 500 }} title="Live browser view" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {content && (
+          <div className="border-t border-border-faint bg-background-lighter p-14 max-h-500 overflow-auto">
+            {isJsonContent(content) ? (
+              <pre className="text-mono-small text-accent-black whitespace-pre-wrap">{extractJsonContent(content)}</pre>
+            ) : (
+              <div className="text-body-small text-black-alpha-56 leading-relaxed prose prose-sm max-w-none prose-headings:text-black-alpha-56 prose-a:text-heat-100">
+                <Streamdown plugins={{ code }}>{content}</Streamdown>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!hasContent && (
+          <div className="px-14 pb-10">
+            <div className="text-body-small text-black-alpha-24 italic">No content returned</div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 // --- Interact card (shows iframe while running) ---
 
-function InteractCard({ item }: { item: TimelineItem }) {
+function InteractCard({ item, isLatest }: { item: TimelineItem; isLatest?: boolean }) {
   const isRunning = item.status !== "complete";
-  // Show live view only while running, hide once complete
   const [userToggled, setUserToggled] = useState(false);
+  const autoCollapsed = useRef(false);
+
+  if (!isLatest && !isRunning && !autoCollapsed.current) {
+    autoCollapsed.current = true;
+  }
+
+  const contentCollapsed = autoCollapsed.current && !userToggled;
   const showLiveView = userToggled ? !isRunning ? false : true : isRunning;
   const domain = item.url ? getDomain(item.url) : null;
 
@@ -357,8 +369,12 @@ function InteractCard({ item }: { item: TimelineItem }) {
       "my-12 rounded-10 border overflow-hidden transition-all",
       isRunning ? "border-heat-40 shadow-sm" : "border-border-faint",
     )}>
-      {/* Header */}
-      <div className="flex items-center gap-8 px-14 py-10">
+      {/* Header -- clickable to toggle */}
+      <button
+        type="button"
+        className="w-full flex items-center gap-8 px-14 py-10 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
+        onClick={() => { if (!isRunning) { autoCollapsed.current = !contentCollapsed; setUserToggled(!contentCollapsed ? false : true); } }}
+      >
         {domain ? <Favicon domain={domain} /> : <GlobeIcon />}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-6">
@@ -390,60 +406,45 @@ function InteractCard({ item }: { item: TimelineItem }) {
               target="_blank"
               rel="noopener noreferrer"
               className="p-4 rounded-4 text-black-alpha-24 hover:text-accent-black hover:bg-black-alpha-4 transition-all"
+              onClick={(e) => e.stopPropagation()}
             >
               <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
               </svg>
             </a>
           )}
-        </div>
-      </div>
-
-      {/* Interact output + live view side by side */}
-      {(item.interactOutput || item.liveViewUrl) && (
-        <div className="mx-14 mb-10 flex gap-8">
-          {/* Text output */}
-          {item.interactOutput && (
-            <div className={cn(
-              "bg-black-alpha-2 rounded-8 border border-border-faint p-12",
-              item.liveViewUrl ? "flex-1 min-w-0" : "w-full",
-            )}>
-              <div className="text-body-small text-accent-black leading-relaxed">
-                {item.interactOutput}
-              </div>
-            </div>
+          {!isRunning && (
+            <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24", contentCollapsed && "-rotate-90")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
           )}
+        </div>
+      </button>
 
-          {/* Live view */}
-          {item.liveViewUrl && (
-            <div className={cn(
-              "flex flex-col gap-6 flex-shrink-0",
-              item.interactOutput ? "w-[280px]" : "w-full",
-            )}>
-              {!isRunning && !showLiveView && !userToggled && (
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-6 px-10 py-5 rounded-6 text-label-small text-black-alpha-48 bg-black-alpha-4 hover:bg-black-alpha-8 transition-all"
-                  onClick={() => setUserToggled(true)}
-                >
-                  <svg fill="none" height="14" viewBox="0 0 24 24" width="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                    <path d="M8 21h8M12 17v4" />
-                  </svg>
-                  Live view
-                </button>
-              )}
-              {(showLiveView || userToggled) && (
-                <div className="relative">
-                  {!isRunning && (
-                    <button
-                      type="button"
-                      className="absolute top-6 right-6 z-10 p-4 rounded-4 bg-white/80 text-black-alpha-40 hover:text-accent-black transition-all"
-                      onClick={() => setUserToggled(false)}
-                    >
-                      <svg fill="none" height="10" viewBox="0 0 24 24" width="10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
-                    </button>
-                  )}
+      {/* Collapsible body */}
+      <div className={cn(
+        "transition-all duration-300 overflow-hidden",
+        contentCollapsed ? "max-h-0 opacity-0" : "max-h-[2000px] opacity-100",
+      )}>
+        {/* Interact output + live view side by side */}
+        {(item.interactOutput || item.liveViewUrl) && (
+          <div className="mx-14 mb-10 flex gap-8">
+            {item.interactOutput && (
+              <div className={cn(
+                "bg-black-alpha-2 rounded-8 border border-border-faint p-12",
+                item.liveViewUrl ? "flex-1 min-w-0" : "w-full",
+              )}>
+                <div className="text-body-small text-accent-black leading-relaxed">
+                  {item.interactOutput}
+                </div>
+              </div>
+            )}
+            {item.liveViewUrl && (
+              <div className={cn(
+                "flex flex-col gap-6 flex-shrink-0",
+                item.interactOutput ? "w-[280px]" : "w-full",
+              )}>
+                {(isRunning || userToggled) && (
                   <div className="rounded-8 border border-border-faint overflow-hidden bg-white" style={{ aspectRatio: "16/10" }}>
                     <iframe
                       src={item.liveViewUrl}
@@ -451,25 +452,24 @@ function InteractCard({ item }: { item: TimelineItem }) {
                       title="Live browser view"
                     />
                   </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
-      {/* Content (for completed interact that also returned markdown) */}
-      {item.content && item.status === "complete" && (
-        <div className="border-t border-border-faint bg-background-lighter p-14 max-h-300 overflow-auto">
-          {isJsonContent(item.content) ? (
-            <pre className="text-mono-small text-accent-black whitespace-pre-wrap">{extractJsonContent(item.content)}</pre>
-          ) : (
-            <div className="text-body-small text-black-alpha-56 leading-relaxed prose prose-sm max-w-none">
-              <Streamdown plugins={{ code }}>{item.content}</Streamdown>
-            </div>
-          )}
-        </div>
-      )}
+        {item.content && item.status === "complete" && (
+          <div className="border-t border-border-faint bg-background-lighter p-14 max-h-300 overflow-auto">
+            {isJsonContent(item.content) ? (
+              <pre className="text-mono-small text-accent-black whitespace-pre-wrap">{extractJsonContent(item.content)}</pre>
+            ) : (
+              <div className="text-body-small text-black-alpha-56 leading-relaxed prose prose-sm max-w-none">
+                <Streamdown plugins={{ code }}>{item.content}</Streamdown>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1024,6 +1024,7 @@ export default function PlanVisualization({
                 query={item.query!}
                 results={item.status === "complete" && item.searchResults?.length ? item.searchResults : []}
                 creditsUsed={item.creditsUsed}
+                isLatest={i === timeline.length - 1}
               />
             );
           case "scrape":
@@ -1039,6 +1040,7 @@ export default function PlanVisualization({
                 pageTitle={item.pageTitle}
                 statusCode={item.statusCode}
                 isInteract={false}
+                isLatest={i === timeline.length - 1}
               />
             ) : (
               (() => {
@@ -1053,7 +1055,7 @@ export default function PlanVisualization({
               })()
             );
           case "interact":
-            return <InteractCard key={i} item={item} />;
+            return <InteractCard key={i} item={item} isLatest={i === timeline.length - 1} />;
           case "bash":
             return item.status === "complete" ? (
               <BashResult key={i} command={item.command!} stdout={item.stdout!} stderr={item.stderr!} exitCode={item.exitCode!} />
