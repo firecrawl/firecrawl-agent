@@ -3,7 +3,9 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import type { UIMessage } from "ai";
 import { Streamdown } from "streamdown";
-import { code } from "@streamdown/code";
+import { createCodePlugin } from "@streamdown/code";
+
+const code = createCodePlugin({ themes: ["github-light", "github-light"] });
 import { cn } from "@/utils/cn";
 
 function isToolPart(part: { type: string }): boolean {
