@@ -308,6 +308,8 @@ export default function AgentPage() {
   const [generatedSkillContent, setGeneratedSkillContent] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [studioCollapsed, setStudioCollapsed] = useState(false);
+  const [generatingFormat, setGeneratingFormat] = useState<string | null>(null);
+  const [generatedOutputs, setGeneratedOutputs] = useState<Record<string, { format: string; content: string }>>({});
 
 
   const [acpAgents, setAcpAgents] = useState<{ name: string; bin: string; displayName: string; available: boolean }[]>([]);
@@ -408,7 +410,50 @@ export default function AgentPage() {
         .catch(() => setSuggestions([]));
     }
     prevIsRunning.current = isRunning;
-  }, [isRunning, messages, config.prompt]);
+
+    // Capture formatOutput results when agent finishes
+    if (prevIsRunning.current === false && !isRunning && generatingFormat) {
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i];
+        if (msg.role !== "assistant") continue;
+        for (const part of msg.parts) {
+          const p = part as Record<string, unknown>;
+          const toolName = (p.toolName ?? (part.type as string).replace("tool-", "")) as string;
+          if (toolName === "formatOutput" && (p.state === "output-available" || p.state === "result") && p.output) {
+            const output = p.output as { format: string; content: string };
+            if (output.content) {
+              setGeneratedOutputs((prev) => ({ ...prev, [generatingFormat]: output }));
+              setGeneratingFormat(null);
+              break;
+            }
+          }
+        }
+        if (!generatingFormat) break;
+      }
+    }
+  }, [isRunning, messages, config.prompt, generatingFormat]);
+
+  // Also watch for formatOutput completing mid-stream
+  useEffect(() => {
+    if (!generatingFormat || isRunning) return;
+    // Agent stopped, check for output
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg.role !== "assistant") continue;
+      for (const part of msg.parts) {
+        const p = part as Record<string, unknown>;
+        const toolName = (p.toolName ?? (part.type as string).replace("tool-", "")) as string;
+        if (toolName === "formatOutput" && (p.state === "output-available" || p.state === "result") && p.output) {
+          const output = p.output as { format: string; content: string };
+          if (output.content) {
+            setGeneratedOutputs((prev) => ({ ...prev, [generatingFormat]: output }));
+            setGeneratingFormat(null);
+            return;
+          }
+        }
+      }
+    }
+  }, [messages, isRunning, generatingFormat]);
 
   const handleSaveSkill = async () => {
     if (!skillName.trim() || savingSkill) return;
@@ -735,6 +780,7 @@ export default function AgentPage() {
                 html: "Format all the collected data as a clean HTML document using formatOutput with format \"text\". Use proper HTML tags, tables where appropriate, and inline styles for readability.",
               };
               setSidebarCollapsed(true);
+              setGeneratingFormat(format);
               sendMessage({ text: prompts[format] });
             }}
           />
@@ -859,42 +905,88 @@ export default function AgentPage() {
             </button>
           </div>
 
-          {!studioCollapsed && <div className="px-12 pb-16 flex flex-col gap-6 overflow-y-auto">
+          {!studioCollapsed && <div className="px-12 pb-16 flex flex-col gap-4 overflow-y-auto">
             {/* Export cards */}
             {([
-              { id: "json" as const, label: "JSON", desc: "Structured data", color: "bg-heat-4 border-heat-20 hover:border-heat-40", icon: <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H7a2 2 0 00-2 2v5a2 2 0 01-2 2 2 2 0 012 2v5a2 2 0 002 2h1M16 3h1a2 2 0 012 2v5a2 2 0 002 2 2 2 0 00-2 2v5a2 2 0 01-2 2h-1" /></svg> },
-              { id: "csv" as const, label: "CSV", desc: "Spreadsheet table", color: "bg-accent-forest/[0.04] border-accent-forest/15 hover:border-accent-forest/30", icon: <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M3 12h18M3 18h18M9 6v12M15 6v12" /></svg> },
-              { id: "markdown" as const, label: "Report", desc: "Markdown summary", color: "bg-accent-amethyst/[0.04] border-accent-amethyst/15 hover:border-accent-amethyst/30", icon: <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" /><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" /></svg> },
-              { id: "html" as const, label: "HTML", desc: "Styled document", color: "bg-[#fff4e6] border-[#ffe0b2] hover:border-[#ffcc80]", icon: <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6" /></svg> },
-            ]).map((card) => (
-              <button
-                key={card.id}
-                type="button"
-                className={cn(
-                  "w-full text-left px-14 py-12 rounded-10 border transition-all",
-                  card.color,
-                )}
-                onClick={() => {
-                  const prompts: Record<string, string> = {
-                    json: "Format all the collected data as JSON using formatOutput.",
-                    csv: "Format all the collected data as CSV using formatOutput.",
-                    markdown: "Format all the collected data as a markdown report using formatOutput with format \"text\".",
-                    html: "Format all the collected data as a clean HTML document using formatOutput with format \"text\". Use proper HTML tags, tables where appropriate, and inline styles for readability.",
-                  };
-                  setSidebarCollapsed(true);
-                  sendMessage({ text: prompts[card.id] });
-                }}
-              >
-                <div className="flex items-center gap-8">
-                  <span className="text-black-alpha-48">{card.icon}</span>
-                  <div>
-                    <div className="text-label-small text-accent-black">{card.label}</div>
-                    <div className="text-body-small text-black-alpha-32">{card.desc}</div>
-                  </div>
-                  <svg fill="none" height="14" viewBox="0 0 24 24" width="14" className="ml-auto text-black-alpha-24" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+              { id: "json" as const, label: "JSON", desc: "Structured data", color: "bg-heat-4 border-heat-20", activeColor: "border-heat-40 shadow-sm", icon: <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H7a2 2 0 00-2 2v5a2 2 0 01-2 2 2 2 0 012 2v5a2 2 0 002 2h1M16 3h1a2 2 0 012 2v5a2 2 0 002 2 2 2 0 00-2 2v5a2 2 0 01-2 2h-1" /></svg> },
+              { id: "csv" as const, label: "CSV", desc: "Spreadsheet table", color: "bg-accent-forest/[0.04] border-accent-forest/15", activeColor: "border-accent-forest/30 shadow-sm", icon: <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M3 12h18M3 18h18M9 6v12M15 6v12" /></svg> },
+              { id: "markdown" as const, label: "Report", desc: "Markdown summary", color: "bg-accent-amethyst/[0.04] border-accent-amethyst/15", activeColor: "border-accent-amethyst/30 shadow-sm", icon: <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" /><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" /></svg> },
+              { id: "html" as const, label: "HTML", desc: "Styled document", color: "bg-[#fff4e6] border-[#ffe0b2]", activeColor: "border-[#ffcc80] shadow-sm", icon: <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6" /></svg> },
+            ]).map((card) => {
+              const isGenerating = generatingFormat === card.id;
+              const generated = generatedOutputs[card.id];
+              return (
+                <div key={card.id}>
+                  <button
+                    type="button"
+                    disabled={isGenerating}
+                    className={cn(
+                      "w-full text-left px-14 py-12 rounded-10 border transition-all",
+                      generated ? card.activeColor + " " + card.color : card.color,
+                      !isGenerating && !generated && "hover:border-heat-40",
+                      isGenerating && "opacity-70 cursor-wait",
+                    )}
+                    onClick={() => {
+                      if (isGenerating) return;
+                      const prompts: Record<string, string> = {
+                        json: "Format all the collected data as JSON using formatOutput.",
+                        csv: "Format all the collected data as CSV using formatOutput.",
+                        markdown: "Format all the collected data as a markdown report using formatOutput with format \"text\".",
+                        html: "Format all the collected data as a clean HTML document using formatOutput with format \"text\". Use proper HTML tags, tables where appropriate, and inline styles for readability.",
+                      };
+                      setSidebarCollapsed(true);
+                      setGeneratingFormat(card.id);
+                      sendMessage({ text: prompts[card.id] });
+                    }}
+                  >
+                    <div className="flex items-center gap-8">
+                      <span className="text-black-alpha-48">{card.icon}</span>
+                      <div>
+                        <div className="text-label-small text-accent-black">{card.label}</div>
+                        <div className="text-body-small text-black-alpha-32">{card.desc}</div>
+                      </div>
+                      {isGenerating ? (
+                        <div className="ml-auto w-14 h-14 rounded-full border-2 border-heat-40 border-t-transparent animate-spin" />
+                      ) : generated ? (
+                        <svg className="ml-auto w-14 h-14 text-accent-forest" fill="none" viewBox="0 0 16 16"><path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                      ) : (
+                        <svg fill="none" height="14" viewBox="0 0 24 24" width="14" className="ml-auto text-black-alpha-24" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Generated result below the card */}
+                  {generated && (
+                    <div className="mt-2 rounded-8 border border-border-faint bg-accent-white overflow-hidden">
+                      <div className="flex items-center justify-between px-10 py-6 border-b border-border-faint bg-black-alpha-2">
+                        <span className="text-mono-x-small text-black-alpha-32">
+                          {(generated.content.length / 1000).toFixed(1)}k chars
+                        </span>
+                        <button
+                          type="button"
+                          className="text-mono-x-small text-black-alpha-40 hover:text-accent-black transition-colors"
+                          onClick={() => {
+                            const ext = card.id === "json" ? "json" : card.id === "csv" ? "csv" : card.id === "html" ? "html" : "md";
+                            const blob = new Blob([generated.content], { type: "text/plain" });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = `output.${ext}`;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                          }}
+                        >
+                          Download
+                        </button>
+                      </div>
+                      <div className="p-10 max-h-200 overflow-auto">
+                        <pre className="text-mono-x-small text-accent-black whitespace-pre-wrap leading-relaxed">{generated.content.slice(0, 500)}{generated.content.length > 500 ? "..." : ""}</pre>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </button>
-            ))}
+              );
+            })}
 
             <div className="h-px bg-border-faint my-4" />
 
