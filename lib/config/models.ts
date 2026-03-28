@@ -42,9 +42,10 @@ export const AVAILABLE_MODELS = {
     { id: "openai/gpt-4o", name: "GPT-4o", icon: "openai" },
   ],
   anthropic: [
+    { id: "claude-sonnet-4-6-20250627", name: "Claude Sonnet 4.6", icon: "claude" },
     { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", icon: "claude" },
-    { id: "claude-opus-4-20250514", name: "Claude Opus 4", icon: "claude" },
-    { id: "claude-haiku-4-20250414", name: "Claude Haiku 4", icon: "claude" },
+    { id: "claude-opus-4-6-20250627", name: "Claude Opus 4.6", icon: "claude" },
+    { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", icon: "claude" },
   ],
   openai: [
     { id: "gpt-5.4", name: "GPT-5.4", icon: "openai" },
