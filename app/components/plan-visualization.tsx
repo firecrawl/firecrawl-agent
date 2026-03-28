@@ -305,7 +305,6 @@ function ScrapeResult({
                 src={liveViewUrl}
                 className="w-full border-0"
                 style={{ height: 500 }}
-                sandbox="allow-same-origin allow-scripts"
                 title="Live browser view"
               />
             </div>
@@ -430,7 +429,6 @@ function InteractCard({ item }: { item: TimelineItem }) {
               <iframe
                 src={item.liveViewUrl}
                 className="w-full h-full border-0"
-                sandbox="allow-same-origin allow-scripts"
                 title="Live browser view"
               />
             </div>
