@@ -684,7 +684,7 @@ export default function AgentPage() {
                 className={cn(
                   "flex items-center gap-4 px-8 py-5 rounded-8 text-label-small transition-all",
                   planMode
-                    ? "bg-accent-amethyst/10 text-accent-amethyst border border-accent-amethyst/20"
+                    ? "bg-heat-8 text-heat-100"
                     : "text-black-alpha-32 hover:bg-black-alpha-4 hover:text-black-alpha-48",
                 )}
                 onClick={() => { setPlanMode(!planMode); setPlanText(null); setPlanEditText(""); }}
@@ -737,7 +737,7 @@ export default function AgentPage() {
           >
             <div className="flex items-center justify-between px-16 py-10 border-b border-border-faint">
               <div className="flex items-center gap-6">
-                <svg fill="none" height="14" viewBox="0 0 24 24" width="14" className="text-accent-amethyst" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg fill="none" height="14" viewBox="0 0 24 24" width="14" className="text-heat-100" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
                   <rect x="9" y="3" width="6" height="4" rx="1" />
                   <path d="M9 12h6M9 16h4" />
