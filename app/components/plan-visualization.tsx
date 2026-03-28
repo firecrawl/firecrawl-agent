@@ -371,6 +371,63 @@ function ScrapeResult({
 
 // --- Interact card (shows iframe while running) ---
 
+function InteractPIP({ url }: { url: string }) {
+  const [minimized, setMinimized] = useState(false);
+
+  if (minimized) {
+    return (
+      <div className="fixed bottom-20 right-20 z-40">
+        <button
+          type="button"
+          className="flex items-center gap-6 px-12 py-8 rounded-10 bg-accent-black text-accent-white text-label-small shadow-lg hover:opacity-90 transition-all"
+          onClick={() => setMinimized(false)}
+        >
+          <svg fill="none" height="14" viewBox="0 0 24 24" width="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
+          </svg>
+          Live View
+          <div className="w-6 h-6 rounded-full bg-heat-100 animate-pulse" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="fixed bottom-20 right-20 z-40 rounded-12 border border-black-alpha-16 overflow-hidden bg-white"
+      style={{
+        width: 420,
+        height: 300,
+        boxShadow: "0px 16px 48px -8px rgba(0,0,0,0.2), 0px 4px 16px -2px rgba(0,0,0,0.1)",
+        resize: "both",
+      }}
+    >
+      <div className="flex items-center justify-between px-10 py-6 bg-black-alpha-2 border-b border-border-faint">
+        <div className="flex items-center gap-6">
+          <div className="w-6 h-6 rounded-full bg-heat-100 animate-pulse" />
+          <span className="text-mono-x-small text-black-alpha-48">Live View</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="p-4 rounded-4 text-black-alpha-32 hover:text-accent-black hover:bg-black-alpha-4 transition-all"
+            onClick={() => setMinimized(true)}
+            title="Minimize"
+          >
+            <svg fill="none" height="10" viewBox="0 0 24 24" width="10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14" /></svg>
+          </button>
+        </div>
+      </div>
+      <iframe
+        src={url}
+        className="w-full border-0"
+        style={{ height: "calc(100% - 32px)" }}
+        title="Live browser view"
+      />
+    </div>
+  );
+}
+
 function InteractCard({ item }: { item: TimelineItem }) {
   const isRunning = item.status !== "complete";
   const [userCollapsed, setUserCollapsed] = useState(false);
@@ -380,125 +437,119 @@ function InteractCard({ item }: { item: TimelineItem }) {
   const domain = item.url ? getDomain(item.url) : null;
 
   return (
-    <div className={cn(
-      "my-12 rounded-10 border overflow-hidden transition-all",
-      isRunning ? "border-heat-40 shadow-sm" : "border-border-faint",
-    )}>
-      {/* Header -- clickable to toggle */}
-      <button
-        type="button"
-        className="w-full flex items-center gap-8 px-14 py-10 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
-        onClick={() => { if (!isRunning) setUserCollapsed(!contentCollapsed); }}
-      >
-        {domain ? <Favicon domain={domain} /> : <GlobeIcon />}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-6">
-            <EndpointBadge type="interact" />
-            {isRunning && (
-              <div className="w-5 h-5 rounded-full bg-heat-100 animate-pulse flex-shrink-0" />
-            )}
-            <span className="text-label-medium text-accent-black truncate">
-              {item.pageTitle || item.url}
-            </span>
-          </div>
-          {item.scrapeQuery && (
-            <div className="text-body-small text-black-alpha-32 truncate mt-1">
-              &ldquo;{item.scrapeQuery}&rdquo;
-            </div>
-          )}
-        </div>
-        <div className="flex items-center gap-6 flex-shrink-0">
-          {item.creditsUsed !== undefined && (
-            <span className="text-mono-x-small text-black-alpha-24 bg-black-alpha-4 px-6 py-1 rounded-4">
-              {item.creditsUsed} credit{item.creditsUsed !== 1 ? "s" : ""}
-            </span>
-          )}
-          {item.url && (
-            <a
-              href={item.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-4 rounded-4 text-black-alpha-24 hover:text-accent-black hover:bg-black-alpha-4 transition-all"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
-              </svg>
-            </a>
-          )}
-          {!isRunning && (
-            <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24", contentCollapsed && "-rotate-90")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M6 9l6 6 6-6" />
-            </svg>
-          )}
-        </div>
-      </button>
+    <>
+      {/* PIP live viewer in corner */}
+      {isRunning && item.liveViewUrl && (
+        <InteractPIP url={item.liveViewUrl} />
+      )}
 
-      {/* Collapsible body */}
       <div className={cn(
-        "transition-all duration-300 overflow-hidden",
-        contentCollapsed ? "max-h-0 opacity-0" : "max-h-[4000px] opacity-100",
+        "my-12 rounded-10 border overflow-hidden transition-all",
+        isRunning ? "border-heat-40 shadow-sm" : "border-border-faint",
       )}>
-        {/* Expand toggle */}
-        {!isRunning && (item.interactOutput || item.content) && (
-          <div className="mx-14 mb-6 flex justify-end">
-            <button
-              type="button"
-              className="flex items-center gap-4 text-mono-x-small text-black-alpha-32 hover:text-accent-black transition-colors"
-              onClick={() => setExpanded(!expanded)}
-            >
-              <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                {expanded
-                  ? <><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" /></>
-                  : <><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></>
-                }
-              </svg>
-              {expanded ? "Compact" : "Expand"}
-            </button>
-          </div>
-        )}
-
-        {/* Live view -- only while running and URL available (iframe has its own loader) */}
-        {isRunning && item.liveViewUrl && (
-          <div className="mx-14 mb-10">
-            <div className="rounded-8 border border-border-faint overflow-hidden bg-white" style={{ aspectRatio: "16/10" }}>
-              <iframe
-                src={item.liveViewUrl}
-                className="w-full h-full border-0"
-                title="Live browser view"
-              />
+        {/* Header -- clickable to toggle */}
+        <button
+          type="button"
+          className="w-full flex items-center gap-8 px-14 py-10 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
+          onClick={() => { if (!isRunning) setUserCollapsed(!contentCollapsed); }}
+        >
+          {domain ? <Favicon domain={domain} /> : <GlobeIcon />}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-6">
+              <EndpointBadge type="interact" />
+              {isRunning && (
+                <div className="w-5 h-5 rounded-full bg-heat-100 animate-pulse flex-shrink-0" />
+              )}
+              <span className="text-label-medium text-accent-black truncate">
+                {item.pageTitle || item.url}
+              </span>
             </div>
+            {item.scrapeQuery && (
+              <div className="text-body-small text-black-alpha-32 truncate mt-1">
+                &ldquo;{item.scrapeQuery}&rdquo;
+              </div>
+            )}
           </div>
-        )}
+          <div className="flex items-center gap-6 flex-shrink-0">
+            {item.creditsUsed !== undefined && (
+              <span className="text-mono-x-small text-black-alpha-24 bg-black-alpha-4 px-6 py-1 rounded-4">
+                {item.creditsUsed} credit{item.creditsUsed !== 1 ? "s" : ""}
+              </span>
+            )}
+            {item.url && (
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-4 rounded-4 text-black-alpha-24 hover:text-accent-black hover:bg-black-alpha-4 transition-all"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+                </svg>
+              </a>
+            )}
+            {!isRunning && (
+              <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24", contentCollapsed && "-rotate-90")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            )}
+          </div>
+        </button>
 
-        {/* Output + content -- shown when complete */}
-        {!isRunning && (item.interactOutput || item.content) && (
-          <div className={cn("mx-14 mb-10", expanded ? "flex flex-col gap-8" : "flex flex-col gap-8")}>
-            {item.interactOutput && (
-              <div className="bg-black-alpha-2 rounded-8 border border-border-faint p-12">
-                <div className="text-body-small text-accent-black leading-relaxed prose prose-sm max-w-none prose-headings:text-accent-black prose-a:text-heat-100 prose-strong:text-accent-black">
-                  <Streamdown plugins={{ code }}>{item.interactOutput}</Streamdown>
-                </div>
-              </div>
-            )}
-            {item.content && (
-              <div className={cn(
-                "rounded-8 border border-border-faint bg-background-lighter p-14 overflow-auto",
-                expanded ? "max-h-[600px]" : "max-h-300",
-              )}>
-                {isJsonContent(item.content) ? (
-                  <pre className="text-mono-small text-accent-black whitespace-pre-wrap">{extractJsonContent(item.content)}</pre>
-                ) : (
+        {/* Collapsible body */}
+        <div className={cn(
+          "transition-all duration-300 overflow-hidden",
+          contentCollapsed ? "max-h-0 opacity-0" : "max-h-[4000px] opacity-100",
+        )}>
+          {/* Expand toggle */}
+          {!isRunning && (item.interactOutput || item.content) && (
+            <div className="mx-14 mb-6 flex justify-end">
+              <button
+                type="button"
+                className="flex items-center gap-4 text-mono-x-small text-black-alpha-32 hover:text-accent-black transition-colors"
+                onClick={() => setExpanded(!expanded)}
+              >
+                <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  {expanded
+                    ? <><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" /></>
+                    : <><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></>
+                  }
+                </svg>
+                {expanded ? "Compact" : "Expand"}
+              </button>
+            </div>
+          )}
+
+          {/* Output + content -- shown when complete */}
+          {!isRunning && (item.interactOutput || item.content) && (
+            <div className={cn("mx-14 mb-10", expanded ? "flex flex-col gap-8" : "flex flex-col gap-8")}>
+              {item.interactOutput && (
+                <div className="bg-black-alpha-2 rounded-8 border border-border-faint p-12">
                   <div className="text-body-small text-accent-black leading-relaxed prose prose-sm max-w-none prose-headings:text-accent-black prose-a:text-heat-100 prose-strong:text-accent-black">
-                    <Streamdown plugins={{ code }}>{item.content}</Streamdown>
+                    <Streamdown plugins={{ code }}>{item.interactOutput}</Streamdown>
                   </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+                </div>
+              )}
+              {item.content && (
+                <div className={cn(
+                  "rounded-8 border border-border-faint bg-background-lighter p-14 overflow-auto",
+                  expanded ? "max-h-[600px]" : "max-h-300",
+                )}>
+                  {isJsonContent(item.content) ? (
+                    <pre className="text-mono-small text-accent-black whitespace-pre-wrap">{extractJsonContent(item.content)}</pre>
+                  ) : (
+                    <div className="text-body-small text-accent-black leading-relaxed prose prose-sm max-w-none prose-headings:text-accent-black prose-a:text-heat-100 prose-strong:text-accent-black">
+                      <Streamdown plugins={{ code }}>{item.content}</Streamdown>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
