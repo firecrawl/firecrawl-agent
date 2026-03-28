@@ -40,3 +40,20 @@
     scrollbar-width: none;
   }
 }
+
+/* Force light theme on all Streamdown code blocks */
+[data-streamdown="code-block"],
+[data-streamdown="code-block"] pre {
+  --sdm-bg: #fafafa !important;
+  background: #fafafa !important;
+  color: #24292e !important;
+}
+
+[data-streamdown="code-block"] pre code span {
+  --sdm-c: inherit;
+}
+
+[data-streamdown="code-block-header"] {
+  background: #f0f0f0 !important;
+  color: #6b7280 !important;
+}

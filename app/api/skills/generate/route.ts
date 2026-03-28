@@ -49,41 +49,51 @@ export async function POST(req: Request) {
 
     const { text: skillContent } = await generateText({
       model,
-      system: `You generate SKILL.md files for a web research agent powered by Firecrawl.
+      system: `You generate SKILL.md files that capture procedural web knowledge -- the HOW of accomplishing a task on the web. Skills are agent-agnostic and tool-agnostic. They describe the process, not the implementation.
 
-A skill is a reusable instruction set that teaches the agent how to accomplish a specific type of task.
+Given a session transcript, distill what was LEARNED about how to accomplish this type of task on the web. Focus on:
+- What pages/sites to visit and why
+- What data lives where and how it's structured
+- What interactions are needed (clicking tabs, expanding sections, pagination)
+- What patterns work and what doesn't
+- How to verify the data is correct
+- How to handle edge cases
 
-Given a session transcript, produce a SKILL.md with this exact format:
+Produce a SKILL.md with this format:
 
 ---
 name: skill-name
-description: One-line description of what this skill does
+description: One-line description of what this skill teaches
 ---
 
 # Skill Title
 
-## When to Use
-Describe when this skill should be loaded.
+## What This Skill Teaches
+One paragraph explaining the procedural knowledge captured here.
 
-## Tools Required
-List which tools to use: search, scrape, interact, bashExec
+## Where to Find the Data
+- Which sites/pages contain the relevant information
+- URL patterns, sitemaps, or search strategies that work
+- What sections of a page to focus on
 
-## Step-by-Step Instructions
+## Step-by-Step Process
 1. First step...
 2. Second step...
-(Procedural, imperative mood, addressed to the agent)
+(Imperative mood. Describe the process, not specific tool calls. E.g. "Search for X", "Navigate to the pricing page", "Extract the comparison table", not "Use the scrape tool with format json".)
 
-## Data Extraction
-What data to extract and how to structure it.
+## Data Structure
+What fields/data points to extract and how they relate to each other.
 
-## Output Format
-How the final output should be formatted.
+## Gotchas & Edge Cases
+- Things that look like data but aren't
+- Pages that require interaction vs static scraping
+- Rate limits, paywalls, or anti-bot measures observed
+- Fallback approaches when the primary method fails
 
-## Tips & Edge Cases
-- Common pitfalls observed in the session
-- Workarounds that worked
+## Verification
+How to validate that the extracted data is correct and complete.
 
-## Example Queries
+## Example Tasks
 - "example prompt 1"
 - "example prompt 2"
 

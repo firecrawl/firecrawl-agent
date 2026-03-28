@@ -775,106 +775,123 @@ export default function AgentPage() {
               </div>
             </div>
 
-            {/* Action buttons -- outside the input card */}
-            <div className="flex flex-wrap items-center gap-6 mt-12">
-              <span className="text-label-x-small text-black-alpha-24">Generate</span>
-              {(["json", "csv", "markdown", "html"] as const).map((fmt) => (
-                <button
-                  key={fmt}
-                  type="button"
-                  className="px-12 py-6 rounded-8 text-label-small text-black-alpha-56 border border-border-faint bg-accent-white hover:border-heat-40 hover:text-accent-black hover:bg-heat-4 transition-all"
-                  onClick={() => {
-                    const prompts: Record<string, string> = {
-                      json: "Format all the collected data as JSON using formatOutput.",
-                      csv: "Format all the collected data as CSV using formatOutput.",
-                      markdown: "Format all the collected data as a markdown report using formatOutput with format \"text\".",
-                      html: "Format all the collected data as a clean HTML document using formatOutput with format \"text\". Use proper HTML tags, tables where appropriate, and inline styles for readability.",
-                    };
-                    setSidebarCollapsed(true);
-                    sendMessage({ text: prompts[fmt] });
-                  }}
-                >
-                  {fmt === "json" ? "JSON" : fmt === "csv" ? "CSV" : fmt === "markdown" ? "Markdown" : "HTML"}
-                </button>
-              ))}
 
-              <div className="w-px h-16 bg-border-faint mx-2" />
+          </div>
+        )}
+      </div>
+      </div>
 
-              {/* Save as Skill */}
-              {!showSaveSkill && !generatedSkillContent && (
-                <button
-                  type="button"
-                  className="flex items-center gap-6 px-12 py-6 rounded-8 text-label-small text-accent-forest border border-accent-forest/20 bg-accent-white hover:bg-accent-forest/[0.06] transition-all"
-                  onClick={() => { setShowSaveSkill(true); setSavedSkillPath(null); setGeneratedSkillContent(null); }}
-                >
-                  <svg fill="none" height="14" viewBox="0 0 24 24" width="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
-                  </svg>
-                  Save as Skill
-                </button>
-              )}
-            </div>
+      {/* Studio panel -- right side, appears after agent finishes */}
+      {!isRunning && messages.length > 0 && (
+        <div className="w-260 h-full border-l border-border-faint bg-background-base flex flex-col flex-shrink-0 overflow-y-auto">
+          <div className="px-16 pt-16 pb-8">
+            <h3 className="text-label-medium text-accent-black">Studio</h3>
+          </div>
 
-            {/* Inline skill name input */}
-            {showSaveSkill && !generatedSkillContent && (
-              <div className="mt-12 flex items-center gap-8">
-                <input
-                  className="flex-1 px-12 py-8 rounded-8 border border-border-faint text-body-medium text-accent-black placeholder:text-black-alpha-24 focus:outline-none focus:border-accent-forest transition-colors"
-                  placeholder="Skill name, e.g. pricing-comparison"
-                  value={skillName}
-                  onChange={(e) => setSkillName(e.target.value)}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && skillName.trim() && !savingSkill) {
-                      e.preventDefault();
-                      handleSaveSkill();
-                    }
-                    if (e.key === "Escape") {
-                      setShowSaveSkill(false);
-                      setSkillName("");
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  className="px-10 py-6 rounded-8 text-label-small text-black-alpha-48 hover:bg-black-alpha-4 transition-all"
-                  onClick={() => { setShowSaveSkill(false); setSkillName(""); }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    "px-14 py-6 rounded-8 text-label-small transition-all",
-                    skillName.trim() && !savingSkill
-                      ? "bg-accent-forest text-white hover:bg-accent-forest/90"
-                      : "bg-black-alpha-8 text-black-alpha-24 cursor-not-allowed",
-                  )}
-                  disabled={!skillName.trim() || savingSkill}
-                  onClick={handleSaveSkill}
-                >
-                  {savingSkill ? "Generating..." : "Generate Skill"}
-                </button>
-              </div>
-            )}
-
-            {/* Generated skill rendered inline */}
-            {generatedSkillContent && (
-              <div className="mt-12 rounded-12 border border-accent-forest/20 bg-accent-forest/[0.02] overflow-hidden">
-                <div className="flex items-center justify-between px-16 py-10 border-b border-accent-forest/10">
-                  <div className="flex items-center gap-8">
-                    <svg className="w-16 h-16 text-accent-forest" fill="none" viewBox="0 0 16 16">
-                      <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    <span className="text-label-medium text-accent-black">Skill saved</span>
-                    {savedSkillPath && (
-                      <code className="text-mono-x-small text-black-alpha-40">{savedSkillPath}</code>
-                    )}
+          <div className="px-12 pb-16 flex flex-col gap-6">
+            {/* Export cards */}
+            {([
+              { id: "json" as const, label: "JSON", desc: "Structured data", color: "bg-heat-4 border-heat-20 hover:border-heat-40", icon: <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H7a2 2 0 00-2 2v5a2 2 0 01-2 2 2 2 0 012 2v5a2 2 0 002 2h1M16 3h1a2 2 0 012 2v5a2 2 0 002 2 2 2 0 00-2 2v5a2 2 0 01-2 2h-1" /></svg> },
+              { id: "csv" as const, label: "CSV", desc: "Spreadsheet table", color: "bg-accent-forest/[0.04] border-accent-forest/15 hover:border-accent-forest/30", icon: <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M3 12h18M3 18h18M9 6v12M15 6v12" /></svg> },
+              { id: "markdown" as const, label: "Report", desc: "Markdown summary", color: "bg-accent-amethyst/[0.04] border-accent-amethyst/15 hover:border-accent-amethyst/30", icon: <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" /><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" /></svg> },
+              { id: "html" as const, label: "HTML", desc: "Styled document", color: "bg-[#fff4e6] border-[#ffe0b2] hover:border-[#ffcc80]", icon: <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6" /></svg> },
+            ]).map((card) => (
+              <button
+                key={card.id}
+                type="button"
+                className={cn(
+                  "w-full text-left px-14 py-12 rounded-10 border transition-all",
+                  card.color,
+                )}
+                onClick={() => {
+                  const prompts: Record<string, string> = {
+                    json: "Format all the collected data as JSON using formatOutput.",
+                    csv: "Format all the collected data as CSV using formatOutput.",
+                    markdown: "Format all the collected data as a markdown report using formatOutput with format \"text\".",
+                    html: "Format all the collected data as a clean HTML document using formatOutput with format \"text\". Use proper HTML tags, tables where appropriate, and inline styles for readability.",
+                  };
+                  setSidebarCollapsed(true);
+                  sendMessage({ text: prompts[card.id] });
+                }}
+              >
+                <div className="flex items-center gap-8">
+                  <span className="text-black-alpha-48">{card.icon}</span>
+                  <div>
+                    <div className="text-label-small text-accent-black">{card.label}</div>
+                    <div className="text-body-small text-black-alpha-32">{card.desc}</div>
                   </div>
-                  <div className="flex items-center gap-6">
+                  <svg fill="none" height="14" viewBox="0 0 24 24" width="14" className="ml-auto text-black-alpha-24" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                </div>
+              </button>
+            ))}
+
+            <div className="h-px bg-border-faint my-4" />
+
+            {/* Save as Skill */}
+            {!generatedSkillContent ? (
+              showSaveSkill ? (
+                <div className="flex flex-col gap-6">
+                  <input
+                    className="w-full px-12 py-8 rounded-8 border border-border-faint text-body-small text-accent-black placeholder:text-black-alpha-24 focus:outline-none focus:border-accent-forest transition-colors"
+                    placeholder="Skill name..."
+                    value={skillName}
+                    onChange={(e) => setSkillName(e.target.value)}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && skillName.trim() && !savingSkill) { e.preventDefault(); handleSaveSkill(); }
+                      if (e.key === "Escape") { setShowSaveSkill(false); setSkillName(""); }
+                    }}
+                  />
+                  <div className="flex gap-4">
                     <button
                       type="button"
-                      className="flex items-center gap-4 px-10 py-4 rounded-6 text-label-small text-black-alpha-48 hover:bg-black-alpha-4 hover:text-accent-black transition-all"
+                      className="flex-1 px-10 py-6 rounded-8 text-label-small text-black-alpha-48 hover:bg-black-alpha-4 transition-all"
+                      onClick={() => { setShowSaveSkill(false); setSkillName(""); }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex-1 px-10 py-6 rounded-8 text-label-small transition-all",
+                        skillName.trim() && !savingSkill ? "bg-accent-forest text-white hover:bg-accent-forest/90" : "bg-black-alpha-8 text-black-alpha-24 cursor-not-allowed",
+                      )}
+                      disabled={!skillName.trim() || savingSkill}
+                      onClick={handleSaveSkill}
+                    >
+                      {savingSkill ? "Generating..." : "Generate"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="w-full text-left px-14 py-12 rounded-10 border border-accent-forest/15 bg-accent-forest/[0.04] hover:border-accent-forest/30 transition-all"
+                  onClick={() => { setShowSaveSkill(true); setSavedSkillPath(null); setGeneratedSkillContent(null); }}
+                >
+                  <div className="flex items-center gap-8">
+                    <svg fill="none" height="16" viewBox="0 0 24 24" width="16" className="text-accent-forest" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
+                    </svg>
+                    <div>
+                      <div className="text-label-small text-accent-black">Save as Skill</div>
+                      <div className="text-body-small text-black-alpha-32">Reusable workflow</div>
+                    </div>
+                    <svg fill="none" height="14" viewBox="0 0 24 24" width="14" className="ml-auto text-black-alpha-24" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+                  </div>
+                </button>
+              )
+            ) : (
+              <div className="rounded-10 border border-accent-forest/20 bg-accent-forest/[0.02] overflow-hidden">
+                <div className="flex items-center justify-between px-12 py-8 border-b border-accent-forest/10">
+                  <div className="flex items-center gap-6">
+                    <svg className="w-14 h-14 text-accent-forest" fill="none" viewBox="0 0 16 16"><path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    <span className="text-label-small text-accent-black">Skill saved</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <button
+                      type="button"
+                      className="p-3 rounded-4 text-black-alpha-32 hover:bg-black-alpha-4 hover:text-accent-black transition-all"
                       onClick={() => {
                         const blob = new Blob([generatedSkillContent], { type: "text/markdown" });
                         const url = URL.createObjectURL(blob);
@@ -885,31 +902,25 @@ export default function AgentPage() {
                         URL.revokeObjectURL(url);
                       }}
                     >
-                      <svg fill="none" height="14" viewBox="0 0 24 24" width="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
-                      </svg>
-                      Download
+                      <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
                     </button>
                     <button
                       type="button"
-                      className="p-4 rounded-6 text-black-alpha-32 hover:bg-black-alpha-4 hover:text-accent-black transition-all"
+                      className="p-3 rounded-4 text-black-alpha-32 hover:bg-black-alpha-4 hover:text-accent-black transition-all"
                       onClick={() => { setGeneratedSkillContent(null); setShowSaveSkill(false); setSkillName(""); setSavedSkillPath(null); }}
                     >
-                      <svg fill="none" height="14" viewBox="0 0 24 24" width="14" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                        <path d="M18 6L6 18M6 6l12 12" />
-                      </svg>
+                      <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
                     </button>
                   </div>
                 </div>
-                <div className="p-16 max-h-400 overflow-auto">
-                  <pre className="text-mono-small text-accent-black whitespace-pre-wrap leading-relaxed">{generatedSkillContent}</pre>
+                <div className="p-12 max-h-300 overflow-auto">
+                  <pre className="text-mono-x-small text-accent-black whitespace-pre-wrap leading-relaxed">{generatedSkillContent}</pre>
                 </div>
               </div>
             )}
           </div>
-        )}
-      </div>
-      </div>
+        </div>
+      )}
 
       </div>
 
