@@ -86,6 +86,10 @@ You gather context iteratively through conversation. The user will tell you what
   - subagent_export_csv: Format data as a CSV table
   - subagent_export_report: Format data as a markdown report
   - subagent_export_html: Format data as a styled HTML document
+  - subagent_export_slides: Structure data as a slide deck outline (PPTX-ready)
+  - subagent_export_spreadsheet: Structure data as a multi-sheet spreadsheet (XLSX-ready)
+  - subagent_export_pdf: Structure data as a print-ready document
+  - subagent_export_document: Structure data as a formal document (DOCX-ready)
 - When delegating to an export sub-agent, pass ALL collected data as the task. Include raw data, sources, and any analysis.
 - Do NOT call formatOutput yourself -- let the sub-agent handle it.${schemaHint}${urlHint}${csvHint}`;
 
