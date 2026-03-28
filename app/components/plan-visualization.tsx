@@ -765,6 +765,11 @@ function extractTimeline(messages: UIMessage[]): TimelineItem[] {
         const isComplete = state === "output-available" || state === "result" || state === "output-error";
         const status = isComplete ? "complete" as const : "running" as const;
 
+        // Debug: log all tool part structure
+        if (toolName === "search") {
+          console.log("[tool-part debug]", "type:", part.type, "state:", state, "toolName:", toolName, "partKeys:", Object.keys(p), "hasOutput:", !!p.output, "hasResult:", !!p.result, "outputSample:", p.output ? JSON.stringify(p.output).slice(0, 200) : "none");
+        }
+
         if (toolName === "search") {
           // Parse search results from output
           // Firecrawl returns { success, data: [...] } but the AI SDK may wrap it
@@ -796,9 +801,9 @@ function extractTimeline(messages: UIMessage[]): TimelineItem[] {
           const searchCredits = typeof (output as { creditsUsed?: number }).creditsUsed === "number"
             ? (output as { creditsUsed?: number }).creditsUsed
             : undefined;
-          // Debug: log when we have output but no results parsed
-          if (status === "complete" && results.length === 0 && output && Object.keys(output).length > 0) {
-            console.log("[search debug] output keys:", Object.keys(output), "output sample:", JSON.stringify(output).slice(0, 300));
+          // Debug: always log search output structure
+          if (status === "complete") {
+            console.log("[search debug] status:", status, "results:", results.length, "output type:", typeof output, "isArray:", Array.isArray(output), "keys:", output && typeof output === "object" ? Object.keys(output) : "N/A", "sample:", JSON.stringify(output).slice(0, 500));
           }
           items.push({
             type: "search",
