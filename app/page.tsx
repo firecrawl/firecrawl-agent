@@ -89,7 +89,7 @@ function SkillsDropdown({
   onChange,
   onClose,
 }: {
-  skills: SkillInfo[];
+  skills: SkillInfo[] | null;
   selected: string[];
   onChange: (skills: string[]) => void;
   onClose: () => void;
@@ -106,7 +106,7 @@ function SkillsDropdown({
   }, [onClose]);
 
   // Filter out export skills and apply search
-  const visibleSkills = skills
+  const visibleSkills = (skills ?? [])
     .filter((s) => s.category !== "Export")
     .filter((s) => {
       if (!search) return true;
@@ -125,7 +125,7 @@ function SkillsDropdown({
     return Array.from(map.entries());
   }, [visibleSkills]);
 
-  if (skills.length === 0) {
+  if (!skills || skills.length === 0) {
     return (
       <div
         ref={ref}
@@ -133,7 +133,7 @@ function SkillsDropdown({
         style={{ boxShadow: "0px 16px 32px -8px rgba(0,0,0,0.08), 0px 4px 12px -2px rgba(0,0,0,0.04)" }}
       >
         <div className="text-body-small text-black-alpha-48">
-          No skills found. Add SKILL.md files to .agents/skills/
+          {skills === null ? "Loading skills..." : "No skills found. Add SKILL.md files to .agents/skills/"}
         </div>
       </div>
     );
@@ -320,7 +320,7 @@ export default function AgentPage() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [showSkills, setShowSkills] = useState(false);
   const [showModel, setShowModel] = useState(false);
-  const [skills, setSkills] = useState<SkillInfo[]>([]);
+  const [skills, setSkills] = useState<SkillInfo[] | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
 
   const [showSaveSkill, setShowSaveSkill] = useState(false);
@@ -344,7 +344,7 @@ export default function AgentPage() {
   useEffect(() => {
     fetch("/api/skills")
       .then((r) => r.json())
-      .then(setSkills)
+      .then((data) => setSkills(data))
       .catch(() => setSkills([]));
     fetch("/api/acp/agents")
       .then((r) => r.json())
@@ -605,9 +605,6 @@ export default function AgentPage() {
         </div>
         <div className="flex flex-col items-center gap-12 mb-32 -mt-60">
           <SymbolColored width={56} height={80} />
-          <h1 className="text-title-h2 text-accent-black text-center">
-            Firecrawl Agent
-          </h1>
         </div>
 
         {/* Input card */}
@@ -899,7 +896,6 @@ export default function AgentPage() {
           }}
         >
           <SymbolColored width={22} height={32} />
-          <h1 className="text-title-h5 text-accent-black">Firecrawl Agent</h1>
         </button>
         <div className="ml-auto flex items-center gap-6">
           {isRunning && (
