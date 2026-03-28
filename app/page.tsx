@@ -960,10 +960,10 @@ export default function AgentPage() {
                     onClick={() => {
                       if (isGen || isRunning) return;
                       const prompts: Record<string, string> = {
-                        json: "Format all the collected data as JSON using formatOutput.",
-                        csv: "Format all the collected data as CSV using formatOutput.",
-                        markdown: "Format all the collected data as a markdown report using formatOutput with format \"text\".",
-                        html: "Format all the collected data as a clean HTML document using formatOutput with format \"text\". Use proper HTML tags, tables where appropriate, and inline styles for readability.",
+                        json: "Use the JSON Exporter sub-agent (subagent_export_json) to format all collected data as structured JSON. Pass it a summary of everything you gathered.",
+                        csv: "Use the CSV Exporter sub-agent (subagent_export_csv) to format all collected data as a CSV table. Pass it a summary of everything you gathered.",
+                        markdown: "Use the Report Writer sub-agent (subagent_export_report) to format all collected data as a markdown report. Pass it a summary of everything you gathered.",
+                        html: "Use the HTML Exporter sub-agent (subagent_export_html) to format all collected data as a styled HTML document. Pass it a summary of everything you gathered.",
                       };
                       setSidebarCollapsed(true);
                       setGeneratingFormat(card.id);
