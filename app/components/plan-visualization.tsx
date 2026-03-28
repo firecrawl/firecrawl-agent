@@ -399,38 +399,60 @@ function InteractCard({ item }: { item: TimelineItem }) {
         </div>
       </div>
 
-      {/* Interact output */}
-      {item.interactOutput && (
-        <div className="mx-14 mb-10 bg-black-alpha-2 rounded-8 border border-border-faint p-12">
-          <div className="text-body-medium text-accent-black leading-relaxed prose prose-sm max-w-none">
-            <Streamdown plugins={{ code }}>{item.interactOutput}</Streamdown>
-          </div>
-        </div>
-      )}
-
-      {/* Live view iframe -- auto-shown while running, hidden once complete */}
-      {item.liveViewUrl && (
-        <div className="mx-14 mb-10">
-          {!isRunning && (
-            <button
-              type="button"
-              className="inline-flex items-center gap-6 px-10 py-5 rounded-6 text-label-small text-black-alpha-48 bg-black-alpha-4 hover:bg-black-alpha-8 transition-all mb-8"
-              onClick={() => setUserToggled(!userToggled)}
-            >
-              <svg fill="none" height="14" viewBox="0 0 24 24" width="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                <path d="M8 21h8M12 17v4" />
-              </svg>
-              {userToggled ? "Hide live view" : "Show live view"}
-            </button>
+      {/* Interact output + live view side by side */}
+      {(item.interactOutput || item.liveViewUrl) && (
+        <div className="mx-14 mb-10 flex gap-8">
+          {/* Text output */}
+          {item.interactOutput && (
+            <div className={cn(
+              "bg-black-alpha-2 rounded-8 border border-border-faint p-12",
+              item.liveViewUrl ? "flex-1 min-w-0" : "w-full",
+            )}>
+              <div className="text-body-small text-accent-black leading-relaxed">
+                {item.interactOutput}
+              </div>
+            </div>
           )}
-          {(showLiveView || userToggled) && (
-            <div className="rounded-8 border border-border-faint overflow-hidden bg-white" style={{ aspectRatio: "16/10" }}>
-              <iframe
-                src={item.liveViewUrl}
-                className="w-full h-full border-0"
-                title="Live browser view"
-              />
+
+          {/* Live view */}
+          {item.liveViewUrl && (
+            <div className={cn(
+              "flex flex-col gap-6 flex-shrink-0",
+              item.interactOutput ? "w-[280px]" : "w-full",
+            )}>
+              {!isRunning && !showLiveView && !userToggled && (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-6 px-10 py-5 rounded-6 text-label-small text-black-alpha-48 bg-black-alpha-4 hover:bg-black-alpha-8 transition-all"
+                  onClick={() => setUserToggled(true)}
+                >
+                  <svg fill="none" height="14" viewBox="0 0 24 24" width="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                    <path d="M8 21h8M12 17v4" />
+                  </svg>
+                  Live view
+                </button>
+              )}
+              {(showLiveView || userToggled) && (
+                <div className="relative">
+                  {!isRunning && (
+                    <button
+                      type="button"
+                      className="absolute top-6 right-6 z-10 p-4 rounded-4 bg-white/80 text-black-alpha-40 hover:text-accent-black transition-all"
+                      onClick={() => setUserToggled(false)}
+                    >
+                      <svg fill="none" height="10" viewBox="0 0 24 24" width="10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                    </button>
+                  )}
+                  <div className="rounded-8 border border-border-faint overflow-hidden bg-white" style={{ aspectRatio: "16/10" }}>
+                    <iframe
+                      src={item.liveViewUrl}
+                      className="w-full h-full border-0"
+                      title="Live browser view"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -844,10 +866,14 @@ function extractTimeline(messages: UIMessage[]): TimelineItem[] {
             markdown = "```json\n" + JSON.stringify(outObj.extract, null, 2) + "\n```";
           }
           // Fallback: if nothing found, dump the raw output (excluding huge fields)
-          if (!markdown && typeof outObj === "object" && outObj && status === "complete") {
+          // Skip for interact -- we extract output + liveViewUrl separately
+          if (!markdown && toolName !== "interact" && typeof outObj === "object" && outObj && status === "complete") {
             const preview = { ...outObj };
             delete (preview as Record<string, unknown>).rawHtml;
             delete (preview as Record<string, unknown>).html;
+            delete (preview as Record<string, unknown>).liveViewUrl;
+            delete (preview as Record<string, unknown>).interactiveLiveViewUrl;
+            delete (preview as Record<string, unknown>).scrapeId;
             const str = JSON.stringify(preview, null, 2);
             if (str.length > 10 && str !== "{}") {
               markdown = "```json\n" + str.slice(0, 5000) + "\n```";

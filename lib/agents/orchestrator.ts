@@ -68,8 +68,8 @@ You gather context iteratively through conversation. The user will tell you what
 - Use search to discover relevant pages when you don't have specific URLs.
 - Use scrape to extract content from pages. For targeted extraction, use the query parameter.
 - Use interact for pages that need JavaScript interaction (clicks, forms, pagination).
-- Use bashExec for data processing: jq (JSON), awk (CSV/text), sed, grep, sort, uniq, wc, head, tail, cut, tr, paste, cat, echo, printf, bc. Write intermediate results to files so you can build on them.
-- IMPORTANT: The bash sandbox does NOT have node, python, curl, wget, or npm. Use only the tools listed above. For JSON processing always use jq. For CSV processing use awk.
+- Use bashExec for data processing: jq (JSON), awk (CSV/text), sed, grep, sort, uniq, wc, head, tail, cut, tr, paste, cat, echo, printf, expr, ls, mkdir, rm, cp, mv, tee, xargs. Write intermediate results to files so you can build on them.
+- IMPORTANT: The bash sandbox does NOT have node, python, curl, wget, npm, pip, or bc. Use only the tools listed above. For JSON processing always use jq. For CSV processing use awk. For math use awk (e.g. awk 'BEGIN{print 10*1.5}') or expr.
 - Prefer using scrape with a query parameter for targeted extraction -- this is the most efficient approach. For full page content, use formats: ["markdown"]. Only use formats: ["json"] when the user explicitly asks for structured JSON or provides a schema.
 - Store collected data in the bash filesystem (e.g. /data/results.json) as you go so nothing is lost.
 
