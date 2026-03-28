@@ -614,24 +614,59 @@ function SubAgentCard({ item }: { item: TimelineItem }) {
 
 // --- Bash result rendering ---
 
+function describeBashAction(command: string): { label: string; detail?: string } {
+  const cmd = command.trim();
+  // File writes
+  if (cmd.startsWith("cat <<") || cmd.startsWith("cat >") || cmd.includes("> /data/")) {
+    const fileMatch = cmd.match(/>\s*(\/\S+)/);
+    return { label: "Saving notes", detail: fileMatch?.[1] };
+  }
+  if (cmd.startsWith("echo") && cmd.includes(">")) {
+    const fileMatch = cmd.match(/>\s*(\/\S+)/);
+    return { label: "Writing data", detail: fileMatch?.[1] };
+  }
+  if (cmd.startsWith("mkdir")) return { label: "Creating directory" };
+  // File reads
+  if (cmd.startsWith("cat ") && !cmd.includes(">")) return { label: "Reading file", detail: cmd.replace("cat ", "") };
+  if (cmd.startsWith("head ") || cmd.startsWith("tail ")) return { label: "Previewing file" };
+  if (cmd.startsWith("wc ")) return { label: "Counting lines" };
+  // Data processing
+  if (cmd.includes("jq ")) return { label: "Processing JSON" };
+  if (cmd.includes("awk ")) return { label: "Processing data" };
+  if (cmd.includes("sort") || cmd.includes("uniq")) return { label: "Sorting and filtering" };
+  if (cmd.includes("grep ")) return { label: "Searching data" };
+  if (cmd.includes("sed ")) return { label: "Transforming text" };
+  if (cmd.includes("cut ") || cmd.includes("tr ")) return { label: "Extracting fields" };
+  if (cmd.includes("paste ")) return { label: "Merging data" };
+  if (cmd.includes("bc") || cmd.includes("expr")) return { label: "Calculating" };
+  return { label: "Running command" };
+}
+
 function BashResult({ command, stdout, stderr, exitCode }: { command: string; stdout: string; stderr: string; exitCode: number }) {
   const [expanded, setExpanded] = useState(false);
   const hasOutput = !!(stdout || stderr);
-  const outputLines = (stdout || "").split("\n").length + (stderr || "").split("\n").length;
+  const { label, detail } = describeBashAction(command);
 
   return (
-    <div className={cn("my-12 rounded-10 border overflow-hidden transition-all", expanded ? "border-black-alpha-16 shadow-sm" : "border-border-faint hover:border-black-alpha-16")}>
+    <div className={cn("my-8 rounded-10 border overflow-hidden transition-all", expanded ? "border-black-alpha-16 shadow-sm" : "border-border-faint hover:border-black-alpha-16")}>
       <button
         type="button"
-        className="w-full flex items-center gap-8 px-14 py-10 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
-        onClick={() => hasOutput && setExpanded(!expanded)}
+        className="w-full flex items-center gap-8 px-14 py-8 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
+        onClick={() => setExpanded(!expanded)}
       >
-        <TerminalIcon />
-        <code className="flex-1 text-mono-small text-accent-black truncate">{command}</code>
+        <div className="w-24 h-24 rounded-6 bg-black-alpha-4 flex-center flex-shrink-0">
+          <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className="text-black-alpha-40" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-label-small text-accent-black">{label}</div>
+          {detail && <div className="text-mono-x-small text-black-alpha-24 truncate">{detail}</div>}
+        </div>
         <div className="flex items-center gap-6 flex-shrink-0">
           {exitCode !== 0 && (
             <span className="text-mono-x-small text-accent-crimson bg-accent-crimson/8 px-6 py-1 rounded-4">
-              exit {exitCode}
+              failed
             </span>
           )}
           {exitCode === 0 && (
@@ -639,31 +674,19 @@ function BashResult({ command, stdout, stderr, exitCode }: { command: string; st
               <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           )}
-          {hasOutput && (
-            <span className="text-mono-x-small text-black-alpha-24 bg-black-alpha-4 px-6 py-1 rounded-4">
-              {outputLines} line{outputLines !== 1 ? "s" : ""}
-            </span>
-          )}
-          {hasOutput && (
-            <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24", expanded && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M6 9l6 6 6-6" />
-            </svg>
-          )}
+          <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24", expanded && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
         </div>
       </button>
 
-      {/* Collapsed preview */}
-      {!expanded && stdout && (
-        <div className="px-14 pb-10">
-          <div className="text-mono-x-small text-black-alpha-32 line-clamp-2 whitespace-pre-wrap">{stdout.slice(0, 200)}</div>
-        </div>
-      )}
-
-      {/* Expanded output */}
-      {expanded && hasOutput && (
-        <div className="border-t border-border-faint bg-black-alpha-2 p-14 max-h-300 overflow-auto">
+      {/* Expanded: show command + output */}
+      {expanded && (
+        <div className="border-t border-border-faint bg-black-alpha-2 px-14 py-10 max-h-300 overflow-auto">
+          <code className="text-mono-x-small text-black-alpha-40 block mb-6">{command}</code>
           {stdout && <pre className="text-mono-small text-accent-black whitespace-pre-wrap">{stdout}</pre>}
-          {stderr && <pre className="text-mono-small text-accent-crimson whitespace-pre-wrap mt-8">{stderr}</pre>}
+          {stderr && <pre className="text-mono-small text-accent-crimson whitespace-pre-wrap mt-6">{stderr}</pre>}
+          {!hasOutput && <span className="text-mono-x-small text-black-alpha-24">No output</span>}
         </div>
       )}
     </div>
