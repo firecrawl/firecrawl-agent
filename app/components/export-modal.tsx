@@ -278,7 +278,7 @@ function OutputContent({ content, formatId, maxH }: { content: string; formatId:
       {isCsv && <CsvTable data={cleaned} />}
       {isHtml && <HtmlViewer html={cleaned} />}
       {!isJson && !isCsv && !isHtml && (
-        <div className="p-14 text-body-medium text-accent-black leading-relaxed prose prose-sm max-w-none prose-headings:text-accent-black prose-a:text-heat-100 prose-strong:text-accent-black prose-code:text-heat-100 prose-code:bg-heat-4 prose-code:px-4 prose-code:py-1 prose-code:rounded-4">
+        <div className="p-14 text-body-medium text-accent-black leading-relaxed max-w-none">
           <Streamdown plugins={{ code }}>{content}</Streamdown>
         </div>
       )}

@@ -970,7 +970,7 @@ export default function AgentPage() {
                   rows={Math.max(6, planEditText.split("\n").length)}
                 />
               ) : (
-                <div className="text-body-medium text-accent-black leading-relaxed prose prose-sm max-w-none prose-headings:text-accent-black prose-a:text-heat-100 prose-strong:text-accent-black prose-code:text-heat-100 prose-code:bg-heat-4 prose-code:px-4 prose-code:py-1 prose-code:rounded-4">
+                <div className="text-body-medium text-accent-black leading-relaxed max-w-none">
                   <Streamdown>{planEditText || planText}</Streamdown>
                 </div>
               )}

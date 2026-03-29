@@ -9,8 +9,9 @@ const code = createCodePlugin({ themes: ["github-light", "github-light"] });
 import { cn } from "@/utils/cn";
 
 // --- Shared prose classes for Streamdown rendering ---
-const PROSE_CLASSES = "text-body-medium text-accent-black leading-relaxed prose prose-sm max-w-none prose-headings:text-accent-black prose-a:text-heat-100 prose-strong:text-accent-black prose-code:text-heat-100 prose-code:bg-heat-4 prose-code:px-4 prose-code:py-1 prose-code:rounded-4";
-const PROSE_CLASSES_LARGE = "text-body-large text-accent-black leading-relaxed prose prose-sm max-w-none prose-headings:text-accent-black prose-a:text-heat-100 prose-strong:text-accent-black prose-code:text-heat-100 prose-code:bg-heat-4 prose-code:px-4 prose-code:py-1 prose-code:rounded-4";
+// Streamdown renders its own styled HTML with Tailwind classes — no prose needed
+const PROSE_CLASSES = "text-body-medium text-accent-black leading-relaxed max-w-none";
+const PROSE_CLASSES_LARGE = "text-body-large text-accent-black leading-relaxed max-w-none";
 
 // --- Icons ---
 
