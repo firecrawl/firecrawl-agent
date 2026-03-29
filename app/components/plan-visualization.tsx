@@ -753,45 +753,49 @@ function BashResult({ command, stdout, stderr, exitCode }: { command: string; st
   const { label, detail } = describeBashAction(command);
 
   return (
-    <div className={cn("my-12 rounded-10 border overflow-hidden transition-all", expanded ? "border-black-alpha-16 shadow-sm" : "border-border-faint hover:border-black-alpha-16")}>
+    <div className={cn("my-12 rounded-10 overflow-hidden transition-all", expanded ? "shadow-sm" : "")} style={{ background: "#1e1e1e" }}>
       <button
         type="button"
-        className="w-full flex items-center gap-8 px-14 py-10 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
+        className="w-full flex items-center gap-8 px-14 py-10 hover:brightness-110 transition-all text-left cursor-pointer"
         onClick={() => setExpanded(!expanded)}
       >
-        <div className="w-24 h-24 rounded-6 bg-black-alpha-4 flex-center flex-shrink-0">
-          <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className="text-black-alpha-40" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" />
-          </svg>
+        {/* Terminal traffic lights */}
+        <div className="flex items-center gap-4 flex-shrink-0">
+          <div className="w-8 h-8 rounded-full" style={{ background: "#ff5f57" }} />
+          <div className="w-8 h-8 rounded-full" style={{ background: "#febc2e" }} />
+          <div className="w-8 h-8 rounded-full" style={{ background: "#28c840" }} />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-label-small text-accent-black">{label}</div>
-          {detail && <div className="text-mono-x-small text-black-alpha-24 truncate">{detail}</div>}
+          <div className="text-label-small" style={{ color: "#e0e0e0" }}>{label}</div>
+          {detail && <div className="text-mono-x-small truncate" style={{ color: "#888" }}>{detail}</div>}
         </div>
         <div className="flex items-center gap-6 flex-shrink-0">
           {exitCode !== 0 && (
-            <span className="text-mono-x-small text-accent-crimson bg-accent-crimson/8 px-6 py-1 rounded-4">
-              failed
+            <span className="text-mono-x-small px-6 py-1 rounded-4" style={{ color: "#ff5f57", background: "rgba(255,95,87,0.15)" }}>
+              exit {exitCode}
             </span>
           )}
           {exitCode === 0 && (
-            <svg className="w-14 h-14 text-accent-forest" fill="none" viewBox="0 0 16 16">
+            <svg className="w-14 h-14" style={{ color: "#28c840" }} fill="none" viewBox="0 0 16 16">
               <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           )}
-          <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24", expanded && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform", expanded && "rotate-180")} style={{ color: "#666" }} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M6 9l6 6 6-6" />
           </svg>
         </div>
       </button>
 
-      {/* Expanded: show command + output */}
+      {/* Expanded: terminal output */}
       {expanded && (
-        <div className="border-t border-border-faint bg-black-alpha-2 px-14 py-10 max-h-300 overflow-auto no-scrollbar">
-          <code className="text-mono-x-small text-black-alpha-40 block mb-6">{command}</code>
-          {stdout && <pre className="text-mono-small text-accent-black whitespace-pre-wrap">{stdout}</pre>}
-          {stderr && <pre className="text-mono-small text-accent-crimson whitespace-pre-wrap mt-6">{stderr}</pre>}
-          {!hasOutput && <span className="text-mono-x-small text-black-alpha-24">No output</span>}
+        <div className="px-14 py-10 max-h-300 overflow-auto no-scrollbar" style={{ borderTop: "1px solid #333" }}>
+          <div className="flex items-start gap-6 mb-6">
+            <span className="text-mono-x-small flex-shrink-0 select-none" style={{ color: "#28c840" }}>$</span>
+            <code className="text-mono-x-small break-all" style={{ color: "#a0a0a0" }}>{command}</code>
+          </div>
+          {stdout && <pre className="text-mono-small whitespace-pre-wrap" style={{ color: "#d4d4d4" }}>{stdout}</pre>}
+          {stderr && <pre className="text-mono-small whitespace-pre-wrap mt-6" style={{ color: "#ff5f57" }}>{stderr}</pre>}
+          {!hasOutput && <span className="text-mono-x-small" style={{ color: "#555" }}>No output</span>}
         </div>
       )}
     </div>
@@ -1219,18 +1223,18 @@ export default function PlanVisualization({
             return item.status === "complete" ? (
               <BashResult key={i} command={item.command!} stdout={item.stdout!} stderr={item.stderr!} exitCode={item.exitCode!} />
             ) : (
-              <div key={i} className="my-12 rounded-10 border border-border-faint overflow-hidden">
-                <div className="flex items-center gap-8 px-14 py-8">
-                  <div className="w-24 h-24 rounded-6 bg-black-alpha-4 flex-center flex-shrink-0">
-                    <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className="text-black-alpha-40" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" />
-                    </svg>
+              <div key={i} className="my-12 rounded-10 overflow-hidden" style={{ background: "#1e1e1e" }}>
+                <div className="flex items-center gap-8 px-14 py-10">
+                  <div className="flex items-center gap-4 flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full" style={{ background: "#ff5f57" }} />
+                    <div className="w-8 h-8 rounded-full" style={{ background: "#febc2e" }} />
+                    <div className="w-8 h-8 rounded-full" style={{ background: "#28c840" }} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-label-small text-accent-black">Using Firecrawl&apos;s computer</div>
-                    <div className="text-mono-x-small text-black-alpha-24 truncate">{describeBashAction(item.command ?? "").label}</div>
+                    <div className="text-label-small" style={{ color: "#e0e0e0" }}>{describeBashAction(item.command ?? "").label}</div>
+                    <div className="text-mono-x-small truncate" style={{ color: "#888" }}>{describeBashAction(item.command ?? "").detail}</div>
                   </div>
-                  <div className="w-10 h-10 rounded-full border-2 border-heat-100 border-t-transparent animate-spin flex-shrink-0" />
+                  <div className="w-10 h-10 rounded-full border-2 border-t-transparent animate-spin flex-shrink-0" style={{ borderColor: "#28c840", borderTopColor: "transparent" }} />
                 </div>
               </div>
             );
