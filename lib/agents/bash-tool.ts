@@ -1,36 +1,56 @@
 import { tool } from "ai";
 import { z } from "zod";
 
-let sharedBash: { exec: (cmd: string) => Promise<{ stdout: string; stderr: string; exitCode: number }> } | null =
-  null;
+type BashInstance = { exec: (cmd: string) => Promise<{ stdout: string; stderr: string; exitCode: number }> };
+
+// Persist across Next.js HMR in dev
+const g = globalThis as unknown as { __firecrawlBash?: BashInstance };
+
+function getSharedBash(): BashInstance | null {
+  return g.__firecrawlBash ?? null;
+}
+function setSharedBash(b: BashInstance) {
+  g.__firecrawlBash = b;
+}
 
 export async function initBashWithFiles(
   files: Record<string, string>,
 ) {
   const { Bash } = await import("just-bash");
-  sharedBash = new Bash();
+  const bash = new Bash();
+  setSharedBash(bash);
   for (const [path, content] of Object.entries(files)) {
-    await sharedBash.exec(`mkdir -p "$(dirname "${path}")"`);
-    // Write file using heredoc to handle special characters
-    await sharedBash.exec(
+    await bash.exec(`mkdir -p "$(dirname "${path}")"`);
+    await bash.exec(
       `cat > "${path}" << 'FIRECRAWL_EOF'\n${content}\nFIRECRAWL_EOF`,
     );
   }
 }
 
 export async function listBashFiles(): Promise<{ path: string; size: number }[]> {
-  if (!sharedBash) return [];
-  const result = await sharedBash.exec("find /data -type f 2>/dev/null | while read f; do s=$(wc -c < \"$f\" 2>/dev/null); echo \"$s $f\"; done");
-  if (!result.stdout.trim()) return [];
-  return result.stdout.trim().split("\n").filter(Boolean).map((line) => {
-    const spaceIdx = line.indexOf(" ");
-    return { path: line.slice(spaceIdx + 1), size: parseInt(line.slice(0, spaceIdx)) || 0 };
-  });
+  const bash = getSharedBash();
+  if (!bash) return [];
+  const result = await bash.exec("ls -R /data 2>/dev/null");
+  if (result.exitCode !== 0 || !result.stdout.trim()) return [];
+  const files: { path: string; size: number }[] = [];
+  let currentDir = "/data";
+  for (const line of result.stdout.split("\n")) {
+    if (line.endsWith(":")) {
+      currentDir = line.slice(0, -1);
+    } else if (line.trim() && !line.startsWith("total")) {
+      const path = `${currentDir}/${line.trim()}`;
+      const sizeResult = await bash.exec(`wc -c < "${path}" 2>/dev/null`);
+      const size = parseInt(sizeResult.stdout.trim()) || 0;
+      if (size > 0) files.push({ path, size });
+    }
+  }
+  return files;
 }
 
 export async function readBashFile(path: string): Promise<string> {
-  if (!sharedBash) return "";
-  const result = await sharedBash.exec(`cat "${path}"`);
+  const bash = getSharedBash();
+  if (!bash) return "";
+  const result = await bash.exec(`cat "${path}"`);
   return result.stdout;
 }
 
@@ -45,11 +65,13 @@ export const bashExec = tool({
       ),
   }),
   execute: async ({ command }) => {
-    if (!sharedBash) {
+    let bash = getSharedBash();
+    if (!bash) {
       const { Bash } = await import("just-bash");
-      sharedBash = new Bash();
+      bash = new Bash();
+      setSharedBash(bash);
     }
-    const result = await sharedBash.exec(command);
+    const result = await bash.exec(command);
     return {
       stdout: result.stdout,
       stderr: result.stderr,
