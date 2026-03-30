@@ -1243,7 +1243,7 @@ export default function PlanVisualization({
                       <div className="text-label-small text-accent-black">{bashInfo.label}</div>
                       {bashInfo.detail && <div className="text-mono-x-small text-black-alpha-24 truncate">{bashInfo.detail}</div>}
                     </div>
-                    <div className="w-10 h-10 rounded-full border-2 border-heat-100 border-t-transparent animate-spin flex-shrink-0" />
+                    <div className="w-5 h-5 rounded-full bg-heat-100 animate-pulse flex-shrink-0" />
                   </div>
                 </div>
               ) : (
@@ -1258,7 +1258,7 @@ export default function PlanVisualization({
                       <div className="text-label-small text-accent-black">{bashInfo.label}</div>
                       {bashInfo.detail && <div className="text-mono-x-small text-black-alpha-24 truncate">{bashInfo.detail}</div>}
                     </div>
-                    <div className="w-10 h-10 rounded-full border-2 border-heat-100 border-t-transparent animate-spin flex-shrink-0" />
+                    <div className="w-5 h-5 rounded-full bg-heat-100 animate-pulse flex-shrink-0" />
                   </div>
                 </div>
               );
