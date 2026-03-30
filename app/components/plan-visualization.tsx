@@ -370,13 +370,15 @@ function InteractCard({ item }: { item: TimelineItem }) {
 
   return (
     <>
-      {/* Inline live viewer */}
-      {isRunning && item.liveViewUrl && (
-        <div className="my-12 rounded-10 border border-heat-40 overflow-hidden">
-          <div className="flex items-center gap-6 px-12 py-6 bg-heat-4 border-b border-heat-40">
-            <div className="w-6 h-6 rounded-full bg-heat-100 animate-pulse" />
-            <span className="text-mono-x-small text-black-alpha-48">Live View</span>
-          </div>
+      {/* Inline live viewer — shows during and after interact */}
+      {item.liveViewUrl && (
+        <div className="my-12 rounded-10 border border-border-faint overflow-hidden">
+          {isRunning && (
+            <div className="flex items-center gap-6 px-12 py-6 bg-heat-4 border-b border-heat-40">
+              <div className="w-6 h-6 rounded-full bg-heat-100 animate-pulse" />
+              <span className="text-mono-x-small text-black-alpha-48">Live View</span>
+            </div>
+          )}
           <iframe
             src={item.liveViewUrl}
             className="w-full border-0"
