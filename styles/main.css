@@ -93,6 +93,21 @@
   min-width: max-content;
 }
 
+/* Hide language labels (mermaid, json, csv, etc.) on code/mermaid blocks */
+[data-streamdown="code-block-header"],
+[data-streamdown="mermaid-block"] > div:first-child > span {
+  display: none;
+}
+
+/* Smaller pan/zoom controls on mermaid */
+[data-streamdown="mermaid-block"] button {
+  padding: 4px;
+}
+[data-streamdown="mermaid-block"] button svg {
+  width: 14px;
+  height: 14px;
+}
+
 /* JSON viewer overrides */
 .json-view-lite {
   font-family: var(--font-mono, ui-monospace, monospace) !important;
