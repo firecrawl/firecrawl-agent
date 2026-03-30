@@ -78,13 +78,29 @@
   --sd-muted-fg: hsl(var(--muted-foreground));
 }
 
-/* Mermaid diagrams — ensure adequate height */
-[data-streamdown="mermaid-block"] svg {
-  min-height: 300px;
-  max-height: 600px;
+/*
+ * Streamdown spacing fix.
+ * This project's Tailwind config maps spacing to px (px-4 = 4px).
+ * Streamdown expects standard Tailwind scale (px-4 = 1rem = 16px).
+ * We restore rem-based spacing inside Streamdown containers.
+ */
+[data-streamdown] {
+  /* Table cells */
+  --sd-cell-px: 1rem;
+  --sd-cell-py: 0.5rem;
+}
+[data-streamdown="table-header-cell"] {
+  padding: 0.5rem 1rem !important;
+}
+[data-streamdown="table-cell"] {
+  padding: 0.5rem 1rem !important;
+}
+[data-streamdown="table-wrapper"] {
+  padding: 0.5rem !important;
+  gap: 0.5rem !important;
 }
 
-/* Code blocks — ensure proper overflow and no content overlap */
+/* Code blocks */
 [data-streamdown="code-block"] pre {
   overflow-x: auto;
 }
@@ -92,28 +108,58 @@
   display: block;
   min-width: max-content;
 }
-
-/* Compact language labels on code/mermaid blocks */
 [data-streamdown="code-block-header"] {
-  padding: 4px 12px;
+  padding: 0.25rem 0.75rem !important;
   font-size: 0.75rem;
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+/* Mermaid */
+[data-streamdown="mermaid-block"] {
+  padding: 0.5rem !important;
+  gap: 0.5rem !important;
 }
 [data-streamdown="mermaid-block"] > div:first-child {
-  padding: 4px 12px;
-  height: auto;
-  min-height: 0;
+  padding: 0.25rem 0.5rem !important;
+  height: auto !important;
+  min-height: 0 !important;
 }
 [data-streamdown="mermaid-block"] > div:first-child > span {
   font-size: 0.75rem;
 }
-
-/* Smaller pan/zoom controls on mermaid */
-[data-streamdown="mermaid-block"] button {
-  padding: 4px;
+/* Mermaid action buttons (download/copy/fullscreen) */
+[data-streamdown="mermaid-block-actions"],
+[data-streamdown="code-block-actions"] {
+  padding: 0.25rem 0.375rem !important;
+  gap: 0.25rem !important;
 }
-[data-streamdown="mermaid-block"] button svg {
-  width: 14px;
-  height: 14px;
+[data-streamdown="mermaid-block-actions"] button,
+[data-streamdown="code-block-actions"] button {
+  padding: 0.25rem !important;
+}
+[data-streamdown="mermaid-block-actions"] button svg,
+[data-streamdown="code-block-actions"] button svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+/* Blockquotes */
+[data-streamdown="blockquote"] {
+  padding-left: 1rem !important;
+  margin-top: 1rem !important;
+  margin-bottom: 1rem !important;
+}
+
+/* Lists */
+[data-streamdown="ordered-list"],
+[data-streamdown="unordered-list"] {
+  padding-left: 1.5rem !important;
+}
+
+/* Spacing between block elements */
+[data-streamdown] > .space-y-4 > * + * {
+  margin-top: 1rem !important;
 }
 
 /* JSON viewer overrides */
