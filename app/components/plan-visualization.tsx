@@ -789,6 +789,88 @@ function TextBlock({ text }: { text: string }) {
   );
 }
 
+function WorkerCard({ id, prompt, result, workerStatus }: { id: string; prompt: string; result?: string; workerStatus: "running" | "done" | "error" }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className={cn(
+      "rounded-8 border overflow-hidden transition-all",
+      workerStatus === "running" ? "border-heat-40 bg-heat-4" : workerStatus === "error" ? "border-accent-crimson/30 bg-accent-crimson/4" : "border-border-faint",
+    )}>
+      <button
+        type="button"
+        className="w-full flex items-center gap-8 px-12 py-8 text-left hover:bg-black-alpha-2 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        {workerStatus === "running" && (
+          <div className="w-8 h-8 rounded-full border-2 border-heat-100 border-t-transparent animate-spin flex-shrink-0" />
+        )}
+        {workerStatus === "done" && (
+          <svg className="w-12 h-12 text-accent-forest flex-shrink-0" fill="none" viewBox="0 0 16 16">
+            <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+        {workerStatus === "error" && (
+          <svg className="w-12 h-12 text-accent-crimson flex-shrink-0" fill="none" viewBox="0 0 16 16">
+            <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="text-label-small text-accent-black">{id}</div>
+          <div className="text-mono-x-small text-black-alpha-32 truncate">{prompt.slice(0, 80)}</div>
+        </div>
+        {result && (
+          <svg fill="none" height="10" viewBox="0 0 24 24" width="10" className={cn("transition-transform text-black-alpha-24", expanded && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        )}
+      </button>
+      {expanded && result && (
+        <div className="border-t border-border-faint px-12 py-10 max-h-300 overflow-auto no-scrollbar">
+          <StreamdownBlock>{result}</StreamdownBlock>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WorkersPanel({ item }: { item: TimelineItem }) {
+  const tasks = item.workerTasks ?? [];
+  const results = item.workerResults ?? [];
+  const isRunning = item.status === "running";
+  const resultMap = new Map(results.map((r) => [r.id, r]));
+
+  return (
+    <div className="my-12">
+      <div className="flex items-center gap-6 mb-8">
+        {isRunning ? (
+          <div className="w-10 h-10 rounded-full border-2 border-heat-100 border-t-transparent animate-spin flex-shrink-0" />
+        ) : (
+          <svg className="w-14 h-14 text-accent-forest flex-shrink-0" fill="none" viewBox="0 0 16 16">
+            <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+        <span className="text-label-small text-accent-black">
+          {isRunning ? `Running ${tasks.length} workers in parallel` : `${results.length} workers completed`}
+        </span>
+      </div>
+      <div className="flex flex-col gap-4 pl-20">
+        {tasks.map((task) => {
+          const r = resultMap.get(task.id);
+          return (
+            <WorkerCard
+              key={task.id}
+              id={task.id}
+              prompt={task.prompt}
+              result={r?.result}
+              workerStatus={isRunning && !r ? "running" : r?.status === "error" ? "error" : "done"}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function SkillLoad({ name, description, status }: { name: string; description?: string; status: "running" | "complete" }) {
   return (
     <div className="my-12 rounded-10 border border-border-faint overflow-hidden">
@@ -823,7 +905,7 @@ function isToolPart(part: { type: string }): boolean {
 }
 
 interface TimelineItem {
-  type: "text" | "search" | "scrape" | "interact" | "bash" | "skill" | "subagent" | "format" | "other";
+  type: "text" | "search" | "scrape" | "interact" | "bash" | "skill" | "subagent" | "format" | "workers" | "other";
   // text
   text?: string;
   // search
@@ -854,6 +936,9 @@ interface TimelineItem {
   // format output
   formatType?: string;
   formatData?: { format: string; content: string };
+  // workers
+  workerTasks?: { id: string; prompt: string }[];
+  workerResults?: { id: string; status: string; result: string; steps: number }[];
   // status
   status: "running" | "complete";
 }
@@ -1019,16 +1104,10 @@ function extractTimeline(messages: UIMessage[]): TimelineItem[] {
           const taskList = Array.isArray((input as Record<string, unknown>).tasks)
             ? (input as Record<string, unknown>).tasks as { id: string; prompt: string }[]
             : [];
-          const results = outObj?.results ?? [];
-          // Render each worker result as inline text
-          const workerSummary = results.map((r) =>
-            `### Worker: ${r.id} ${r.status === "done" ? "✓" : "✗"}\n${r.result}`
-          ).join("\n\n---\n\n");
           items.push({
-            type: "text",
-            text: workerSummary || (status === "running"
-              ? `Running ${taskList.length} workers in parallel: ${taskList.map((t) => t.id).join(", ")}...`
-              : "Workers completed"),
+            type: "workers",
+            workerTasks: taskList,
+            workerResults: outObj?.results ?? [],
             status,
           });
         } else if (toolName.startsWith("subagent_")) {
@@ -1216,6 +1295,8 @@ export default function PlanVisualization({
             const skillLabel = fmtLabel[item.formatType ?? "text"] ?? "Export";
             return <SkillLoad key={i} name={`${skillLabel} Skill`} description={item.status === "running" ? "Formatting output..." : "Output ready"} status={item.status} />;
           }
+          case "workers":
+            return <WorkersPanel key={i} item={item} />;
           default:
             return null;
         }
@@ -1226,26 +1307,8 @@ export default function PlanVisualization({
         const last = timeline.length > 0 ? timeline[timeline.length - 1] : null;
         const lastRunning = last?.status === "running" ? last : null;
 
-        // spawnWorkers running — show worker cards
-        if (lastRunning?.type === "text" && lastRunning.text?.includes("workers in parallel")) {
-          const workerIds = lastRunning.text.match(/: (.+)\.\.\.$/)?.[1]?.split(", ") ?? [];
-          return (
-            <div className="my-12">
-              <div className="flex items-center gap-6 mb-8 px-4">
-                <div className="w-12 h-12 rounded-full border-2 border-black-alpha-8 border-t-heat-100 animate-spin flex-shrink-0" />
-                <span className="text-body-small text-black-alpha-40">Running {workerIds.length} workers in parallel</span>
-              </div>
-              <div className="grid grid-cols-2 gap-6 px-4">
-                {workerIds.map((id) => (
-                  <div key={id} className="flex items-center gap-8 px-12 py-10 rounded-8 border border-heat-40 bg-heat-4 animate-pulse">
-                    <div className="w-8 h-8 rounded-full border-2 border-heat-100 border-t-transparent animate-spin flex-shrink-0" />
-                    <span className="text-label-small text-accent-black">{id}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        }
+        // Workers panel handles its own running state — skip here
+        if (lastRunning?.type === "workers") return null;
 
         // Regular tool running — describe it
         let description = "Thinking...";
