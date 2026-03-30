@@ -370,24 +370,6 @@ function InteractCard({ item }: { item: TimelineItem }) {
 
   return (
     <>
-      {/* Inline live viewer — shows during and after interact */}
-      {item.liveViewUrl && (
-        <div className="my-12 rounded-10 border border-border-faint overflow-hidden">
-          {isRunning && (
-            <div className="flex items-center gap-6 px-12 py-6 bg-heat-4 border-b border-heat-40">
-              <div className="w-6 h-6 rounded-full bg-heat-100 animate-pulse" />
-              <span className="text-mono-x-small text-black-alpha-48">Live View</span>
-            </div>
-          )}
-          <iframe
-            src={item.liveViewUrl}
-            className="w-full border-0"
-            style={{ height: 400 }}
-            title="Live browser view"
-          />
-        </div>
-      )}
-
       <div className={cn(
         "my-12 rounded-10 border overflow-hidden transition-all",
         isRunning ? "border-heat-40 shadow-sm" : "border-border-faint",
@@ -447,6 +429,18 @@ function InteractCard({ item }: { item: TimelineItem }) {
           "transition-all duration-300 overflow-hidden",
           contentCollapsed ? "max-h-0 opacity-0" : "max-h-[4000px] opacity-100",
         )}>
+          {/* Live view embedded in card */}
+          {item.liveViewUrl && (
+            <div className="border-b border-border-faint">
+              <iframe
+                src={item.liveViewUrl}
+                className="w-full border-0"
+                style={{ height: 350 }}
+                title="Live browser view"
+              />
+            </div>
+          )}
+
           {/* Expand toggle */}
           {!isRunning && (item.interactOutput || item.content) && (
             <div className="mx-14 mb-6 flex justify-end">
@@ -470,8 +464,8 @@ function InteractCard({ item }: { item: TimelineItem }) {
           {!isRunning && (item.interactOutput || item.content) && (
             <div className={cn("mx-14 mb-10", expanded ? "flex flex-col gap-8" : "flex flex-col gap-8")}>
               {item.interactOutput && (
-                <div className="bg-black-alpha-2 rounded-8 border border-border-faint p-12">
-                  <StreamdownBlock>{item.interactOutput}</StreamdownBlock>
+                <div className="bg-black-alpha-2 rounded-8 border border-border-faint p-12 max-h-200 overflow-auto no-scrollbar">
+                  <StreamdownBlock>{item.interactOutput.length > 500 ? item.interactOutput.slice(0, 500) + "\n\n..." : item.interactOutput}</StreamdownBlock>
                 </div>
               )}
               {item.content && (
