@@ -16,6 +16,8 @@ export interface WorkerProgress {
   currentTool?: string;
   currentInput?: string;
   tokens: number;
+  inputTokens: number;
+  outputTokens: number;
   stepLog: { tool: string; input: string }[];
 }
 
@@ -66,6 +68,8 @@ export function createWorkerTool(
           status: "running",
           steps: 0,
           tokens: 0,
+          inputTokens: 0,
+          outputTokens: 0,
           stepLog: [],
         });
       }
@@ -103,14 +107,16 @@ export function createWorkerTool(
                   currentTool: toolName,
                   currentInput: toolInput || undefined,
                   tokens: (prev?.tokens ?? 0) + (usage?.totalTokens ?? 0),
+                  inputTokens: (prev?.inputTokens ?? 0) + (usage?.inputTokens ?? 0),
+                  outputTokens: (prev?.outputTokens ?? 0) + (usage?.outputTokens ?? 0),
                   stepLog: [...prevLog, { tool: toolName, input: toolInput }],
                 });
               },
             });
 
             const tokens = workerProgress.get(task.id)?.tokens ?? 0;
-            const doneLog = workerProgress.get(task.id)?.stepLog ?? [];
-            workerProgress.set(task.id, { id: task.id, status: "done", steps: result.steps.length, tokens, stepLog: doneLog });
+            const donePrev = workerProgress.get(task.id);
+            workerProgress.set(task.id, { id: task.id, status: "done", steps: result.steps.length, tokens, inputTokens: donePrev?.inputTokens ?? 0, outputTokens: donePrev?.outputTokens ?? 0, stepLog: donePrev?.stepLog ?? [] });
 
             return {
               id: task.id,
@@ -127,7 +133,7 @@ export function createWorkerTool(
               })),
             };
           } catch (err) {
-            workerProgress.set(task.id, { id: task.id, status: "error", steps: 0, tokens: 0, stepLog: [] });
+            workerProgress.set(task.id, { id: task.id, status: "error", steps: 0, tokens: 0, inputTokens: 0, outputTokens: 0, stepLog: [] });
             return {
               id: task.id,
               status: "error" as const,
