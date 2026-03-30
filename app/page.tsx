@@ -1201,6 +1201,25 @@ export default function AgentPage() {
               </div>
             </div>
 
+            {/* Generate buttons */}
+            <div className="grid grid-cols-3 gap-8 mt-10">
+              {[
+                { label: "Generate CSV", format: "CSV", skill: "export-csv" },
+                { label: "Generate JSON", format: "JSON", skill: "export-json" },
+                { label: "Generate Markdown", format: "Markdown", skill: "export-report" },
+              ].map((btn) => (
+                <button
+                  key={btn.format}
+                  type="button"
+                  className="px-12 py-8 rounded-10 border border-border-faint text-label-small text-black-alpha-48 hover:border-heat-40 hover:text-heat-100 hover:bg-heat-4 transition-all text-center"
+                  onClick={() => {
+                    sendMessage({ text: `Load the "${btn.skill}" skill and format all collected data as ${btn.format}. Follow the skill instructions. Stream the output inline.` });
+                  }}
+                >
+                  {btn.label}
+                </button>
+              ))}
+            </div>
 
           </div>
         )}
