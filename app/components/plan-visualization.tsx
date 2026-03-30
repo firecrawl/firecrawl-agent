@@ -1288,7 +1288,7 @@ export default function PlanVisualization({
         if (lastRunning?.type === "workers") return null;
 
         // Regular tool running — show as a card tile
-        let title = "Generating response";
+        let title = "Thinking";
         let subtitle = "";
         if (lastRunning?.type === "search") { title = "Searching"; subtitle = lastRunning.text?.slice(0, 80) ?? ""; }
         else if (lastRunning?.type === "scrape") { title = "Scraping"; subtitle = lastRunning.url ? new URL(lastRunning.url).hostname : ""; }
