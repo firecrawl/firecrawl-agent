@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import type { UIMessage } from "ai";
 import StreamdownBlock from "@/components/shared/streamdown-block";
 import { cn } from "@/utils/cn";
@@ -789,17 +789,45 @@ function TextBlock({ text }: { text: string }) {
   );
 }
 
-function WorkerCard({ id, prompt, result, workerStatus }: { id: string; prompt: string; result?: string; workerStatus: "running" | "done" | "error" }) {
+interface WorkerResultData {
+  id: string;
+  status: string;
+  result: string;
+  steps: number;
+  tokens?: number;
+  stepDetails?: { toolCalls: { name: string; input: string }[]; text: string }[];
+}
+
+interface WorkerLiveProgress {
+  id: string;
+  status: string;
+  steps: number;
+  currentTool?: string;
+  currentInput?: string;
+  tokens: number;
+}
+
+function WorkerCard({ id, prompt, result, workerStatus, liveProgress, stepDetails }: {
+  id: string;
+  prompt: string;
+  result?: string;
+  workerStatus: "running" | "done" | "error";
+  liveProgress?: WorkerLiveProgress;
+  stepDetails?: { toolCalls: { name: string; input: string }[]; text: string }[];
+}) {
   const [expanded, setExpanded] = useState(false);
+  const steps = liveProgress?.steps ?? result ? (stepDetails?.length ?? 0) : 0;
+  const tokens = liveProgress?.tokens ?? 0;
+
   return (
     <div className={cn(
       "rounded-10 border overflow-hidden transition-all",
-      workerStatus === "running" ? "border-heat-40" : workerStatus === "error" ? "border-accent-crimson/30" : "border-border-faint hover:border-black-alpha-16",
+      workerStatus === "error" ? "border-accent-crimson/20" : "border-border-faint hover:border-black-alpha-16",
     )}>
       <button
         type="button"
         className="w-full flex items-center gap-8 px-14 py-10 text-left hover:bg-black-alpha-2 transition-colors"
-        onClick={() => result && setExpanded(!expanded)}
+        onClick={() => setExpanded(!expanded)}
       >
         {workerStatus === "running" && (
           <div className="w-10 h-10 rounded-full border-2 border-heat-100 border-t-transparent animate-spin flex-shrink-0" />
@@ -815,18 +843,53 @@ function WorkerCard({ id, prompt, result, workerStatus }: { id: string; prompt: 
           </svg>
         )}
         <div className="flex-1 min-w-0">
-          <div className="text-label-medium text-accent-black">{id}</div>
-          <div className="text-body-small text-black-alpha-40 truncate">{prompt.slice(0, 80)}</div>
+          <div className="flex items-center gap-6">
+            <span className="text-label-medium text-accent-black">{id}</span>
+            {steps > 0 && (
+              <span className="text-mono-x-small text-black-alpha-24">
+                {steps} step{steps !== 1 ? "s" : ""}{tokens > 0 ? ` · ~${tokens > 1000 ? `${(tokens / 1000).toFixed(1)}k` : tokens} tokens` : ""}
+              </span>
+            )}
+          </div>
+          {workerStatus === "running" && liveProgress?.currentTool ? (
+            <div className="text-body-small text-heat-100 truncate animate-pulse">
+              {liveProgress.currentTool}{liveProgress.currentInput ? `: ${liveProgress.currentInput.slice(0, 60)}` : ""}
+            </div>
+          ) : (
+            <div className="text-body-small text-black-alpha-40 truncate">{prompt.slice(0, 80)}</div>
+          )}
         </div>
-        {result && (
-          <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24", expanded && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        )}
+        <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24", expanded && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
       </button>
-      {expanded && result && (
-        <div className="border-t border-border-faint px-14 py-10 max-h-400 overflow-auto no-scrollbar">
-          <StreamdownBlock>{result}</StreamdownBlock>
+      {expanded && (
+        <div className="border-t border-border-faint">
+          {/* Step timeline */}
+          {stepDetails && stepDetails.length > 0 && (
+            <div className="px-14 py-8 flex flex-col gap-3">
+              {stepDetails.map((step, si) => (
+                <div key={si} className="flex items-start gap-6">
+                  <div className="w-16 h-16 rounded-full bg-black-alpha-4 flex-center flex-shrink-0 mt-2 text-mono-x-small text-black-alpha-32">{si + 1}</div>
+                  <div className="min-w-0 flex-1">
+                    {step.toolCalls.map((tc, ti) => (
+                      <div key={ti} className="text-mono-x-small text-black-alpha-48 truncate">{tc.name}: {tc.input}</div>
+                    ))}
+                    {step.text && <div className="text-body-small text-black-alpha-32 truncate mt-1">{step.text}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {/* Final result */}
+          {result && (
+            <div className={cn("px-14 py-10 max-h-400 overflow-auto no-scrollbar", stepDetails?.length ? "border-t border-border-faint" : "")}>
+              <StreamdownBlock>{result}</StreamdownBlock>
+            </div>
+          )}
+          {workerStatus === "running" && !result && (
+            <div className="px-14 py-10 text-body-small text-black-alpha-24">Running...</div>
+          )}
         </div>
       )}
     </div>
@@ -835,9 +898,24 @@ function WorkerCard({ id, prompt, result, workerStatus }: { id: string; prompt: 
 
 function WorkersPanel({ item }: { item: TimelineItem }) {
   const tasks = item.workerTasks ?? [];
-  const results = item.workerResults ?? [];
+  const results = (item.workerResults ?? []) as WorkerResultData[];
   const isRunning = item.status === "running";
   const resultMap = new Map(results.map((r) => [r.id, r]));
+
+  // Poll for live progress while workers are running
+  const [liveProgress, setLiveProgress] = useState<Record<string, WorkerLiveProgress>>({});
+  useEffect(() => {
+    if (!isRunning) return;
+    const poll = () => {
+      fetch("/api/workers/progress")
+        .then((r) => r.json())
+        .then(setLiveProgress)
+        .catch(() => {});
+    };
+    poll();
+    const interval = setInterval(poll, 1000);
+    return () => clearInterval(interval);
+  }, [isRunning]);
 
   return (
     <div className="my-12">
@@ -856,6 +934,7 @@ function WorkersPanel({ item }: { item: TimelineItem }) {
       <div className="flex flex-col gap-6">
         {tasks.map((task) => {
           const r = resultMap.get(task.id);
+          const live = liveProgress[task.id];
           return (
             <WorkerCard
               key={task.id}
@@ -863,6 +942,8 @@ function WorkersPanel({ item }: { item: TimelineItem }) {
               prompt={task.prompt}
               result={r?.result}
               workerStatus={isRunning && !r ? "running" : r?.status === "error" ? "error" : "done"}
+              liveProgress={isRunning && !r ? live : undefined}
+              stepDetails={r?.stepDetails}
             />
           );
         })}
@@ -938,7 +1019,7 @@ interface TimelineItem {
   formatData?: { format: string; content: string };
   // workers
   workerTasks?: { id: string; prompt: string }[];
-  workerResults?: { id: string; status: string; result: string; steps: number }[];
+  workerResults?: WorkerResultData[];
   // status
   status: "running" | "complete";
 }

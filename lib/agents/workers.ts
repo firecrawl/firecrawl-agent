@@ -7,6 +7,37 @@ import type { SkillMetadata } from "../types";
 import { createSkillTools } from "../skills/tools";
 import { config } from "@/config";
 
+// --- Progress tracking (persists across HMR) ---
+
+export interface WorkerProgress {
+  id: string;
+  status: "running" | "done" | "error";
+  steps: number;
+  currentTool?: string;
+  currentInput?: string;
+  tokens: number;
+}
+
+const g = globalThis as unknown as { __workerProgress?: Map<string, WorkerProgress> };
+if (!g.__workerProgress) g.__workerProgress = new Map();
+export const workerProgress = g.__workerProgress;
+
+export interface WorkerStepDetail {
+  toolCalls: { name: string; input: string }[];
+  text: string;
+}
+
+export interface WorkerResult {
+  id: string;
+  status: "done" | "error";
+  result: string;
+  steps: number;
+  tokens: number;
+  stepDetails: WorkerStepDetail[];
+}
+
+// --- Worker tool ---
+
 export function createWorkerTool(
   model: LanguageModel,
   firecrawlApiKey: string,
@@ -17,28 +48,38 @@ export function createWorkerTool(
   const workerTools = { ...fcTools, ...skillTools, formatOutput, bashExec };
 
   return tool({
-    description: `Spawn parallel worker agents to handle independent tasks concurrently. Each worker gets its own isolated context and full toolkit (search, scrape, interact, bash). Workers return only a concise summary — the orchestrator context stays clean. Use this when you have 2+ independent data collection tasks (e.g., scraping multiple sites, researching multiple companies).`,
+    description: `Spawn parallel worker agents to handle independent tasks concurrently. Each worker gets its own isolated context and full toolkit (search, scrape, interact, bash). Workers return only a concise summary — the orchestrator context stays clean. Use this when you have 2+ independent data collection tasks.`,
     inputSchema: z.object({
       tasks: z.array(z.object({
-        id: z.string().describe("Short identifier for this task (e.g. 'vercel', 'nvidia')"),
-        prompt: z.string().describe("The task for the worker to complete. Be specific about what to find and how to format the result."),
+        id: z.string().describe("Short identifier (e.g. 'vercel', 'nvidia')"),
+        prompt: z.string().describe("The task to complete. Be specific."),
       })).describe("Array of independent tasks to run in parallel"),
     }),
     execute: async ({ tasks }, { abortSignal }) => {
-      // Limit concurrent workers
       const limited = tasks.slice(0, config.maxWorkers);
-      const results = await Promise.all(
+
+      // Clear progress for this batch
+      for (const task of limited) {
+        workerProgress.set(task.id, {
+          id: task.id,
+          status: "running",
+          steps: 0,
+          tokens: 0,
+        });
+      }
+
+      const results: WorkerResult[] = await Promise.all(
         limited.map(async (task) => {
           try {
             const worker = new ToolLoopAgent({
               model,
               instructions: `You are a focused worker agent. Complete the task and return a clean, concise result.
 - Use search, scrape, and interact as needed.
-- Return ONLY the findings — no narration, no "here's what I found", just the data.
+- Return ONLY the findings — no narration, just the data.
 - For tabular data, use a markdown table.
 - For structured data, use JSON.
 - Keep your response under 500 words.
-- Save any large datasets to /data/${task.id}.json using bashExec.`,
+- Save large datasets to /data/${task.id}.json using bashExec.`,
               tools: workerTools,
               stopWhen: stepCountIs(config.workerMaxSteps),
             });
@@ -46,20 +87,47 @@ export function createWorkerTool(
             const result = await worker.generate({
               prompt: task.prompt,
               abortSignal,
+              onStepFinish: ({ toolCalls, usage }) => {
+                const prev = workerProgress.get(task.id);
+                const lastTool = toolCalls?.[toolCalls.length - 1];
+                const tc = lastTool as Record<string, unknown> | undefined;
+                workerProgress.set(task.id, {
+                  id: task.id,
+                  status: "running",
+                  steps: (prev?.steps ?? 0) + 1,
+                  currentTool: lastTool?.toolName,
+                  currentInput: tc?.args ? JSON.stringify(tc.args).slice(0, 100) : undefined,
+                  tokens: (prev?.tokens ?? 0) + (usage?.totalTokens ?? 0),
+                });
+              },
             });
+
+            const tokens = workerProgress.get(task.id)?.tokens ?? 0;
+            workerProgress.set(task.id, { id: task.id, status: "done", steps: result.steps.length, tokens });
 
             return {
               id: task.id,
               status: "done" as const,
               result: result.text,
               steps: result.steps.length,
+              tokens,
+              stepDetails: result.steps.map((s) => ({
+                toolCalls: s.toolCalls.map((tc) => {
+                  const c = tc as Record<string, unknown>;
+                  return { name: tc?.toolName ?? "unknown", input: JSON.stringify(c?.args ?? c?.input ?? {}).slice(0, 100) };
+                }),
+                text: s.text?.slice(0, 200) ?? "",
+              })),
             };
           } catch (err) {
+            workerProgress.set(task.id, { id: task.id, status: "error", steps: 0, tokens: 0 });
             return {
               id: task.id,
               status: "error" as const,
               result: err instanceof Error ? err.message : "Unknown error",
               steps: 0,
+              tokens: 0,
+              stepDetails: [],
             };
           }
         }),
