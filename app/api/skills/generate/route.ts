@@ -1,16 +1,12 @@
-import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
 import fs from "fs/promises";
 import path from "path";
-import { getKey } from "@/lib/config/keys";
+import { getTaskModel } from "@/config";
+import { resolveModel } from "@/lib/config/resolve-model";
 
 const SKILLS_DIR = path.join(process.cwd(), ".agents", "skills");
 
 export async function POST(req: Request) {
-  const apiKey = getKey("anthropic");
-  if (!apiKey) {
-    return Response.json({ error: "ANTHROPIC_API_KEY not configured. Add it in Settings." }, { status: 500 });
-  }
 
   let body: { name: string; messages: unknown[]; prompt: string };
   try {
@@ -45,8 +41,7 @@ export async function POST(req: Request) {
     .join("\n");
 
   try {
-    const anthropic = createAnthropic({ apiKey });
-    const model = anthropic("claude-sonnet-4-6");
+    const model = await resolveModel(getTaskModel("skillGeneration"));
 
     const { text: skillContent } = await generateText({
       model,

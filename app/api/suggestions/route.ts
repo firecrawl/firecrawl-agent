@@ -1,6 +1,6 @@
-import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
-import { getKey } from "@/lib/config/keys";
+import { getTaskModel } from "@/config";
+import { resolveModel } from "@/lib/config/resolve-model";
 
 export async function POST(req: Request) {
   const { prompt, summary } = (await req.json()) as {
@@ -8,14 +8,8 @@ export async function POST(req: Request) {
     summary: string;
   };
 
-  const apiKey = getKey("anthropic");
-  if (!apiKey) {
-    return Response.json({ suggestions: [] });
-  }
-
   try {
-    const anthropic = createAnthropic({ apiKey });
-    const model = anthropic("claude-haiku-4-5-20251001");
+    const model = await resolveModel(getTaskModel("suggestions"));
 
     const { text } = await generateText({
       model,

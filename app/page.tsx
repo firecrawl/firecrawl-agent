@@ -48,10 +48,9 @@ function HeaderLinks() {
   );
 }
 
-const defaultModel: ModelConfig = {
-  provider: "anthropic",
-  model: "claude-sonnet-4-6",
-};
+import { getOrchestratorModel } from "@/config";
+
+const defaultModel: ModelConfig = getOrchestratorModel();
 
 const defaultConfig: AgentConfig = {
   prompt: "",

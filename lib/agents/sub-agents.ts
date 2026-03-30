@@ -131,7 +131,8 @@ When finished, write a clear summary of what you found.${preloadedSkills}`,
   }
 
   // Built-in sub-agents (export formatters, etc.)
-  const builtinModel = parentModel ?? await resolveModel({ provider: "anthropic", model: "claude-sonnet-4-5-20250514" });
+  const { getSubAgentModel } = await import("@/config");
+  const builtinModel = parentModel ?? await resolveModel(getSubAgentModel());
   const builtinTools = buildFullToolset(firecrawlApiKey, skills, undefined, customInstructions);
 
   for (const builtin of BUILTIN_SUBAGENTS) {

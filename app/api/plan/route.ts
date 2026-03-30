@@ -1,8 +1,8 @@
-import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
 import type { AgentConfig } from "@/lib/types";
 import { discoverSkills } from "@/lib/skills/discovery";
-import { getKey } from "@/lib/config/keys";
+import { getTaskModel } from "@/config";
+import { resolveModel } from "@/lib/config/resolve-model";
 
 export const maxDuration = 60;
 
@@ -17,12 +17,10 @@ export async function POST(req: Request) {
     ? `\nAvailable skills: ${skills.map((s) => `${s.name} (${s.description.slice(0, 60)})`).join(", ")}`
     : "";
 
-  const anthropic = createAnthropic({
-    apiKey: getKey("anthropic"),
-  });
+  const model = await resolveModel(getTaskModel("plan"));
 
   const { text } = await generateText({
-    model: anthropic("claude-haiku-4-5-20251001"),
+    model,
     system: `You are a planning agent for a web research tool powered by Firecrawl. Given a user's request, produce a clear, numbered execution plan.
 
 Available tools:

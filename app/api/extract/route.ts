@@ -1,6 +1,7 @@
 import { generateText, stepCountIs, ToolLoopAgent } from "ai";
 import { FirecrawlTools } from "firecrawl-aisdk";
 import { resolveModel } from "@/lib/config/resolve-model";
+import { getTaskModel } from "@/config";
 import { formatOutput } from "@/lib/agents/tools";
 import { bashExec } from "@/lib/agents/bash-tool";
 import { createSkillTools } from "@/lib/skills/tools";
@@ -45,8 +46,8 @@ export async function POST(req: Request) {
     schema,
     columns,
     urls,
-    model: modelId = "claude-sonnet-4-6",
-    provider = "anthropic",
+    model: modelId,
+    provider,
     maxSteps: rawMaxSteps,
   } = body as {
     prompt: string;
@@ -71,9 +72,10 @@ export async function POST(req: Request) {
   }
 
   try {
+    const extractDefault = getTaskModel("extract");
     const model = await resolveModel({
-      provider: provider as "anthropic" | "openai" | "google" | "gateway",
-      model: modelId,
+      provider: (provider ?? extractDefault.provider) as "anthropic" | "openai" | "google" | "gateway",
+      model: modelId ?? extractDefault.model,
     });
 
     const { systemPrompt: fcSystemPrompt, ...fcTools } = FirecrawlTools({

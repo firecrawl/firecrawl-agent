@@ -12,10 +12,9 @@ const TOOL_OPTIONS = [
   { id: "map" as const, label: "Map" },
 ];
 
-const defaultModel: ModelConfig = {
-  provider: "anthropic",
-  model: "claude-sonnet-4-6",
-};
+import { getSubAgentModel } from "@/config";
+
+const defaultModel: ModelConfig = getSubAgentModel();
 
 export default function SubAgentConfigurator({
   agents,
