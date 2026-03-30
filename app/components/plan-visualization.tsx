@@ -162,27 +162,22 @@ function SearchResults({ query, results, creditsUsed, isLatest }: { query: strin
     <div className="my-12 rounded-10 border border-border-faint overflow-hidden">
       <button
         type="button"
-        className="flex items-center gap-8 px-14 py-10 text-black-alpha-40 w-full text-left hover:bg-black-alpha-2 transition-colors"
+        className="flex items-center gap-8 px-14 py-10 w-full text-left hover:bg-black-alpha-2 transition-colors"
         onClick={() => setUserToggled(collapsed)}
       >
-        <SearchIcon />
         <EndpointBadge type="search" />
-        <span className="text-label-medium flex-1">Searched: &ldquo;{query}&rdquo;</span>
-        <div className="flex items-center gap-6 flex-shrink-0">
-          {results.length > 0 && (
-            <span className="text-mono-x-small text-black-alpha-24 bg-black-alpha-4 px-6 py-1 rounded-4">
-              {results.length} result{results.length !== 1 ? "s" : ""}
-            </span>
-          )}
-          {creditsUsed !== undefined && (
-            <span className="text-mono-x-small text-black-alpha-24 bg-black-alpha-4 px-6 py-1 rounded-4">
-              {creditsUsed} credit{creditsUsed !== 1 ? "s" : ""}
-            </span>
-          )}
-          <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform", collapsed && "-rotate-90")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
+        <div className="flex-1 min-w-0">
+          <div className="text-label-medium text-accent-black truncate">{query}</div>
+          <div className="text-body-small text-black-alpha-40">
+            {results.length} result{results.length !== 1 ? "s" : ""}
+          </div>
         </div>
+        <svg className="w-14 h-14 text-accent-forest flex-shrink-0" fill="none" viewBox="0 0 16 16">
+          <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24 flex-shrink-0", collapsed && "-rotate-90")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
       </button>
       {!collapsed && (
         <div className="border-t border-border-faint px-14 py-8 flex flex-col gap-4">
@@ -244,59 +239,25 @@ function ScrapeResult({
         className="w-full flex items-center gap-8 px-14 py-10 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
         onClick={() => { autoCollapsed.current = expanded; setUserToggled(expanded ? false : true); }}
       >
-        {domain ? <Favicon domain={domain} /> : <GlobeIcon />}
+        <EndpointBadge type={isInteract ? "interact" : "scrape"} />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-6">
-            <EndpointBadge type={isInteract ? "interact" : "scrape"} />
-            <span className="text-label-medium text-accent-black truncate">
-              {pageTitle || url}
-            </span>
+          <div className="text-label-medium text-accent-black truncate">
+            {pageTitle || (domain ?? url)}
           </div>
-          {pageTitle && (
-            <div className="text-body-small text-black-alpha-24 truncate mt-1">{url}</div>
-          )}
-          {scrapeQuery && (
-            <div className="text-body-small text-black-alpha-32 truncate mt-1">
-              &ldquo;{scrapeQuery}&rdquo;
-            </div>
-          )}
+          <div className="text-body-small text-black-alpha-40 truncate">
+            {scrapeQuery ? `"${scrapeQuery}"` : url}
+          </div>
         </div>
-        <div className="flex items-center gap-6 flex-shrink-0">
-          {statusCode && statusCode !== 200 && (
-            <span className={cn("text-mono-x-small px-6 py-1 rounded-4", statusCode >= 400 ? "text-accent-crimson bg-accent-crimson/8" : "text-black-alpha-24 bg-black-alpha-4")}>
-              {statusCode}
-            </span>
-          )}
-          {scrapeFormats && scrapeFormats.length > 0 && (
-            <span className="text-mono-x-small text-black-alpha-24 bg-black-alpha-4 px-6 py-1 rounded-4">
-              {scrapeFormats.join(", ")}
-            </span>
-          )}
-          {creditsUsed !== undefined && (
-            <span className="text-mono-x-small text-black-alpha-24 bg-black-alpha-4 px-6 py-1 rounded-4">
-              {creditsUsed} credit{creditsUsed !== 1 ? "s" : ""}
-            </span>
-          )}
-          {content && (
-            <span className="text-mono-x-small text-black-alpha-24 bg-black-alpha-4 px-6 py-1 rounded-4">
-              {(content.length / 1000).toFixed(1)}k
-            </span>
-          )}
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-4 rounded-4 text-black-alpha-24 hover:text-accent-bluetron hover:bg-black-alpha-4 transition-all"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
-            </svg>
-          </a>
-          <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24", expanded && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </div>
+        {domain && <Favicon domain={domain} />}
+        {statusCode && statusCode >= 400 && (
+          <span className="text-mono-x-small text-accent-crimson flex-shrink-0">{statusCode}</span>
+        )}
+        <svg className="w-14 h-14 text-accent-forest flex-shrink-0" fill="none" viewBox="0 0 16 16">
+          <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24 flex-shrink-0", expanded && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
       </button>
 
       {/* Collapsible body */}
@@ -379,48 +340,26 @@ function InteractCard({ item }: { item: TimelineItem }) {
           className="w-full flex items-center gap-8 px-14 py-10 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
           onClick={() => { if (!isRunning) setUserCollapsed(!contentCollapsed); }}
         >
-          {domain ? <Favicon domain={domain} /> : <GlobeIcon />}
+          <EndpointBadge type="interact" />
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-6">
-              <EndpointBadge type="interact" />
-              {isRunning && (
-                <div className="w-5 h-5 rounded-full bg-heat-100 animate-pulse flex-shrink-0" />
-              )}
-              <span className="text-label-medium text-accent-black truncate">
-                {item.pageTitle || item.url}
-              </span>
+            <div className="text-label-medium text-accent-black truncate">
+              {item.pageTitle || (domain ?? item.url)}
             </div>
-            {item.scrapeQuery && (
-              <div className="text-body-small text-black-alpha-32 truncate mt-1">
-                &ldquo;{item.scrapeQuery}&rdquo;
-              </div>
-            )}
+            <div className="text-body-small text-black-alpha-40 truncate">
+              {item.scrapeQuery ? `"${item.scrapeQuery}"` : item.url}
+            </div>
           </div>
-          <div className="flex items-center gap-6 flex-shrink-0">
-            {item.creditsUsed !== undefined && (
-              <span className="text-mono-x-small text-black-alpha-24 bg-black-alpha-4 px-6 py-1 rounded-4">
-                {item.creditsUsed} credit{item.creditsUsed !== 1 ? "s" : ""}
-              </span>
-            )}
-            {item.url && (
-              <a
-                href={item.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-4 rounded-4 text-black-alpha-24 hover:text-accent-black hover:bg-black-alpha-4 transition-all"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
-                </svg>
-              </a>
-            )}
-            {!isRunning && (
-              <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24", contentCollapsed && "-rotate-90")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            )}
-          </div>
+          {domain && <Favicon domain={domain} />}
+          {isRunning ? (
+            <div className="w-5 h-5 rounded-full bg-heat-100 animate-pulse flex-shrink-0" />
+          ) : (
+            <svg className="w-14 h-14 text-accent-forest flex-shrink-0" fill="none" viewBox="0 0 16 16">
+              <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+          <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24 flex-shrink-0", !contentCollapsed && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
         </button>
 
         {/* Collapsible body */}
@@ -681,36 +620,27 @@ function BashResult({ command, stdout, stderr, exitCode }: { command: string; st
   const hasOutput = !!(stdout || stderr);
   const { label, detail, isFileOp } = describeBashAction(command);
 
-  // File operations (save, read, mkdir) — light card style
-  if (isFileOp) {
-    return (
-      <div className={cn("my-12 rounded-10 border overflow-hidden transition-all", expanded ? "border-black-alpha-16 shadow-sm" : "border-border-faint hover:border-black-alpha-16")}>
+  return (
+      <div className="my-12 rounded-10 border border-border-faint overflow-hidden">
         <button
           type="button"
           className="w-full flex items-center gap-8 px-14 py-10 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
-          onClick={() => hasOutput ? setExpanded(!expanded) : undefined}
+          onClick={() => setExpanded(!expanded)}
         >
-          <div className="w-24 h-24 rounded-6 bg-black-alpha-4 flex-center flex-shrink-0">
-            <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className="text-black-alpha-40" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" /><path d="M14 2v6h6" />
-            </svg>
-          </div>
           <div className="flex-1 min-w-0">
-            <div className="text-label-small text-accent-black">{label}</div>
-            {detail && <div className="text-mono-x-small text-black-alpha-24 truncate">{detail}</div>}
+            <div className="text-label-medium text-accent-black">{label}</div>
+            {detail && <div className="text-body-small text-black-alpha-40 truncate">{detail}</div>}
           </div>
-          <div className="flex items-center gap-6 flex-shrink-0">
-            {exitCode === 0 && (
-              <svg className="w-14 h-14 text-accent-forest" fill="none" viewBox="0 0 16 16">
-                <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
-            {hasOutput && (
-              <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24", expanded && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            )}
-          </div>
+          {exitCode === 0 ? (
+            <svg className="w-14 h-14 text-accent-forest flex-shrink-0" fill="none" viewBox="0 0 16 16">
+              <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            <span className="text-mono-x-small text-accent-crimson flex-shrink-0">exit {exitCode}</span>
+          )}
+          <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24 flex-shrink-0", expanded && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
         </button>
         {expanded && hasOutput && (
           <div className="border-t border-border-faint bg-black-alpha-2 px-14 py-10 max-h-300 overflow-auto no-scrollbar">
@@ -720,56 +650,6 @@ function BashResult({ command, stdout, stderr, exitCode }: { command: string; st
         )}
       </div>
     );
-  }
-
-  // Data processing commands — same light card style
-  return (
-    <div className={cn("my-12 rounded-10 border overflow-hidden transition-all", expanded ? "border-black-alpha-16 shadow-sm" : "border-border-faint hover:border-black-alpha-16")}>
-      <button
-        type="button"
-        className="w-full flex items-center gap-8 px-14 py-10 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div className="w-24 h-24 rounded-6 bg-black-alpha-4 flex-center flex-shrink-0">
-          <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className="text-black-alpha-40" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" />
-          </svg>
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-label-small text-accent-black">{label}</div>
-          {detail && <div className="text-mono-x-small text-black-alpha-24 truncate">{detail}</div>}
-        </div>
-        <div className="flex items-center gap-6 flex-shrink-0">
-          {exitCode !== 0 && (
-            <span className="text-mono-x-small text-accent-crimson bg-accent-crimson/8 px-6 py-1 rounded-4">
-              exit {exitCode}
-            </span>
-          )}
-          {exitCode === 0 && (
-            <svg className="w-14 h-14 text-accent-forest" fill="none" viewBox="0 0 16 16">
-              <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          )}
-          <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24", expanded && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </div>
-      </button>
-
-      {expanded && (
-        <div className="border-t border-border-faint px-14 py-10 max-h-300 overflow-auto no-scrollbar">
-          <StreamdownBlock>{[
-            "```bash",
-            command,
-            "```",
-            stdout ? ["```", stdout, "```"].join("\n") : "",
-            stderr ? ["```", "# stderr", stderr, "```"].join("\n") : "",
-            !hasOutput ? "*No output*" : "",
-          ].filter(Boolean).join("\n\n")}</StreamdownBlock>
-        </div>
-      )}
-    </div>
-  );
 }
 
 // --- Skill load rendering ---
