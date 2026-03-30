@@ -1155,34 +1155,6 @@ export default function AgentPage() {
               ))}
             </div>
 
-            {/* Get code example button */}
-            <button
-              type="button"
-              className="w-full mb-10 px-14 py-10 rounded-10 bg-heat-100 text-accent-white text-label-medium hover:bg-[color:var(--heat-90)] transition-all active:scale-[0.99] text-center"
-              onClick={() => {
-                sendMessage({ text: `Show me the code to reproduce this query using the Firecrawl API. Show tabs for: Python, TypeScript/Node.js, and cURL. Include the prompt, any schemas, and the expected response format.` });
-              }}
-            >
-              Get code example
-            </button>
-
-            {/* Follow-up suggestions — stacked block level */}
-            <div className="flex flex-col gap-4 mb-10">
-              {suggestions.map((s, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className="w-full text-left px-14 py-10 rounded-10 border border-border-faint bg-accent-white text-body-small text-black-alpha-56 hover:border-heat-40 hover:text-accent-black hover:bg-heat-4 transition-all"
-                  onClick={() => {
-                    setSuggestions([]);
-                    sendMessage({ text: s });
-                  }}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-
             {/* Follow-up input */}
             <div
               className="bg-accent-white rounded-12 overflow-hidden"
