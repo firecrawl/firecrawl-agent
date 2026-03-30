@@ -793,39 +793,39 @@ function WorkerCard({ id, prompt, result, workerStatus }: { id: string; prompt: 
   const [expanded, setExpanded] = useState(false);
   return (
     <div className={cn(
-      "rounded-8 border overflow-hidden transition-all",
-      workerStatus === "running" ? "border-heat-40 bg-heat-4" : workerStatus === "error" ? "border-accent-crimson/30 bg-accent-crimson/4" : "border-border-faint",
+      "rounded-10 border overflow-hidden transition-all",
+      workerStatus === "running" ? "border-heat-40" : workerStatus === "error" ? "border-accent-crimson/30" : "border-border-faint hover:border-black-alpha-16",
     )}>
       <button
         type="button"
-        className="w-full flex items-center gap-8 px-12 py-8 text-left hover:bg-black-alpha-2 transition-colors"
-        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-8 px-14 py-10 text-left hover:bg-black-alpha-2 transition-colors"
+        onClick={() => result && setExpanded(!expanded)}
       >
         {workerStatus === "running" && (
-          <div className="w-8 h-8 rounded-full border-2 border-heat-100 border-t-transparent animate-spin flex-shrink-0" />
+          <div className="w-10 h-10 rounded-full border-2 border-heat-100 border-t-transparent animate-spin flex-shrink-0" />
         )}
         {workerStatus === "done" && (
-          <svg className="w-12 h-12 text-accent-forest flex-shrink-0" fill="none" viewBox="0 0 16 16">
+          <svg className="w-14 h-14 text-accent-forest flex-shrink-0" fill="none" viewBox="0 0 16 16">
             <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         )}
         {workerStatus === "error" && (
-          <svg className="w-12 h-12 text-accent-crimson flex-shrink-0" fill="none" viewBox="0 0 16 16">
+          <svg className="w-14 h-14 text-accent-crimson flex-shrink-0" fill="none" viewBox="0 0 16 16">
             <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
         )}
         <div className="flex-1 min-w-0">
-          <div className="text-label-small text-accent-black">{id}</div>
-          <div className="text-mono-x-small text-black-alpha-32 truncate">{prompt.slice(0, 80)}</div>
+          <div className="text-label-medium text-accent-black">{id}</div>
+          <div className="text-body-small text-black-alpha-40 truncate">{prompt.slice(0, 80)}</div>
         </div>
         {result && (
-          <svg fill="none" height="10" viewBox="0 0 24 24" width="10" className={cn("transition-transform text-black-alpha-24", expanded && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24", expanded && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M6 9l6 6 6-6" />
           </svg>
         )}
       </button>
       {expanded && result && (
-        <div className="border-t border-border-faint px-12 py-10 max-h-300 overflow-auto no-scrollbar">
+        <div className="border-t border-border-faint px-14 py-10 max-h-400 overflow-auto no-scrollbar">
           <StreamdownBlock>{result}</StreamdownBlock>
         </div>
       )}
@@ -853,7 +853,7 @@ function WorkersPanel({ item }: { item: TimelineItem }) {
           {isRunning ? `Running ${tasks.length} workers in parallel` : `${results.length} workers completed`}
         </span>
       </div>
-      <div className="flex flex-col gap-4 pl-20">
+      <div className="flex flex-col gap-6">
         {tasks.map((task) => {
           const r = resultMap.get(task.id);
           return (

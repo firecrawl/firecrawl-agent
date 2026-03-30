@@ -140,6 +140,8 @@ function PlusMenu({
   uploads,
   onRemoveUpload,
   onClose,
+  planMode,
+  onTogglePlan,
 }: {
   skills: SkillInfo[] | null;
   selectedSkills: string[];
@@ -148,6 +150,8 @@ function PlusMenu({
   uploads: UploadedFile[];
   onRemoveUpload: (i: number) => void;
   onClose: () => void;
+  planMode: boolean;
+  onTogglePlan: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState("");
@@ -250,9 +254,26 @@ function PlusMenu({
         </div>
       </div>
 
-      {/* Upload option (pinned at bottom, closest to + button) */}
+      {/* Actions (pinned at bottom) */}
       <div className="border-t border-border-faint flex-shrink-0">
-        <div className="px-6 py-6">
+        <div className="px-6 py-6 flex flex-col gap-2">
+          {/* Plan toggle */}
+          <button
+            type="button"
+            className={cn(
+              "w-full flex items-center gap-8 px-10 py-8 rounded-8 text-left transition-all",
+              planMode ? "bg-heat-8" : "hover:bg-black-alpha-2",
+            )}
+            onClick={() => { onTogglePlan(); onClose(); }}
+          >
+            <svg fill="none" height="16" viewBox="0 0 24 24" width="16" className={cn("flex-shrink-0", planMode ? "text-heat-100" : "text-black-alpha-40")} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+              <rect x="9" y="3" width="6" height="4" rx="1" />
+              <path d="M9 12h6M9 16h4" />
+            </svg>
+            <span className={cn("text-label-small", planMode ? "text-heat-100" : "text-accent-black")}>Plan before running{planMode ? " (on)" : ""}</span>
+          </button>
+          {/* Upload */}
           <button
             type="button"
             className="w-full flex items-center gap-8 px-10 py-8 rounded-8 text-left hover:bg-black-alpha-2 transition-all"
@@ -828,6 +849,8 @@ export default function AgentPage() {
                       setConfig({ ...config, uploads: (config.uploads ?? []).filter((_, idx) => idx !== i) })
                     }
                     onClose={() => setShowPlus(false)}
+                    planMode={planMode}
+                    onTogglePlan={() => { setPlanMode(!planMode); setPlanText(null); setPlanEditText(""); }}
                   />
                 )}
               </div>
@@ -880,24 +903,6 @@ export default function AgentPage() {
                 )}
               </div>
 
-              <button
-                type="button"
-                className={cn(
-                  "flex items-center gap-4 px-8 py-5 rounded-8 text-label-small transition-all",
-                  planMode
-                    ? "bg-heat-8 text-heat-100"
-                    : "text-black-alpha-32 hover:bg-black-alpha-4 hover:text-black-alpha-48",
-                )}
-                onClick={() => { setPlanMode(!planMode); setPlanText(null); setPlanEditText(""); }}
-                title={planMode ? "Plan mode on" : "Plan mode off"}
-              >
-                <svg fill="none" height="14" viewBox="0 0 24 24" width="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
-                  <rect x="9" y="3" width="6" height="4" rx="1" />
-                  <path d="M9 12h6M9 16h4" />
-                </svg>
-                <span>Plan</span>
-              </button>
               <button
                 type="button"
                 className={cn(
@@ -1053,7 +1058,7 @@ export default function AgentPage() {
         </div>
 
         {/* Recent conversations */}
-        <div className="w-full max-w-780 pb-60">
+        <div className="w-full max-w-640 pb-60">
           <HistoryPanel
             onSelect={(id, title) => setConfig({ ...config, prompt: title })}
             currentId={conversationId ?? undefined}

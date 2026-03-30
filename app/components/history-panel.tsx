@@ -62,23 +62,23 @@ export default function HistoryPanel({
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+      <div className="grid grid-cols-2 gap-8">
         {visible.map((conv) => (
           <button
             key={conv.id}
             type="button"
             className={cn(
-              "w-full text-left px-16 py-14 rounded-12 border transition-all group",
+              "w-full text-left px-14 py-10 rounded-10 border transition-all group",
               currentId === conv.id
                 ? "bg-heat-4 border-heat-20"
                 : "border-border-faint bg-accent-white hover:border-heat-40 hover:bg-heat-4",
             )}
             onClick={() => onSelect(conv.id, conv.title)}
           >
-            <div className="text-label-small text-accent-black truncate group-hover:text-heat-100 transition-colors">
+            <span className="text-body-medium text-black-alpha-48 group-hover:text-accent-black transition-colors line-clamp-2">
               {conv.title}
-            </div>
-            <div className="text-body-small text-black-alpha-32 mt-4">
+            </span>
+            <div className="text-mono-x-small text-black-alpha-24 mt-4">
               {formatRelativeTime(conv.updated_at)}
             </div>
           </button>

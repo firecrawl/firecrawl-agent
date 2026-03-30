@@ -30,6 +30,10 @@ export const config = {
   // subAgent:     { provider: "openai", model: "gpt-5.4" } satisfies ModelRef,
   // background:   { provider: "openai", model: "gpt-5.4" } satisfies ModelRef,
 
+  // ─── Parallel workers ───
+  maxWorkers: 6,               // Max concurrent worker agents
+  workerMaxSteps: 10,          // Max steps per worker
+
   // ─── Task-specific overrides ───
   // Set a model here to override the background model for that task.
   // null = use the background model above.

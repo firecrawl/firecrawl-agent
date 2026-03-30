@@ -5,6 +5,7 @@ import { bashExec } from "./bash-tool";
 import { formatOutput } from "./tools";
 import type { SkillMetadata } from "../types";
 import { createSkillTools } from "../skills/tools";
+import { config } from "@/config";
 
 export function createWorkerTool(
   model: LanguageModel,
@@ -24,8 +25,10 @@ export function createWorkerTool(
       })).describe("Array of independent tasks to run in parallel"),
     }),
     execute: async ({ tasks }, { abortSignal }) => {
+      // Limit concurrent workers
+      const limited = tasks.slice(0, config.maxWorkers);
       const results = await Promise.all(
-        tasks.map(async (task) => {
+        limited.map(async (task) => {
           try {
             const worker = new ToolLoopAgent({
               model,
@@ -37,7 +40,7 @@ export function createWorkerTool(
 - Keep your response under 500 words.
 - Save any large datasets to /data/${task.id}.json using bashExec.`,
               tools: workerTools,
-              stopWhen: stepCountIs(10),
+              stopWhen: stepCountIs(config.workerMaxSteps),
             });
 
             const result = await worker.generate({
