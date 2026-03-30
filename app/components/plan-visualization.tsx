@@ -978,22 +978,19 @@ function SkillLoad({ name, description, status }: { name: string; description?: 
       <div className="flex items-center gap-8 px-14 py-10">
         <EndpointBadge type="skill" />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-6">
-            <span className="text-label-medium text-accent-black">{name}</span>
-            {status === "running" && (
-              <div className="w-4 h-4 rounded-full bg-accent-forest animate-pulse" />
-            )}
-            {status === "complete" && (
-              <svg className="w-14 h-14 text-accent-forest flex-shrink-0" fill="none" viewBox="0 0 16 16">
-                <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
-          </div>
+          <span className="text-label-medium text-accent-black">{name}</span>
           {description && (
             <div className="text-body-small text-black-alpha-40 mt-1">{description}</div>
           )}
         </div>
-        <SkillIcon />
+        {status === "running" && (
+          <div className="w-5 h-5 rounded-full bg-heat-100 animate-pulse flex-shrink-0" />
+        )}
+        {status === "complete" && (
+          <svg className="w-14 h-14 text-accent-forest flex-shrink-0" fill="none" viewBox="0 0 16 16">
+            <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
       </div>
     </div>
   );
