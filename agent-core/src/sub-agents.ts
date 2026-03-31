@@ -54,8 +54,8 @@ function makeSubagentTool(
   return tool({
     description: `Delegate a task to sub-agent "${name}": ${description}`,
     inputSchema: subagentSchema,
-    execute: async ({ task }) => {
-      const result = await subAgent.generate({ prompt: task });
+    execute: async ({ task }, { abortSignal }) => {
+      const result = await subAgent.generate({ prompt: task, abortSignal });
       const stepDetails = result.steps.map((step) => ({
         text: step.text || "",
         toolCalls: step.toolCalls.map((tc) => {

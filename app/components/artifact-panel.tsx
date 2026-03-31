@@ -1,0 +1,372 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import type { UIMessage } from "ai";
+import { cn } from "@/utils/cn";
+import StreamdownBlock from "@/components/shared/streamdown-block";
+
+function isToolPart(part: { type: string }): boolean {
+  return part.type.startsWith("tool-") || part.type === "dynamic-tool";
+}
+
+interface FormattedOutput {
+  format: "text" | "json" | "csv";
+  content: string;
+}
+
+function extractFormattedOutput(messages: UIMessage[]): FormattedOutput & { streaming: boolean } | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (msg.role !== "assistant") continue;
+    for (const part of msg.parts) {
+      if (isToolPart(part)) {
+        const p = part as Record<string, unknown>;
+        const toolName = (p.toolName ?? (part.type as string).replace("tool-", "")) as string;
+        if (toolName !== "formatOutput") continue;
+
+        const state = (p.state ?? "") as string;
+        const isComplete = state === "output-available" || state === "result";
+
+        // Complete: use the final output
+        if (isComplete && p.output) {
+          const output = p.output as { format: string; content: string };
+          if (output.format && output.content) {
+            return { format: output.format as FormattedOutput["format"], content: output.content, streaming: false };
+          }
+        }
+
+        // Still streaming: use the tool input data as a preview
+        if (!isComplete) {
+          const input = (p.input ?? p.args ?? {}) as Record<string, unknown>;
+          const format = (input.format as string) ?? "json";
+          let content = "";
+          if (input.data !== undefined) {
+            content = typeof input.data === "string" ? input.data : JSON.stringify(input.data, null, 2);
+          }
+          if (content) {
+            return { format: format as FormattedOutput["format"], content, streaming: true };
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function download(content: string, filename: string) {
+  const blob = new Blob([content], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function JsonViewer({ data }: { data: string }) {
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  const parsed = useMemo(() => {
+    try { return JSON.parse(data); }
+    catch { return null; }
+  }, [data]);
+
+  if (!parsed) {
+    return <pre className="text-mono-small text-accent-black whitespace-pre-wrap p-14">{data}</pre>;
+  }
+
+  const toggle = (path: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path); else next.add(path);
+      return next;
+    });
+  };
+
+  const renderValue = (value: unknown, path: string, depth: number): React.ReactNode => {
+    if (value === null) return <span className="text-black-alpha-24 italic">null</span>;
+    if (typeof value === "boolean") return <span className="text-black-alpha-56">{String(value)}</span>;
+    if (typeof value === "number") return <span className="text-black-alpha-56">{value}</span>;
+    if (typeof value === "string") {
+      const display = value.length > 200 ? value.slice(0, 200) + "..." : value;
+      return <span className="text-accent-black">&quot;{display}&quot;</span>;
+    }
+
+    if (Array.isArray(value)) {
+      if (value.length === 0) return <span className="text-black-alpha-32">[]</span>;
+      const isCollapsed = collapsed.has(path);
+      return (
+        <span>
+          <button type="button" className="text-black-alpha-32 hover:text-accent-black" onClick={() => toggle(path)}>
+            {isCollapsed ? "▸" : "▾"}
+          </button>
+          {isCollapsed ? <span className="text-black-alpha-32"> [{value.length} items]</span> : (
+            <>{"[\n"}{value.map((item, i) => (
+              <span key={i}>{"    ".repeat(depth + 1)}{renderValue(item, `${path}[${i}]`, depth + 1)}{i < value.length - 1 ? <span className="text-black-alpha-24">,</span> : ""}{"\n"}</span>
+            ))}{"    ".repeat(depth)}<span className="text-black-alpha-32">]</span></>
+          )}
+        </span>
+      );
+    }
+
+    if (typeof value === "object") {
+      const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b));
+      if (entries.length === 0) return <span className="text-black-alpha-32">{"{}"}</span>;
+      const isCollapsed = collapsed.has(path);
+      return (
+        <span>
+          <button type="button" className="text-black-alpha-32 hover:text-accent-black" onClick={() => toggle(path)}>
+            {isCollapsed ? "▸" : "▾"}
+          </button>
+          {isCollapsed ? <span className="text-black-alpha-32"> {"{"}{entries.length} keys{"}"}</span> : (
+            <><span className="text-black-alpha-24">{"{"}</span>{"\n"}{entries.map(([key, val], i) => (
+              <span key={key}>{"    ".repeat(depth + 1)}<span className="text-black-alpha-48">&quot;{key}&quot;</span><span className="text-black-alpha-24">: </span>{renderValue(val, `${path}.${key}`, depth + 1)}{i < entries.length - 1 ? <span className="text-black-alpha-24">,</span> : ""}{"\n"}</span>
+            ))}{"    ".repeat(depth)}<span className="text-black-alpha-24">{"}"}</span></>
+          )}
+        </span>
+      );
+    }
+
+    return <span className="text-accent-black">{String(value)}</span>;
+  };
+
+  return (
+    <pre className="text-[13px] text-accent-black whitespace-pre-wrap font-mono leading-[1.7] p-14">
+      {renderValue(parsed, "$", 0)}
+    </pre>
+  );
+}
+
+function CsvTable({ data }: { data: string }) {
+  const rows = useMemo(() => {
+    const lines = data.split("\n").filter((l) => l.trim());
+    return lines.map((line) => {
+      const cells: string[] = [];
+      let current = "";
+      let inQuote = false;
+      for (const ch of line) {
+        if (ch === '"') inQuote = !inQuote;
+        else if (ch === "," && !inQuote) { cells.push(current.trim()); current = ""; }
+        else current += ch;
+      }
+      cells.push(current.trim());
+      return cells;
+    });
+  }, [data]);
+
+  if (rows.length < 2) return <div className="text-body-small text-black-alpha-32 p-14">No tabular data</div>;
+
+  return (
+    <div className="overflow-auto">
+      <table className="w-full text-body-small border-collapse">
+        <thead>
+          <tr className="bg-black-alpha-2 border-b border-border-faint sticky top-0">
+            {rows[0].map((h, i) => (
+              <th key={i} className="text-left text-label-small text-black-alpha-56 px-12 py-8 whitespace-nowrap">{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.slice(1).map((row, ri) => (
+            <tr key={ri} className={cn("border-b border-border-faint last:border-0", ri % 2 === 1 && "bg-black-alpha-1")}>
+              {row.map((cell, ci) => (
+                <td key={ci} className="px-12 py-6 text-accent-black whitespace-nowrap max-w-[240px] truncate" title={cell}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+interface ArtifactPanelProps {
+  messages: UIMessage[];
+  isRunning: boolean;
+  onRequestFormat: (format: string) => void;
+  onClose: () => void;
+  prompt?: string;
+  schema?: Record<string, unknown>;
+  urls?: string[];
+}
+
+function buildCodeSnippet(lang: "curl" | "fetch" | "python", prompt: string, schema?: Record<string, unknown>, urls?: string[]): string {
+  const body: Record<string, unknown> = { prompt, format: "json" };
+  if (schema) body.schema = schema;
+  if (urls?.length) body.urls = urls;
+  const jsonBody = JSON.stringify(body, null, 2);
+
+  if (lang === "curl") {
+    return `curl -X POST http://localhost:3002/api/v1/run \\
+  -H "Content-Type: application/json" \\
+  -d '${jsonBody}'`;
+  }
+  if (lang === "fetch") {
+    return `const response = await fetch("http://localhost:3002/api/v1/run", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(${jsonBody}),
+});
+const data = await response.json();
+console.log(data);`;
+  }
+  return `import requests
+
+response = requests.post(
+    "http://localhost:3002/api/v1/run",
+    json=${jsonBody.replace(/: true/g, ": True").replace(/: false/g, ": False").replace(/: null/g, ": None")},
+)
+print(response.json())`;
+}
+
+export default function ArtifactPanel({ messages, isRunning, onRequestFormat, onClose, prompt, schema, urls }: ArtifactPanelProps) {
+  const formatted = extractFormattedOutput(messages);
+
+  const [showCode, setShowCode] = useState(false);
+  const [codeLang, setCodeLang] = useState<"curl" | "fetch" | "python">("curl");
+  const [copied, setCopied] = useState(false);
+
+  if (!formatted) return null;
+
+  const fmt = formatted.format;
+  const isStreaming = formatted.streaming;
+
+  const isJson = fmt === "json";
+  const isCsv = fmt === "csv";
+  const ext = isJson ? "json" : isCsv ? "csv" : "md";
+  const label = isJson ? "JSON" : isCsv ? "CSV" : "Markdown";
+  const sizeStr = formatted.content.length > 1024
+    ? `${(formatted.content.length / 1024).toFixed(1)} KB`
+    : `${formatted.content.length} B`;
+
+  return (
+    <div className="h-full border-l border-border-faint bg-background-base flex flex-col flex-shrink-0 w-[50%] transition-all duration-200 overflow-hidden">
+      {/* Header */}
+      <div className="px-14 py-10 border-b border-border-faint flex items-center gap-8">
+        <span className="text-mono-x-small text-black-alpha-48 bg-black-alpha-4 px-8 py-2 rounded-4">{label}</span>
+        {isStreaming ? (
+          <span className="text-mono-x-small text-black-alpha-32 flex-1 flex items-center gap-4">
+            <span className="inline-block w-4 h-4 rounded-full bg-heat-100 animate-pulse" />
+            Streaming...
+          </span>
+        ) : (
+          <span className="text-mono-x-small text-black-alpha-32 flex-1">{sizeStr}</span>
+        )}
+        {!isStreaming && (
+          <>
+            <button
+              type="button"
+              className={cn(
+                "flex items-center gap-4 text-mono-x-small transition-colors",
+                showCode ? "text-accent-black" : "text-black-alpha-32 hover:text-accent-black",
+              )}
+              onClick={() => setShowCode(!showCode)}
+            >
+              <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
+              </svg>
+              Code
+            </button>
+            <button
+              type="button"
+              className="flex items-center gap-4 text-mono-x-small text-black-alpha-32 hover:text-accent-black transition-colors"
+              onClick={() => download(formatted.content, `output.${ext}`)}
+            >
+              <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+              </svg>
+              Download
+            </button>
+          </>
+        )}
+        <button
+          type="button"
+          className="p-4 rounded-4 text-black-alpha-24 hover:text-accent-black hover:bg-black-alpha-4 transition-all"
+          onClick={onClose}
+        >
+          <svg fill="none" height="14" viewBox="0 0 24 24" width="14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      {/* Code snippet panel */}
+      {showCode && (
+        <div className="border-b border-border-faint bg-black-alpha-2">
+          <div className="px-14 py-6 flex items-center gap-4">
+            {(["curl", "fetch", "python"] as const).map((lang) => (
+              <button
+                key={lang}
+                type="button"
+                className={cn(
+                  "px-8 py-3 rounded-6 text-mono-x-small transition-all",
+                  codeLang === lang
+                    ? "bg-accent-white text-accent-black shadow-sm"
+                    : "text-black-alpha-40 hover:text-accent-black",
+                )}
+                onClick={() => setCodeLang(lang)}
+              >
+                {lang === "fetch" ? "JavaScript" : lang === "python" ? "Python" : "cURL"}
+              </button>
+            ))}
+            <div className="flex-1" />
+            <button
+              type="button"
+              className="flex items-center gap-4 text-mono-x-small text-black-alpha-32 hover:text-accent-black transition-colors"
+              onClick={() => {
+                navigator.clipboard.writeText(buildCodeSnippet(codeLang, prompt ?? "", schema, urls));
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }}
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <pre className="px-14 pb-10 text-[12px] font-mono leading-[1.6] text-accent-black whitespace-pre-wrap overflow-auto max-h-[200px]">
+            {buildCodeSnippet(codeLang, prompt ?? "", schema, urls)}
+          </pre>
+        </div>
+      )}
+
+      {/* Content */}
+      <div className="flex-1 overflow-auto no-scrollbar">
+        {isJson && (
+          isStreaming
+            ? <pre className="text-[13px] text-accent-black whitespace-pre-wrap font-mono leading-[1.7] p-14">{formatted.content}</pre>
+            : <JsonViewer data={formatted.content} />
+        )}
+        {isCsv && <CsvTable data={formatted.content} />}
+        {!isJson && !isCsv && (
+          <div className="p-14">
+            <StreamdownBlock>{formatted.content}</StreamdownBlock>
+          </div>
+        )}
+      </div>
+
+      {/* Regenerate as different format */}
+      {!isStreaming && (
+        <div className="px-12 py-10 border-t border-border-faint flex items-center gap-6">
+          <span className="text-mono-x-small text-black-alpha-32 mr-4">Regenerate as</span>
+          {([
+            { id: "JSON", icon: "{}", active: isJson },
+            { id: "CSV", icon: "⊞", active: isCsv },
+            { id: "Markdown", icon: "¶", active: !isJson && !isCsv },
+          ] as const).map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              disabled={f.active}
+              className={cn(
+                "px-8 py-4 rounded-6 text-mono-x-small transition-all",
+                f.active
+                  ? "bg-black-alpha-4 text-black-alpha-32 cursor-default"
+                  : "text-black-alpha-48 hover:text-accent-black hover:bg-black-alpha-4",
+              )}
+              onClick={() => { if (!f.active) onRequestFormat(f.id); }}
+            >
+              {f.id}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -7,3 +7,4 @@ next-env.d.ts
 .firecrawl/
 data/
 tmp/
+__tests__/

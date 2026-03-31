@@ -1,6 +1,6 @@
-import { ToolLoopAgent, stepCountIs } from "ai";
+import { ToolLoopAgent, stepCountIs, type LanguageModel } from "ai";
 import { FirecrawlTools } from "firecrawl-aisdk";
-import type { AgentConfig } from "./types";
+import type { AgentConfig, ModelConfig } from "./types";
 import { resolveModel } from "./resolve-model";
 import { createSkillTools } from "./skills/tools";
 import { createSubAgentTools } from "./sub-agents";
@@ -8,6 +8,7 @@ import { createWorkerTool } from "./workers";
 import { formatOutput, bashExec, initBashWithFiles } from "./tools";
 import { discoverSkills } from "./skills/discovery";
 import { loadOrchestratorPrompt } from "./prompts/loader";
+import { createPrepareStepWithCompaction } from "./compaction";
 
 // --- Research plan builder ---
 
@@ -76,6 +77,52 @@ function buildResearchPlan(
   return lines.join("\n");
 }
 
+// --- Presentation mode builders ---
+
+function buildInlinePresentationMode(): string {
+  return `
+## Presenting results — ALWAYS use formatOutput
+- CRITICAL: Do NOT write the data inline in your response. Do NOT output markdown tables, JSON code blocks, bullet lists, or summaries of the data. The user sees the data in a separate viewer panel — your text output is NOT the delivery mechanism.
+- When you have collected all the data, call formatOutput with format "json" and the data as a structured JSON object or array. That is the ONLY way to deliver results.
+- Include a "source" field with the full URL for every object when sources are available.
+- Your text output should be extremely brief: at most one sentence like "Found 10 stories from Hacker News." Then immediately call formatOutput. Do not repeat or summarize the data in text.
+- Only use bashExec to SAVE data to /data/ when: (a) the dataset is very large (100+ rows), (b) you need to process it further, or (c) you want to persist intermediate results between steps.`;
+}
+
+function buildStructuredPresentationMode(
+  schema?: Record<string, unknown>,
+  columns?: string[],
+): string {
+  const lines = [
+    "",
+    "## Presenting results — STRUCTURED OUTPUT (MANDATORY)",
+    "A schema has been provided. You MUST call formatOutput to deliver the final result. This is not optional.",
+    "",
+    "Rules:",
+    "- Gather ALL data from your research plan before calling formatOutput.",
+    "- Match the schema EXACTLY — use null for missing fields, never omit keys.",
+    "- Arrays must be arrays even for single items.",
+    "- Numbers must be actual numbers, not strings like \"$1,000\".",
+    "- CRITICAL: Do NOT stream the data inline. Do NOT output markdown tables, JSON code blocks, bullet lists, or summaries of the data. The user sees the data in a separate viewer panel. Your text output should be at most one sentence, then call formatOutput.",
+    "- You may save intermediate results to /data/ with bashExec as you go, but the FINAL output MUST go through formatOutput.",
+    "- Use bashExec with jq to aggregate, transform, or merge data before calling formatOutput if needed.",
+  ];
+
+  if (schema) {
+    lines.push(
+      "",
+      "When finished, call formatOutput with format \"json\" and the data matching this schema.",
+    );
+  } else if (columns?.length) {
+    lines.push(
+      "",
+      `When finished, call formatOutput with format "csv" and columns: ${JSON.stringify(columns)}.`,
+    );
+  }
+
+  return lines.join("\n");
+}
+
 // --- Orchestrator factory ---
 
 export interface OrchestratorOptions {
@@ -85,6 +132,8 @@ export interface OrchestratorOptions {
   skillsDir?: string;
   maxWorkers?: number;
   workerMaxSteps?: number;
+  /** Model used to summarize context when approaching token limits. Defaults to the orchestrator model. */
+  compactionModel?: ModelConfig;
 }
 
 export async function createOrchestrator(options: OrchestratorOptions) {
@@ -95,6 +144,7 @@ export async function createOrchestrator(options: OrchestratorOptions) {
     skillsDir,
     maxWorkers = 6,
     workerMaxSteps = 10,
+    compactionModel,
   } = options;
 
   const model = await resolveModel(config.model, apiKeys);
@@ -129,12 +179,12 @@ export async function createOrchestrator(options: OrchestratorOptions) {
     ? buildResearchPlan(config.schema, config.columns)
     : "";
 
-  // Slim schema hint (end of prompt — output formatting reminder)
-  const schemaHint = config.schema
-    ? `\n\nWhen you have gathered ALL data from your research plan, compile it into the exact schema shape and call formatOutput with format "json".`
-    : config.columns
-      ? `\n\nWhen you have gathered ALL data from your research plan, call formatOutput with format "csv" and columns: ${JSON.stringify(config.columns)}.`
-      : "";
+  // Presentation mode: structured output (schema provided) vs inline streaming (chat UI)
+  const hasStructuredOutput = !!(config.schema || config.columns);
+
+  const presentationMode = hasStructuredOutput
+    ? buildStructuredPresentationMode(config.schema, config.columns)
+    : buildInlinePresentationMode();
 
   const urlHint =
     config.urls && config.urls.length > 0
@@ -184,7 +234,7 @@ export async function createOrchestrator(options: OrchestratorOptions) {
     FIRECRAWL_SYSTEM_PROMPT: fcSystemPrompt ?? "",
     SKILL_CATALOG: skillCatalog,
     RESEARCH_PLAN: researchPlan,
-    SCHEMA_HINT: schemaHint,
+    PRESENTATION_MODE: presentationMode,
     URL_HINTS: urlHint,
     UPLOAD_HINTS: uploadHint,
   });
@@ -193,6 +243,15 @@ export async function createOrchestrator(options: OrchestratorOptions) {
     maxWorkers,
     workerMaxSteps,
   });
+
+  // Context compaction: use provided model or fall back to the orchestrator model
+  const resolvedCompactionModel: LanguageModel = compactionModel
+    ? await resolveModel(compactionModel, apiKeys)
+    : model;
+  const compaction = createPrepareStepWithCompaction(
+    config.model.model,
+    resolvedCompactionModel,
+  );
 
   return new ToolLoopAgent({
     model,
@@ -206,6 +265,7 @@ export async function createOrchestrator(options: OrchestratorOptions) {
       bashExec,
     },
     stopWhen: stepCountIs(config.maxSteps ?? 20),
+    prepareStep: compaction.prepareStep,
     experimental_repairToolCall: async ({ toolCall, inputSchema }) => {
       try {
         const schema = await inputSchema({ toolName: toolCall.toolName });

@@ -858,14 +858,25 @@ function WorkersPanel({ item }: { item: TimelineItem }) {
   );
 }
 
-function SkillLoad({ name, description, status }: { name: string; description?: string; status: "running" | "complete" }) {
+function SkillLoad({ name, description, instructions, status }: { name: string; description?: string; instructions?: string; status: "running" | "complete" }) {
+  const [expanded, setExpanded] = useState(false);
+  const clickable = status === "complete" && !!instructions;
+
   return (
     <div className="my-12 rounded-10 border border-border-faint overflow-hidden">
-      <div className="flex items-center gap-8 px-14 py-10">
+      <button
+        type="button"
+        className={cn(
+          "w-full flex items-center gap-8 px-14 py-10 text-left transition-all",
+          clickable && "hover:bg-black-alpha-2 cursor-pointer",
+        )}
+        onClick={() => { if (clickable) setExpanded(!expanded); }}
+        disabled={!clickable}
+      >
         <EndpointBadge type="skill" />
         <div className="flex-1 min-w-0">
           <span className="text-label-medium text-accent-black">{name}</span>
-          {description && (
+          {description && !expanded && (
             <div className="text-body-small text-black-alpha-40 mt-1">{description}</div>
           )}
         </div>
@@ -877,7 +888,17 @@ function SkillLoad({ name, description, status }: { name: string; description?: 
             <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         )}
-      </div>
+        {clickable && (
+          <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className="text-black-alpha-24 flex-shrink-0 transition-transform" style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)" }} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        )}
+      </button>
+      {expanded && instructions && (
+        <div className="border-t border-border-faint px-14 py-10 bg-black-alpha-1 max-h-[300px] overflow-auto">
+          <pre className="text-[12px] font-mono leading-[1.6] text-black-alpha-56 whitespace-pre-wrap">{instructions}</pre>
+        </div>
+      )}
     </div>
   );
 }
@@ -913,6 +934,7 @@ interface TimelineItem {
   exitCode?: number;
   // skill
   skillName?: string;
+  skillInstructions?: string;
   // subagent
   subagentDescription?: string;
   subagentTask?: string;
@@ -1071,16 +1093,31 @@ function extractTimeline(messages: UIMessage[]): TimelineItem[] {
             exitCode: Number((output as { exitCode?: number }).exitCode ?? 0),
             status,
           });
+        } else if (toolName === "lookup_site_playbook") {
+          const siteOutput = output as { found?: boolean; platform?: string; playbook?: string; skill?: string; message?: string };
+          const label = siteOutput.found
+            ? `${siteOutput.platform} playbook`
+            : `No playbook for ${String(input.url ?? "")}`;
+          items.push({
+            type: "skill",
+            skillName: label,
+            text: siteOutput.found ? `Site-specific navigation for ${siteOutput.platform}` : siteOutput.message,
+            skillInstructions: siteOutput.playbook,
+            status,
+          });
         } else if (toolName === "load_skill" || toolName === "read_skill_resource") {
-          const skillOutput = output as { name?: string; instructions?: string; error?: string };
-          // Extract first line of instructions as description
+          const skillOutput = output as { name?: string; instructions?: string; error?: string; available_site_playbooks?: string[] };
           const desc = skillOutput.instructions
             ? skillOutput.instructions.split("\n").find((l) => l.trim() && !l.startsWith("#"))?.trim()
             : undefined;
+          const siteHint = skillOutput.available_site_playbooks?.length
+            ? ` (sites: ${skillOutput.available_site_playbooks.join(", ")})`
+            : "";
           items.push({
             type: "skill",
-            skillName: String(input.name ?? input.skill ?? skillOutput.name ?? ""),
+            skillName: String(input.name ?? input.skill ?? skillOutput.name ?? "") + siteHint,
             text: desc,
+            skillInstructions: skillOutput.instructions,
             status,
           });
         } else if (toolName === "spawnAgents" || toolName === "spawnWorkers") {
@@ -1158,10 +1195,12 @@ export default function PlanVisualization({
   messages,
   isRunning,
   preloadedSkills,
+  onArtifactClick,
 }: {
   messages: UIMessage[];
   isRunning: boolean;
   preloadedSkills?: string[];
+  onArtifactClick?: () => void;
 }) {
   const timeline = extractTimeline(messages);
 
@@ -1271,13 +1310,37 @@ export default function PlanVisualization({
               );
             })();
           case "skill":
-            return <SkillLoad key={i} name={item.skillName!} description={item.text} status={item.status} />;
+            return <SkillLoad key={i} name={item.skillName!} description={item.text} instructions={item.skillInstructions} status={item.status} />;
           case "subagent":
             return <SubAgentCard key={i} item={item} />;
           case "format": {
             const fmtLabel: Record<string, string> = { csv: "CSV", json: "JSON", text: "Report" };
             const skillLabel = fmtLabel[item.formatType ?? "text"] ?? "Export";
-            return <SkillLoad key={i} name={`${skillLabel} Skill`} description={item.status === "running" ? "Formatting output..." : "Output ready"} status={item.status} />;
+            if (item.status === "running") {
+              return <SkillLoad key={i} name={`${skillLabel}`} description="Formatting output..." status={item.status} />;
+            }
+            return (
+              <button
+                key={i}
+                type="button"
+                className="w-full my-12 rounded-10 border border-border-faint overflow-hidden text-left hover:bg-black-alpha-2 transition-all group"
+                onClick={() => onArtifactClick?.()}
+              >
+                <div className="flex items-center gap-8 px-14 py-10">
+                  <span className="flex items-center justify-center w-28 h-20 rounded-4 bg-black-alpha-4 text-mono-x-small text-black-alpha-48 flex-shrink-0">{"{}"}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-label-medium text-accent-black">{skillLabel}</span>
+                    <div className="text-body-small text-black-alpha-40">Output ready</div>
+                  </div>
+                  <svg className="w-14 h-14 text-accent-forest flex-shrink-0" fill="none" viewBox="0 0 16 16">
+                    <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <svg fill="none" height="14" viewBox="0 0 24 24" width="14" className="text-black-alpha-24 group-hover:text-accent-black transition-colors flex-shrink-0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
+                </div>
+              </button>
+            );
           }
           case "workers":
             return <WorkersPanel key={i} item={item} />;

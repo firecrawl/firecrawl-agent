@@ -72,54 +72,54 @@ function JsonViewer({ data }: { data: string }) {
   };
 
   const renderValue = (value: unknown, path: string, depth: number): React.ReactNode => {
-    if (value === null) return <span className="text-black-alpha-40">null</span>;
-    if (typeof value === "boolean") return <span className="text-accent-bluetron">{String(value)}</span>;
-    if (typeof value === "number") return <span className="text-accent-amethyst">{value}</span>;
+    if (value === null) return <span className="text-black-alpha-24 italic">null</span>;
+    if (typeof value === "boolean") return <span className="text-black-alpha-56">{String(value)}</span>;
+    if (typeof value === "number") return <span className="text-black-alpha-56">{value}</span>;
     if (typeof value === "string") {
-      const display = value.length > 120 ? value.slice(0, 120) + "..." : value;
-      return <span className="text-accent-forest">&quot;{display}&quot;</span>;
+      const display = value.length > 200 ? value.slice(0, 200) + "..." : value;
+      return <span className="text-accent-black">&quot;{display}&quot;</span>;
     }
 
     if (Array.isArray(value)) {
-      if (value.length === 0) return <span>[]</span>;
+      if (value.length === 0) return <span className="text-black-alpha-32">[]</span>;
       const isCollapsed = collapsed.has(path);
       return (
         <span>
-          <button type="button" className="text-black-alpha-40 hover:text-accent-black" onClick={() => toggle(path)}>
+          <button type="button" className="text-black-alpha-32 hover:text-accent-black" onClick={() => toggle(path)}>
             {isCollapsed ? "▸" : "▾"}
           </button>
-          {isCollapsed ? <span className="text-black-alpha-40"> [{value.length} items]</span> : (
+          {isCollapsed ? <span className="text-black-alpha-32"> [{value.length} items]</span> : (
             <>{"[\n"}{value.map((item, i) => (
-              <span key={i}>{"  ".repeat(depth + 1)}{renderValue(item, `${path}[${i}]`, depth + 1)}{i < value.length - 1 ? "," : ""}{"\n"}</span>
-            ))}{"  ".repeat(depth)}]</>
+              <span key={i}>{"    ".repeat(depth + 1)}{renderValue(item, `${path}[${i}]`, depth + 1)}{i < value.length - 1 ? <span className="text-black-alpha-24">,</span> : ""}{"\n"}</span>
+            ))}{"    ".repeat(depth)}<span className="text-black-alpha-32">]</span></>
           )}
         </span>
       );
     }
 
     if (typeof value === "object") {
-      const entries = Object.entries(value as Record<string, unknown>);
-      if (entries.length === 0) return <span>{"{}"}</span>;
+      const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b));
+      if (entries.length === 0) return <span className="text-black-alpha-32">{"{}"}</span>;
       const isCollapsed = collapsed.has(path);
       return (
         <span>
-          <button type="button" className="text-black-alpha-40 hover:text-accent-black" onClick={() => toggle(path)}>
+          <button type="button" className="text-black-alpha-32 hover:text-accent-black" onClick={() => toggle(path)}>
             {isCollapsed ? "▸" : "▾"}
           </button>
-          {isCollapsed ? <span className="text-black-alpha-40"> {"{"}{entries.length} keys{"}"}</span> : (
-            <>{"{\n"}{entries.map(([key, val], i) => (
-              <span key={key}>{"  ".repeat(depth + 1)}<span className="text-heat-100">&quot;{key}&quot;</span>{": "}{renderValue(val, `${path}.${key}`, depth + 1)}{i < entries.length - 1 ? "," : ""}{"\n"}</span>
-            ))}{"  ".repeat(depth)}{"}"}</>
+          {isCollapsed ? <span className="text-black-alpha-32"> {"{"}{entries.length} keys{"}"}</span> : (
+            <><span className="text-black-alpha-24">{"{"}</span>{"\n"}{entries.map(([key, val], i) => (
+              <span key={key}>{"    ".repeat(depth + 1)}<span className="text-black-alpha-48">&quot;{key}&quot;</span><span className="text-black-alpha-24">: </span>{renderValue(val, `${path}.${key}`, depth + 1)}{i < entries.length - 1 ? <span className="text-black-alpha-24">,</span> : ""}{"\n"}</span>
+            ))}{"    ".repeat(depth)}<span className="text-black-alpha-24">{"}"}</span></>
           )}
         </span>
       );
     }
 
-    return <span>{String(value)}</span>;
+    return <span className="text-accent-black">{String(value)}</span>;
   };
 
   return (
-    <pre className="text-mono-small text-accent-black whitespace-pre font-mono leading-relaxed">
+    <pre className="text-[13px] text-accent-black whitespace-pre-wrap font-mono leading-[1.7]">
       {renderValue(parsed, "$", 0)}
     </pre>
   );

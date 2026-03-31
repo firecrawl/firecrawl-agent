@@ -31,7 +31,7 @@ export async function loadOrchestratorPrompt(vars: {
   FIRECRAWL_SYSTEM_PROMPT: string;
   SKILL_CATALOG: string;
   RESEARCH_PLAN: string;
-  SCHEMA_HINT: string;
+  PRESENTATION_MODE: string;
   URL_HINTS: string;
   UPLOAD_HINTS: string;
 }): Promise<string> {

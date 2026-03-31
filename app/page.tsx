@@ -14,7 +14,7 @@ import type { UploadedFile } from "@agent-core";
 import HistoryPanel from "./components/history-panel";
 import StreamdownBlock from "@/components/shared/streamdown-block";
 import Sidebar from "./components/sidebar";
-import ExportSidebar from "./components/export-modal";
+import ArtifactPanel from "./components/artifact-panel";
 import SymbolColored from "@/components/shared/icons/symbol-colored";
 import Link from "next/link";
 import { cn } from "@/utils/cn";
@@ -142,6 +142,8 @@ function PlusMenu({
   onClose,
   planMode,
   onTogglePlan,
+  schema,
+  onSchemaChange,
 }: {
   skills: SkillInfo[] | null;
   selectedSkills: string[];
@@ -152,9 +154,14 @@ function PlusMenu({
   onClose: () => void;
   planMode: boolean;
   onTogglePlan: () => void;
+  schema: Record<string, unknown> | undefined;
+  onSchemaChange: (schema: Record<string, unknown> | undefined) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState("");
+  const [showSchemaInput, setShowSchemaInput] = useState(false);
+  const [schemaDesc, setSchemaDesc] = useState("");
+  const [schemaLoading, setSchemaLoading] = useState(false);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -300,6 +307,69 @@ function PlusMenu({
               ))}
             </div>
           )}
+          {/* Describe schema */}
+          <button
+            type="button"
+            className="w-full flex items-center gap-8 px-10 py-8 rounded-8 text-left hover:bg-black-alpha-2 transition-all"
+            onClick={() => setShowSchemaInput(!showSchemaInput)}
+          >
+            <svg fill="none" height="16" viewBox="0 0 24 24" width="16" className="text-black-alpha-40 flex-shrink-0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M8 3H7a2 2 0 00-2 2v5a2 2 0 01-2 2 2 2 0 012 2v5a2 2 0 002 2h1M16 3h1a2 2 0 012 2v5a2 2 0 002 2 2 2 0 00-2 2v5a2 2 0 01-2 2h-1" />
+            </svg>
+            <span className="text-label-small text-accent-black">Describe schema</span>
+          </button>
+          {showSchemaInput && (
+            <div className="px-10 pt-2 pb-2">
+              <textarea
+                className="w-full bg-black-alpha-4 rounded-8 px-10 py-6 text-body-small text-accent-black placeholder:text-black-alpha-32 focus:outline-none resize-none"
+                rows={2}
+                placeholder="e.g. company name, funding amount, list of investors, website"
+                value={schemaDesc}
+                onChange={(e) => setSchemaDesc(e.target.value)}
+                onKeyDown={async (e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!schemaDesc.trim() || schemaLoading) return;
+                    setSchemaLoading(true);
+                    try {
+                      const resp = await fetch("/api/schema/generate", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ description: schemaDesc }),
+                      });
+                      const data = await resp.json();
+                      if (data.schema) {
+                        onSchemaChange(data.schema);
+                        setShowSchemaInput(false);
+                      }
+                    } catch { /* ignore */ }
+                    setSchemaLoading(false);
+                  }
+                }}
+              />
+              <div className="flex items-center justify-between mt-4">
+                <span className="text-mono-x-small text-black-alpha-32">
+                  {schemaLoading ? "Generating..." : "Enter to generate"}
+                </span>
+                {schema && (
+                  <button
+                    type="button"
+                    className="text-mono-x-small text-black-alpha-32 hover:text-accent-crimson transition-colors"
+                    onClick={() => { onSchemaChange(undefined); setSchemaDesc(""); }}
+                  >
+                    Clear schema
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+          {schema && !showSchemaInput && (
+            <div className="px-10 pt-2 pb-2">
+              <div className="bg-black-alpha-4 rounded-8 px-10 py-6 text-mono-x-small text-black-alpha-48 break-all max-h-[80px] overflow-auto">
+                {schemaDesc || JSON.stringify(schema, null, 2).slice(0, 200)}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -433,7 +503,7 @@ export default function AgentPage() {
   const [savedSkillPath, setSavedSkillPath] = useState<string | null>(null);
   const [generatedSkillContent, setGeneratedSkillContent] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [exportCollapsed, setExportCollapsed] = useState(true);
+  const [artifactOpen, setArtifactOpen] = useState(false);
   const [planMode, setPlanMode] = useState(false);
   const [planText, setPlanText] = useState<string | null>(null);
   const [planLoading, setPlanLoading] = useState(false);
@@ -532,12 +602,12 @@ export default function AgentPage() {
     let agentTurns = 0;
     let llmCalls = 0;
     let totalChars = 0;
+    let workerInputTokens = 0;
+    let workerOutputTokens = 0;
 
     for (const msg of messages) {
       if (msg.role === "assistant") {
         agentTurns++;
-        // Each assistant message = one LLM inference. Additional LLM calls happen
-        // after tool results return (counted by tool calls that produce a follow-up).
         llmCalls++;
       }
       for (const part of msg.parts) {
@@ -557,24 +627,30 @@ export default function AgentPage() {
             if (toolName === "search") { searchCredits += credits; searchCount++; }
             else if (toolName === "scrape" || toolName === "map") { scrapeCredits += credits; scrapeCount++; }
             else if (toolName === "interact") { interactCredits += credits; interactCount++; }
-            // Count only content-relevant fields for token estimation, not transport metadata
             const contentKeys = ["markdown", "content", "answer", "text", "json", "extract", "data", "output", "web"];
             let contentSize = 0;
             for (const k of contentKeys) {
               if (output[k] !== undefined) contentSize += JSON.stringify(output[k]).length;
             }
             totalChars += contentSize || Math.min(JSON.stringify(output).length, 500);
+            if (toolName === "spawnAgents" && Array.isArray(output.results)) {
+              for (const wr of output.results as { tokens?: number; inputTokens?: number; outputTokens?: number }[]) {
+                workerInputTokens += wr.inputTokens ?? 0;
+                workerOutputTokens += wr.outputTokens ?? 0;
+              }
+            }
           }
         }
       }
     }
 
-    const estimatedTokens = Math.round(totalChars / 4);
+    const orchestratorTokens = Math.round(totalChars / 4);
+    const orchestratorIn = Math.round(orchestratorTokens * 0.8);
+    const orchestratorOut = orchestratorTokens - orchestratorIn;
 
-    // Each tool call triggers an additional LLM call (tool result → model)
     llmCalls += toolCalls;
 
-    return { firecrawlCredits, searchCredits, scrapeCredits, interactCredits, searchCount, scrapeCount, interactCount, toolCalls, agentTurns, llmCalls, estimatedTokens };
+    return { firecrawlCredits, searchCredits, scrapeCredits, interactCredits, searchCount, scrapeCount, interactCount, toolCalls, agentTurns, llmCalls, orchestratorIn, orchestratorOut, workerInputTokens, workerOutputTokens };
   }, [messages]);
 
   const prevIsRunning = useRef(false);
@@ -598,11 +674,34 @@ export default function AgentPage() {
         .then((d) => setSuggestions(d.suggestions ?? []))
         .catch(() => setSuggestions([]));
 
-      // Auto-expand export panel when agent finishes
-      setExportCollapsed(false);
+      // Auto-open artifact panel when agent finishes with formatted output
+      const hasOutput = messages.some((m) =>
+        m.role === "assistant" && m.parts.some((p) => {
+          const pp = p as Record<string, unknown>;
+          const tn = (pp.toolName ?? (p.type as string).replace("tool-", "")) as string;
+          return tn === "formatOutput" && (pp.state === "output-available" || pp.state === "result") && pp.output;
+        })
+      );
+      if (hasOutput) setArtifactOpen(true);
     }
     prevIsRunning.current = isRunning;
   }, [isRunning, messages, config.prompt]);
+
+  // Auto-open artifact panel as soon as formatOutput appears (even while streaming)
+  const prevHadArtifact = useRef(false);
+  useEffect(() => {
+    const hasFormatOutput = messages.some((m) =>
+      m.role === "assistant" && m.parts.some((p) => {
+        const pp = p as Record<string, unknown>;
+        const tn = (pp.toolName ?? (p.type as string).replace("tool-", "")) as string;
+        return tn === "formatOutput";
+      })
+    );
+    if (hasFormatOutput && !prevHadArtifact.current) {
+      setArtifactOpen(true);
+    }
+    prevHadArtifact.current = hasFormatOutput;
+  }, [messages]);
 
   const handleSaveSkill = async () => {
     if (!skillName.trim() || savingSkill) return;
@@ -851,12 +950,14 @@ export default function AgentPage() {
                     onClose={() => setShowPlus(false)}
                     planMode={planMode}
                     onTogglePlan={() => { setPlanMode(!planMode); setPlanText(null); setPlanEditText(""); }}
+                    schema={config.schema}
+                    onSchemaChange={(s) => setConfig({ ...config, schema: s })}
                   />
                 )}
               </div>
 
               {/* Inline indicators for selected items */}
-              {((config.uploads ?? []).length > 0 || config.skills.length > 0) && (
+              {((config.uploads ?? []).length > 0 || config.skills.length > 0 || config.schema) && (
                 <div className="flex items-center gap-4">
                   {(config.uploads ?? []).map((f, i) => (
                     <span key={`f-${i}`} className="flex items-center gap-2 px-6 py-2 rounded-6 bg-black-alpha-4 text-mono-x-small text-black-alpha-48 max-w-[100px]">
@@ -874,6 +975,18 @@ export default function AgentPage() {
                     <span className="flex items-center gap-4 px-6 py-2 rounded-6 bg-heat-8 text-mono-x-small text-heat-100">
                       <SkillsIcon />
                       {config.skills.length} skill{config.skills.length > 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {config.schema && (
+                    <span className="flex items-center gap-2 px-6 py-2 rounded-6 bg-heat-8 text-mono-x-small text-heat-100">
+                      {"{}"} Schema
+                      <button
+                        type="button"
+                        className="flex-shrink-0 text-heat-60 hover:text-accent-crimson transition-colors"
+                        onClick={() => setConfig({ ...config, schema: undefined })}
+                      >
+                        <svg fill="none" height="8" viewBox="0 0 24 24" width="8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                      </button>
                     </span>
                   )}
                 </div>
@@ -1023,12 +1136,12 @@ export default function AgentPage() {
         <div className="w-full max-w-640 mt-20">
           <div className="grid grid-cols-2 gap-8">
             {[
-              "Compare pricing across Vercel, Netlify, Cloudflare Pages, and Railway — scrape each site in parallel and build a comparison table",
-              "Research NVDA, AAPL, GOOGL, MSFT, and AMZN — get current prices, market cap, and recent news for each in parallel",
-              "Scrape Hacker News front page and summarize the top 10 stories",
-              "Find the top YC W25 companies, scrape each company page, extract founders and descriptions",
-              "Compare features across the top 5 headless CMS platforms — scrape each docs site",
-              "Extract all Nike men's running shoes with prices from nike.com",
+              "Get AAPL financials from finance.yahoo.com/quote/AAPL — income statement, balance sheet, and cash flow",
+              "Extract the top 20 products from amazon.com/s?k=mechanical+keyboards with prices and ratings",
+              "Search for the 5 best AI code editors in 2025, scrape each homepage, and compare their features",
+              "Scrape news.ycombinator.com front page, then scrape the top 5 article links in parallel",
+              "Go to reddit.com/r/selfhosted/top?t=month, interact to load all posts, extract titles and scores",
+              "Research Anthropic, OpenAI, and Google DeepMind — scrape each site in parallel, extract team size, funding, and key products",
             ].map((prompt) => (
               <button
                 key={prompt}
@@ -1121,7 +1234,7 @@ export default function AgentPage() {
         />
 
       <div className="flex-1 overflow-y-auto no-scrollbar">
-      <div className={cn("mx-auto px-20 py-24 transition-all duration-200", sidebarCollapsed ? "max-w-900" : "max-w-700")}>
+      <div className={cn("mx-auto px-20 py-24 transition-all duration-200", sidebarCollapsed && !artifactOpen ? "max-w-900" : "max-w-700")}>
         {/* Query display */}
         <div className="mb-20">
           <div className="text-title-h4 text-accent-black">
@@ -1130,31 +1243,11 @@ export default function AgentPage() {
         </div>
 
         {/* Activity feed */}
-        <PlanVisualization messages={messages} isRunning={isRunning} preloadedSkills={config.skills.length > 0 ? config.skills : undefined} />
+        <PlanVisualization messages={messages} isRunning={isRunning} preloadedSkills={config.skills.length > 0 ? config.skills : undefined} onArtifactClick={() => setArtifactOpen(true)} />
 
         {/* Bottom section */}
         {!isRunning && messages.length > 0 && (
           <div className="mt-20 pt-16 border-t border-border-faint">
-            {/* Generate buttons — always on top */}
-            <div className="grid grid-cols-3 gap-8 mb-10">
-              {[
-                { label: "Generate CSV", format: "CSV", skill: "export-csv" },
-                { label: "Generate JSON", format: "JSON", skill: "export-json" },
-                { label: "Generate Markdown", format: "Markdown", skill: "export-report" },
-              ].map((btn) => (
-                <button
-                  key={btn.format}
-                  type="button"
-                  className="px-12 py-8 rounded-10 border border-border-faint bg-accent-white text-label-small text-black-alpha-48 hover:border-heat-40 hover:text-heat-100 hover:bg-heat-4 transition-all text-center"
-                  onClick={() => {
-                    sendMessage({ text: `Load the "${btn.skill}" skill and format all collected data as ${btn.format}. Follow the skill instructions. Stream the output inline.` });
-                  }}
-                >
-                  {btn.label}
-                </button>
-              ))}
-            </div>
-
             {/* Follow-up input */}
             <div
               className="bg-accent-white rounded-12 overflow-hidden"
@@ -1202,6 +1295,25 @@ export default function AgentPage() {
               </div>
             </div>
 
+            {/* Suggestions */}
+            {suggestions.length > 0 && (
+              <div className="flex flex-col gap-4 mt-8">
+                {suggestions.slice(0, 3).map((s, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    className="w-full px-16 py-10 rounded-8 border border-border-faint text-body-small text-black-alpha-48 hover:border-black-alpha-16 hover:text-accent-black transition-all text-left"
+                    onClick={() => {
+                      setSuggestions([]);
+                      sendMessage({ text: s });
+                    }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+
           </div>
         )}
 
@@ -1221,9 +1333,22 @@ export default function AgentPage() {
                 <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a4 4 0 014 4c0 1.95-2 4-4 6-2-2-4-4.05-4-6a4 4 0 014-4zM8 14v.5A3.5 3.5 0 004.5 18v0a1.5 1.5 0 001.5 1.5h12a1.5 1.5 0 001.5-1.5v0A3.5 3.5 0 0016 14.5V14" /></svg>
                 {sessionStats.llmCalls} LLM call{sessionStats.llmCalls !== 1 ? "s" : ""}
               </div>
+              {(sessionStats.searchCount + sessionStats.scrapeCount + sessionStats.interactCount) > 0 && (
+                <div className="flex items-center gap-4 text-mono-x-small text-black-alpha-32">
+                  <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+                  {sessionStats.searchCount + sessionStats.scrapeCount + sessionStats.interactCount} Firecrawl call{(sessionStats.searchCount + sessionStats.scrapeCount + sessionStats.interactCount) !== 1 ? "s" : ""}
+                </div>
+              )}
               <div className="flex items-center gap-4 text-mono-x-small text-black-alpha-32">
                 <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16" /></svg>
-                ~{sessionStats.estimatedTokens > 1000 ? `${(sessionStats.estimatedTokens / 1000).toFixed(1)}k` : sessionStats.estimatedTokens} tokens
+                {(() => {
+                  const fmt = (n: number) => n > 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
+                  const hasWorkers = sessionStats.workerInputTokens > 0 || sessionStats.workerOutputTokens > 0;
+                  if (hasWorkers) {
+                    return `~${fmt(sessionStats.orchestratorIn)}↓ ${fmt(sessionStats.orchestratorOut)}↑ orch · ${fmt(sessionStats.workerInputTokens)}↓ ${fmt(sessionStats.workerOutputTokens)}↑ workers`;
+                  }
+                  return `~${fmt(sessionStats.orchestratorIn)}↓ ${fmt(sessionStats.orchestratorOut)}↑`;
+                })()}
               </div>
               {sessionStats.firecrawlCredits > 0 && (
                 <div className="flex items-center gap-4 text-mono-x-small text-black-alpha-32">
@@ -1256,17 +1381,20 @@ export default function AgentPage() {
       </div>
       </div>
 
-      {/* Export sidebar -- right side */}
-      {messages.length > 0 && (
-        <ExportSidebar
-          collapsed={exportCollapsed}
-          onToggleCollapse={() => setExportCollapsed(!exportCollapsed)}
+      {/* Artifact panel -- right side, auto-opens when output is ready */}
+      {artifactOpen && (
+        <ArtifactPanel
           messages={messages}
-          onGenerate={(format) => {
+          isRunning={isRunning}
+          prompt={config.prompt}
+          schema={config.schema}
+          urls={config.urls}
+          onRequestFormat={(format) => {
             const skillMap: Record<string, string> = { JSON: "export-json", CSV: "export-csv", Markdown: "export-report" };
             const skill = skillMap[format] ?? "export-json";
             sendMessage({ text: `Load the "${skill}" skill and then format all the collected data as ${format}. Follow the skill instructions. Stream the output inline.` });
           }}
+          onClose={() => setArtifactOpen(false)}
         />
       )}
 

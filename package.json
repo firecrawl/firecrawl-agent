@@ -52,7 +52,7 @@
     "just-bash": "^2.14.0",
     "lucide-react": "^0.539.0",
     "motion": "^12.20.2",
-    "next": "^15.2.0",
+    "next": "^16.2.1",
     "papaparse": "^5.4.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

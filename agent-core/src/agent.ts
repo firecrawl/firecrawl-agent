@@ -5,6 +5,7 @@ import { resolveModel } from "./resolve-model";
 import { discoverSkills } from "./skills/discovery";
 import { formatOutput, bashExec } from "./tools";
 import { createSkillTools } from "./skills/tools";
+import { workerProgress } from "./workers";
 import type {
   CreateAgentOptions,
   RunParams,
@@ -16,10 +17,21 @@ import type {
 export class FirecrawlAgent {
   constructor(private options: CreateAgentOptions) {}
 
+  private sumWorkerUsage() {
+    let inputTokens = 0;
+    let outputTokens = 0;
+    for (const w of workerProgress.values()) {
+      inputTokens += w.inputTokens ?? 0;
+      outputTokens += w.outputTokens ?? 0;
+    }
+    return { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens };
+  }
+
   /**
    * Run the agent to completion. Returns the full result.
    */
   async run(params: RunParams): Promise<RunResult> {
+    workerProgress.clear();
     const orchestrator = await this.buildOrchestrator(params);
 
     const result = await orchestrator.generate({
@@ -43,6 +55,7 @@ export class FirecrawlAgent {
 
     const steps = this.mapSteps(result.steps);
     const extracted = this.extractFormattedOutput(result.steps, params.format);
+    const workerUsage = this.sumWorkerUsage();
 
     return {
       text: result.text ?? "",
@@ -50,9 +63,9 @@ export class FirecrawlAgent {
       format: extracted?.format ?? params.format,
       steps,
       usage: {
-        inputTokens: result.usage?.inputTokens ?? 0,
-        outputTokens: result.usage?.outputTokens ?? 0,
-        totalTokens: result.usage?.totalTokens ?? 0,
+        inputTokens: (result.usage?.inputTokens ?? 0) + workerUsage.inputTokens,
+        outputTokens: (result.usage?.outputTokens ?? 0) + workerUsage.outputTokens,
+        totalTokens: (result.usage?.totalTokens ?? 0) + workerUsage.totalTokens,
       },
     };
   }
@@ -61,6 +74,7 @@ export class FirecrawlAgent {
    * Stream agent events as an async generator.
    */
   async *stream(params: RunParams): AsyncGenerator<AgentEvent> {
+    workerProgress.clear();
     const orchestrator = await this.buildOrchestrator(params);
     const events: AgentEvent[] = [];
 
@@ -98,11 +112,18 @@ export class FirecrawlAgent {
     const steps = this.mapSteps(result.steps);
     const extracted = this.extractFormattedOutput(result.steps, params.format);
 
+    const workerUsage = this.sumWorkerUsage();
+    const combinedUsage = {
+      inputTokens: (result.usage?.inputTokens ?? 0) + workerUsage.inputTokens,
+      outputTokens: (result.usage?.outputTokens ?? 0) + workerUsage.outputTokens,
+      totalTokens: (result.usage?.totalTokens ?? 0) + workerUsage.totalTokens,
+    };
+
     yield {
       type: "done",
       text: extracted?.content ?? result.text ?? "",
       steps,
-      usage: result.usage,
+      usage: combinedUsage,
     };
   }
 

@@ -5,6 +5,8 @@ export interface SkillFrontmatter {
   description: string;
   category?: string;
   model?: string;
+  domains?: string[];
+  platform?: string;
 }
 
 export function parseSkillFrontmatter(content: string): SkillFrontmatter {
@@ -14,6 +16,8 @@ export function parseSkillFrontmatter(content: string): SkillFrontmatter {
     description: typeof data.description === "string" ? data.description : "",
     category: typeof data.category === "string" ? data.category : undefined,
     model: typeof data.model === "string" ? data.model : undefined,
+    domains: Array.isArray(data.domains) ? data.domains.map(String) : undefined,
+    platform: typeof data.platform === "string" ? data.platform : undefined,
   };
 }
 

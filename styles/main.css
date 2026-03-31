@@ -125,6 +125,17 @@
   height: auto !important;
   min-height: 0 !important;
 }
+/* Let mermaid SVGs grow to fit their content */
+[data-streamdown="mermaid-block"] svg {
+  max-height: none !important;
+  height: auto !important;
+  min-height: 200px;
+}
+[data-streamdown="mermaid-block"] > div:last-of-type:not([data-streamdown]) {
+  max-height: none !important;
+  height: auto !important;
+  overflow: visible !important;
+}
 [data-streamdown="mermaid-block"] > div:first-child > span {
   font-size: 0.75rem;
   visibility: hidden;

@@ -20,12 +20,20 @@ export interface SubAgentConfig {
   skills: string[];
 }
 
+export interface SitePlaybook {
+  name: string;
+  platform: string;
+  domains: string[];
+  filePath: string;
+}
+
 export interface SkillMetadata {
   name: string;
   description: string;
   category?: string;
   directory: string;
   resources: string[];
+  sitePlaybooks?: SitePlaybook[];
 }
 
 export interface AgentConfig {
