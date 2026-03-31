@@ -7,6 +7,7 @@ info:
   version: 0.1.0
   license:
     name: MIT
+    identifier: MIT
 
 servers:
   - url: http://localhost:3000/api/v1
