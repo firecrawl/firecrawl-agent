@@ -127,6 +127,14 @@
 }
 [data-streamdown="mermaid-block"] > div:first-child > span {
   font-size: 0.75rem;
+  visibility: hidden;
+  position: relative;
+}
+[data-streamdown="mermaid-block"] > div:first-child > span::after {
+  content: "Plan";
+  visibility: visible;
+  position: absolute;
+  left: 0;
 }
 /* Mermaid action buttons (download/copy/fullscreen) */
 [data-streamdown="mermaid-block-actions"],
