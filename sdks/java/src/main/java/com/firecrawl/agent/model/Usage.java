@@ -48,7 +48,7 @@ import com.firecrawl.agent.JSON;
 /**
  * Usage
  */
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-03-31T10:44:05.795897-04:00[America/Toronto]", comments = "Generator version: 7.21.0")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-03-31T13:14:50.457716-04:00[America/Toronto]", comments = "Generator version: 7.21.0")
 public class Usage {
   public static final String SERIALIZED_NAME_INPUT_TOKENS = "inputTokens";
   @SerializedName(SERIALIZED_NAME_INPUT_TOKENS)

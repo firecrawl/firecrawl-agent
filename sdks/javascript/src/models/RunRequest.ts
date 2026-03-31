@@ -46,13 +46,15 @@ export interface RunRequest {
      */
     format?: RunRequestFormatEnum;
     /**
-     * JSON Schema for structured output (used with format=json).
+     * JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean "find all items." The final output is compiled into this exact shape. Used with format=json.
+     * 
      * @type {object}
      * @memberof RunRequest
      */
     schema?: object;
     /**
-     * Column names for CSV output.
+     * Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry.
+     * 
      * @type {Array<string>}
      * @memberof RunRequest
      */

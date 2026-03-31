@@ -51,7 +51,7 @@ import com.firecrawl.agent.JSON;
 /**
  * RunRequest
  */
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-03-31T10:44:05.795897-04:00[America/Toronto]", comments = "Generator version: 7.21.0")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-03-31T13:14:50.457716-04:00[America/Toronto]", comments = "Generator version: 7.21.0")
 public class RunRequest {
   public static final String SERIALIZED_NAME_PROMPT = "prompt";
   @SerializedName(SERIALIZED_NAME_PROMPT)
@@ -223,7 +223,7 @@ public class RunRequest {
   }
 
   /**
-   * JSON Schema for structured output (used with format&#x3D;json).
+   * JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean \&quot;find all items.\&quot; The final output is compiled into this exact shape. Used with format&#x3D;json. 
    * @return schema
    */
   @javax.annotation.Nullable
@@ -250,7 +250,7 @@ public class RunRequest {
   }
 
   /**
-   * Column names for CSV output.
+   * Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry. 
    * @return columns
    */
   @javax.annotation.Nullable

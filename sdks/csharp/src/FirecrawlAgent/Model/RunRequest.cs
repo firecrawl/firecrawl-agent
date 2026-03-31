@@ -36,8 +36,8 @@ namespace FirecrawlAgent.Model
         /// <param name="prompt">The research task or question.</param>
         /// <param name="stream">If true, response is an SSE stream of AgentEvent objects. (default to false)</param>
         /// <param name="format">Desired output format. If set, agent will format data accordingly.</param>
-        /// <param name="schema">JSON Schema for structured output (used with format&#x3D;json).</param>
-        /// <param name="columns">Column names for CSV output.</param>
+        /// <param name="schema">JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean \&quot;find all items.\&quot; The final output is compiled into this exact shape. Used with format&#x3D;json. </param>
+        /// <param name="columns">Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry. </param>
         /// <param name="urls">Seed URLs to start from instead of searching.</param>
         /// <param name="model">model</param>
         /// <param name="subAgentModel">subAgentModel</param>
@@ -186,9 +186,9 @@ namespace FirecrawlAgent.Model
         public Option<Object?> SchemaOption { get; private set; }
 
         /// <summary>
-        /// JSON Schema for structured output (used with format&#x3D;json).
+        /// JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean \&quot;find all items.\&quot; The final output is compiled into this exact shape. Used with format&#x3D;json. 
         /// </summary>
-        /// <value>JSON Schema for structured output (used with format&#x3D;json).</value>
+        /// <value>JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean \&quot;find all items.\&quot; The final output is compiled into this exact shape. Used with format&#x3D;json. </value>
         [JsonPropertyName("schema")]
         public Object? Schema { get { return this.SchemaOption; } set { this.SchemaOption = new(value); } }
 
@@ -200,9 +200,9 @@ namespace FirecrawlAgent.Model
         public Option<List<string>?> ColumnsOption { get; private set; }
 
         /// <summary>
-        /// Column names for CSV output.
+        /// Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry. 
         /// </summary>
-        /// <value>Column names for CSV output.</value>
+        /// <value>Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry. </value>
         [JsonPropertyName("columns")]
         public List<string>? Columns { get { return this.ColumnsOption; } set { this.ColumnsOption = new(value); } }
 

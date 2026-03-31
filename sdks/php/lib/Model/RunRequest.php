@@ -493,7 +493,7 @@ class RunRequest implements ModelInterface, ArrayAccess, \JsonSerializable
     /**
      * Sets schema
      *
-     * @param object|null $schema JSON Schema for structured output (used with format=json).
+     * @param object|null $schema JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean \"find all items.\" The final output is compiled into this exact shape. Used with format=json.
      *
      * @return self
      */
@@ -520,7 +520,7 @@ class RunRequest implements ModelInterface, ArrayAccess, \JsonSerializable
     /**
      * Sets columns
      *
-     * @param string[]|null $columns Column names for CSV output.
+     * @param string[]|null $columns Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry.
      *
      * @return self
      */

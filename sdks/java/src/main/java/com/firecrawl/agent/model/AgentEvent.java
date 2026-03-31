@@ -68,7 +68,7 @@ import com.google.gson.JsonParseException;
 
 import com.firecrawl.agent.JSON;
 
-@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-03-31T10:44:05.795897-04:00[America/Toronto]", comments = "Generator version: 7.21.0")
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaClientCodegen", date = "2026-03-31T13:14:50.457716-04:00[America/Toronto]", comments = "Generator version: 7.21.0")
 public class AgentEvent extends AbstractOpenApiSchema {
     private static final Logger log = Logger.getLogger(AgentEvent.class.getName());
 

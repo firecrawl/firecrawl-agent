@@ -1,4 +1,3 @@
-.openapi-generator-ignore
 Build.ps1
 README.md
 appveyor.yml
@@ -48,22 +47,3 @@ src/FirecrawlAgent/Private/HttpSignatureAuth.ps1
 src/FirecrawlAgent/Private/Out-DebugParameter.ps1
 src/FirecrawlAgent/Private/RSAEncryptionProvider.cs
 src/FirecrawlAgent/en-US/about_FirecrawlAgent.help.txt
-tests/Api/DefaultApi.Tests.ps1
-tests/Model/AgentEvent.Tests.ps1
-tests/Model/AgentEventOneOf.Tests.ps1
-tests/Model/AgentEventOneOf1.Tests.ps1
-tests/Model/AgentEventOneOf2.Tests.ps1
-tests/Model/AgentEventOneOf3.Tests.ps1
-tests/Model/AgentEventOneOf4.Tests.ps1
-tests/Model/AgentEventOneOf5.Tests.ps1
-tests/Model/ErrorResponse.Tests.ps1
-tests/Model/ModelConfig.Tests.ps1
-tests/Model/RunRequest.Tests.ps1
-tests/Model/RunResponse.Tests.ps1
-tests/Model/Skill.Tests.ps1
-tests/Model/StepDetail.Tests.ps1
-tests/Model/StepDetailToolCallsInner.Tests.ps1
-tests/Model/StepDetailToolResultsInner.Tests.ps1
-tests/Model/Usage.Tests.ps1
-tests/Model/WorkerProgress.Tests.ps1
-tests/Model/WorkerProgressStepLogInner.Tests.ps1

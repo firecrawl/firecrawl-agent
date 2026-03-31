@@ -19,9 +19,9 @@ case class RunRequest(
   stream: Option[Boolean] = None,
   /* Desired output format. If set, agent will format data accordingly. */
   format: Option[RunRequestEnums.Format] = None,
-  /* JSON Schema for structured output (used with format=json). */
+  /* JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean \"find all items.\" The final output is compiled into this exact shape. Used with format=json.  */
   schema: Option[Any] = None,
-  /* Column names for CSV output. */
+  /* Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry.  */
   columns: Option[Seq[String]] = None,
   /* Seed URLs to start from instead of searching. */
   urls: Option[Seq[String]] = None,

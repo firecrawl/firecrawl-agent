@@ -34,7 +34,7 @@ class RunRequest {
   /// Desired output format. If set, agent will format data accordingly.
   RunRequestFormatEnum? format;
 
-  /// JSON Schema for structured output (used with format=json).
+  /// JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean \"find all items.\" The final output is compiled into this exact shape. Used with format=json. 
   ///
   /// Please note: This property should have been non-nullable! Since the specification file
   /// does not include a default value (using the "default:" property), however, the generated
@@ -43,7 +43,7 @@ class RunRequest {
   ///
   Object? schema;
 
-  /// Column names for CSV output.
+  /// Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry. 
   List<String> columns;
 
   /// Seed URLs to start from instead of searching.

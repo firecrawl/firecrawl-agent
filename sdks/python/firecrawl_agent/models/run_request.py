@@ -32,8 +32,8 @@ class RunRequest(BaseModel):
     prompt: StrictStr = Field(description="The research task or question.")
     stream: Optional[StrictBool] = Field(default=False, description="If true, response is an SSE stream of AgentEvent objects.")
     format: Optional[StrictStr] = Field(default=None, description="Desired output format. If set, agent will format data accordingly.")
-    var_schema: Optional[Dict[str, Any]] = Field(default=None, description="JSON Schema for structured output (used with format=json).", alias="schema")
-    columns: Optional[List[StrictStr]] = Field(default=None, description="Column names for CSV output.")
+    var_schema: Optional[Dict[str, Any]] = Field(default=None, description="JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean \"find all items.\" The final output is compiled into this exact shape. Used with format=json. ", alias="schema")
+    columns: Optional[List[StrictStr]] = Field(default=None, description="Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry. ")
     urls: Optional[List[StrictStr]] = Field(default=None, description="Seed URLs to start from instead of searching.")
     model: Optional[ModelConfig] = None
     sub_agent_model: Optional[ModelConfig] = Field(default=None, alias="subAgentModel")

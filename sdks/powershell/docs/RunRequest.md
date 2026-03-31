@@ -6,8 +6,8 @@ Name | Type | Description | Notes
 **Prompt** | **String** | The research task or question. | 
 **Stream** | **Boolean** | If true, response is an SSE stream of AgentEvent objects. | [optional] [default to $false]
 **Format** | **String** | Desired output format. If set, agent will format data accordingly. | [optional] 
-**Schema** | [**SystemCollectionsHashtable**](.md) | JSON Schema for structured output (used with format&#x3D;json). | [optional] 
-**Columns** | **String[]** | Column names for CSV output. | [optional] 
+**Schema** | [**SystemCollectionsHashtable**](.md) | JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean &quot;&quot;find all items.&quot;&quot; The final output is compiled into this exact shape. Used with format&#x3D;json.  | [optional] 
+**Columns** | **String[]** | Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry.  | [optional] 
 **Urls** | **String[]** | Seed URLs to start from instead of searching. | [optional] 
 **Model** | [**ModelConfig**](ModelConfig.md) |  | [optional] 
 **SubAgentModel** | [**ModelConfig**](ModelConfig.md) |  | [optional] 

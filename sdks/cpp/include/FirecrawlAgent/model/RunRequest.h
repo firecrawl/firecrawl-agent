@@ -97,7 +97,7 @@ public:
     void setFormat(const FormatEnum value);
 
     /// <summary>
-    /// JSON Schema for structured output (used with format&#x3D;json).
+    /// JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean \&quot;find all items.\&quot; The final output is compiled into this exact shape. Used with format&#x3D;json. 
     /// </summary>
     std::shared_ptr<Object> getSchema() const;
     bool schemaIsSet() const;
@@ -105,7 +105,7 @@ public:
     void setSchema(const std::shared_ptr<Object>& value);
 
     /// <summary>
-    /// Column names for CSV output.
+    /// Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry. 
     /// </summary>
     std::vector<utility::string_t> getColumns() const;
     bool columnsIsSet() const;

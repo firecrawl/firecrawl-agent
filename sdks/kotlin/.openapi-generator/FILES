@@ -1,4 +1,3 @@
-.openapi-generator-ignore
 README.md
 build.gradle
 docs/AgentEvent.md
@@ -61,22 +60,3 @@ src/main/kotlin/com/firecrawl/agent/models/StepDetailToolResultsInner.kt
 src/main/kotlin/com/firecrawl/agent/models/Usage.kt
 src/main/kotlin/com/firecrawl/agent/models/WorkerProgress.kt
 src/main/kotlin/com/firecrawl/agent/models/WorkerProgressStepLogInner.kt
-src/test/kotlin/com/firecrawl/agent/apis/DefaultApiTest.kt
-src/test/kotlin/com/firecrawl/agent/models/AgentEventOneOf1Test.kt
-src/test/kotlin/com/firecrawl/agent/models/AgentEventOneOf2Test.kt
-src/test/kotlin/com/firecrawl/agent/models/AgentEventOneOf3Test.kt
-src/test/kotlin/com/firecrawl/agent/models/AgentEventOneOf4Test.kt
-src/test/kotlin/com/firecrawl/agent/models/AgentEventOneOf5Test.kt
-src/test/kotlin/com/firecrawl/agent/models/AgentEventOneOfTest.kt
-src/test/kotlin/com/firecrawl/agent/models/AgentEventTest.kt
-src/test/kotlin/com/firecrawl/agent/models/ErrorResponseTest.kt
-src/test/kotlin/com/firecrawl/agent/models/ModelConfigTest.kt
-src/test/kotlin/com/firecrawl/agent/models/RunRequestTest.kt
-src/test/kotlin/com/firecrawl/agent/models/RunResponseTest.kt
-src/test/kotlin/com/firecrawl/agent/models/SkillTest.kt
-src/test/kotlin/com/firecrawl/agent/models/StepDetailTest.kt
-src/test/kotlin/com/firecrawl/agent/models/StepDetailToolCallsInnerTest.kt
-src/test/kotlin/com/firecrawl/agent/models/StepDetailToolResultsInnerTest.kt
-src/test/kotlin/com/firecrawl/agent/models/UsageTest.kt
-src/test/kotlin/com/firecrawl/agent/models/WorkerProgressStepLogInnerTest.kt
-src/test/kotlin/com/firecrawl/agent/models/WorkerProgressTest.kt

@@ -2,7 +2,7 @@
 
 Firecrawl Agent API
 - API version: 0.1.0
-  - Build date: 2026-03-31T10:44:05.795897-04:00[America/Toronto]
+  - Build date: 2026-03-31T13:14:50.457716-04:00[America/Toronto]
   - Generator version: 7.21.0
 
 AI-powered web research agent built on Firecrawl.

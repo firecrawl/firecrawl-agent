@@ -59,7 +59,7 @@ $Manifest = @{
     ModuleVersion = '0.1.2'
 
     RootModule = 'FirecrawlAgent.psm1'
-    Guid = '{392D6178-82FD-414E-B2B0-E5B9D73DC627}' # Has to be static, otherwise each new build will be considered different module
+    Guid = '{3104E3EE-CFD7-4ABE-96B3-23485B533D25}' # Has to be static, otherwise each new build will be considered different module
 
     PowerShellVersion = '6.2'
 

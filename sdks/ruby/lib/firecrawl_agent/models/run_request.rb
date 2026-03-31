@@ -24,10 +24,10 @@ module FirecrawlAgent
     # Desired output format. If set, agent will format data accordingly.
     attr_accessor :format
 
-    # JSON Schema for structured output (used with format=json).
+    # JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean \"find all items.\" The final output is compiled into this exact shape. Used with format=json. 
     attr_accessor :schema
 
-    # Column names for CSV output.
+    # Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry. 
     attr_accessor :columns
 
     # Seed URLs to start from instead of searching.

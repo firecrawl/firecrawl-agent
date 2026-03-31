@@ -1,6 +1,5 @@
 .gitignore
 .npmignore
-.openapi-generator-ignore
 README.md
 docs/AgentEvent.md
 docs/AgentEventOneOf.md

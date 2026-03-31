@@ -21,9 +21,9 @@ public struct RunRequest: Sendable, Codable, Hashable {
     public var stream: Bool? = false
     /** Desired output format. If set, agent will format data accordingly. */
     public var format: Format?
-    /** JSON Schema for structured output (used with format=json). */
+    /** JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean \"find all items.\" The final output is compiled into this exact shape. Used with format=json.  */
     public var schema: JSONValue?
-    /** Column names for CSV output. */
+    /** Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry.  */
     public var columns: [String]?
     /** Seed URLs to start from instead of searching. */
     public var urls: [String]?

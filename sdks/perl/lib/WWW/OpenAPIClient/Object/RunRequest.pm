@@ -244,14 +244,14 @@ __PACKAGE__->method_documentation({
     'schema' => {
         datatype => 'object',
         base_name => 'schema',
-        description => 'JSON Schema for structured output (used with format&#x3D;json).',
+        description => 'JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean \&quot;find all items.\&quot; The final output is compiled into this exact shape. Used with format&#x3D;json. ',
         format => '',
         read_only => '',
             },
     'columns' => {
         datatype => 'ARRAY[string]',
         base_name => 'columns',
-        description => 'Column names for CSV output.',
+        description => 'Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry. ',
         format => '',
         read_only => '',
             },

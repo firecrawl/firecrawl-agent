@@ -27,9 +27,9 @@ type RunRequest struct {
 	Stream *bool `json:"stream,omitempty"`
 	// Desired output format. If set, agent will format data accordingly.
 	Format *string `json:"format,omitempty"`
-	// JSON Schema for structured output (used with format=json).
+	// JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean \"find all items.\" The final output is compiled into this exact shape. Used with format=json. 
 	Schema map[string]interface{} `json:"schema,omitempty"`
-	// Column names for CSV output.
+	// Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry. 
 	Columns []string `json:"columns,omitempty"`
 	// Seed URLs to start from instead of searching.
 	Urls []string `json:"urls,omitempty"`

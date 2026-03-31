@@ -22,10 +22,10 @@ pub struct RunRequest {
     /// Desired output format. If set, agent will format data accordingly.
     #[serde(rename = "format", skip_serializing_if = "Option::is_none")]
     pub format: Option<Format>,
-    /// JSON Schema for structured output (used with format=json).
+    /// JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean \"find all items.\" The final output is compiled into this exact shape. Used with format=json. 
     #[serde(rename = "schema", skip_serializing_if = "Option::is_none")]
     pub schema: Option<serde_json::Value>,
-    /// Column names for CSV output.
+    /// Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry. 
     #[serde(rename = "columns", skip_serializing_if = "Option::is_none")]
     pub columns: Option<Vec<String>>,
     /// Seed URLs to start from instead of searching.

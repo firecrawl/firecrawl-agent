@@ -1,5 +1,4 @@
 .gitignore
-.openapi-generator-ignore
 .travis.yml
 README.md
 api/openapi.yaml
@@ -47,5 +46,4 @@ model_usage.go
 model_worker_progress.go
 model_worker_progress_step_log_inner.go
 response.go
-test/api_default_test.go
 utils.go

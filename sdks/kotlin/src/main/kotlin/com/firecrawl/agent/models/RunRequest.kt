@@ -34,8 +34,8 @@ import com.squareup.moshi.JsonClass
  * @param prompt The research task or question.
  * @param stream If true, response is an SSE stream of AgentEvent objects.
  * @param format Desired output format. If set, agent will format data accordingly.
- * @param schema JSON Schema for structured output (used with format=json).
- * @param columns Column names for CSV output.
+ * @param schema JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean \"find all items.\" The final output is compiled into this exact shape. Used with format=json. 
+ * @param columns Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry. 
  * @param urls Seed URLs to start from instead of searching.
  * @param model 
  * @param subAgentModel 
@@ -58,11 +58,11 @@ data class RunRequest (
     @Json(name = "format")
     val format: RunRequest.Format? = null,
 
-    /* JSON Schema for structured output (used with format=json). */
+    /* JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean \"find all items.\" The final output is compiled into this exact shape. Used with format=json.  */
     @Json(name = "schema")
     val schema: kotlin.Any? = null,
 
-    /* Column names for CSV output. */
+    /* Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry.  */
     @Json(name = "columns")
     val columns: kotlin.collections.List<kotlin.String>? = null,
 

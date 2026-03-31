@@ -10,8 +10,8 @@
 #' @field prompt The research task or question. character
 #' @field stream If true, response is an SSE stream of AgentEvent objects. character [optional]
 #' @field format Desired output format. If set, agent will format data accordingly. character [optional]
-#' @field schema JSON Schema for structured output (used with format=json). object [optional]
-#' @field columns Column names for CSV output. list(character) [optional]
+#' @field schema JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean \"find all items.\" The final output is compiled into this exact shape. Used with format=json. object [optional]
+#' @field columns Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry. list(character) [optional]
 #' @field urls Seed URLs to start from instead of searching. list(character) [optional]
 #' @field model  \link{ModelConfig} [optional]
 #' @field subAgentModel  \link{ModelConfig} [optional]
@@ -40,8 +40,8 @@ RunRequest <- R6::R6Class(
     #' @param prompt The research task or question.
     #' @param stream If true, response is an SSE stream of AgentEvent objects.. Default to FALSE.
     #' @param format Desired output format. If set, agent will format data accordingly.
-    #' @param schema JSON Schema for structured output (used with format=json).
-    #' @param columns Column names for CSV output.
+    #' @param schema JSON schema that serves as both a research plan and output format. The agent treats each field as a data point to collect during research. Array fields mean \"find all items.\" The final output is compiled into this exact shape. Used with format=json.
+    #' @param columns Column names for CSV output. Each column acts as a required data point the agent will research. The final CSV contains one column per entry.
     #' @param urls Seed URLs to start from instead of searching.
     #' @param model model
     #' @param subAgentModel subAgentModel
