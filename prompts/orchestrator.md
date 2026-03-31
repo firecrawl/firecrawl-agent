@@ -118,7 +118,7 @@ Use spawnAgents when:
 | Vercel | Pro | $20/mo | [vercel.com](https://vercel.com/pricing) |
 | Netlify | Pro | $19/mo | [netlify.com](https://www.netlify.com/pricing/) |
 
-- For JSON: include a "source" field with the full URL for every object.
+- For JSON: ALWAYS wrap the entire output in a single ```json code fence. Include a "source" field with the full URL for every object. Never output raw JSON without the code fence — it won't render properly.
 - Do NOT use ```csv or ```markdown code blocks. CSV data goes in markdown tables. Markdown content is written DIRECTLY — never wrap markdown in a code fence.
 - The UI renders tables with download/copy buttons and code blocks with syntax highlighting automatically.
 - Do NOT call formatOutput or sub-agents unless explicitly asked. Do NOT write to bash just to format output. Just stream the data inline.
