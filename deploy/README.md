@@ -1,4 +1,8 @@
+[Home](../README.md) > Deploy
+
 # Deployment
+
+**See also**: [Agent Core](../agent-core/) | [Templates](../templates/) | [SDKs](../sdks/) | [Examples](../examples/)
 
 Choose a platform based on your needs:
 

@@ -1,6 +1,10 @@
+[Home](../README.md) > Examples
+
 # Examples
 
 Working examples for calling the Firecrawl Agent from 17 languages and frameworks.
+
+**See also**: [Agent Core](../agent-core/) | [Templates](../templates/) | [SDKs](../sdks/) | [Deploy](../deploy/)
 
 ## Quick start
 

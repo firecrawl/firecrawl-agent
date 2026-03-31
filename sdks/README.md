@@ -1,8 +1,12 @@
+[Home](../README.md) > SDKs
+
 # SDKs
 
 Auto-generated typed clients for calling the Firecrawl Agent API from any language.
 
-All SDKs are generated from `agent-core/openapi.yaml` using [OpenAPI Generator](https://openapi-generator.tech/).
+All SDKs are generated from [agent-core/openapi.yaml](../agent-core/openapi.yaml) using [OpenAPI Generator](https://openapi-generator.tech/).
+
+**See also**: [Agent Core](../agent-core/) | [Templates](../templates/) | [Examples](../examples/) | [Deploy](../deploy/)
 
 ## Available SDKs
 

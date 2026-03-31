@@ -1,6 +1,10 @@
+[Home](../README.md) > Agent Core
+
 # Agent Core
 
 The core agent logic. Pure TypeScript, no framework dependencies. Built on the [Vercel AI SDK](https://sdk.vercel.ai/) and [Firecrawl](https://firecrawl.dev/).
+
+**See also**: [Templates](../templates/) | [SDKs](../sdks/) | [Examples](../examples/) | [Deploy](../deploy/)
 
 ## What it does
 

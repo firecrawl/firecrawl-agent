@@ -1,6 +1,10 @@
+[Home](../README.md) > Templates
+
 # Templates
 
-Server templates for running the Firecrawl Agent. Each wraps `agent-core` with a different framework.
+Server templates for running the Firecrawl Agent. Each wraps [agent-core](../agent-core/) with a different framework.
+
+**See also**: [Agent Core](../agent-core/) | [SDKs](../sdks/) | [Examples](../examples/) | [Deploy](../deploy/)
 
 ## Comparison
 
