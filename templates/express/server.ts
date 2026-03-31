@@ -28,7 +28,7 @@ app.post("/v1/run", async (req, res) => {
 
   const agent = createAgent({
     firecrawlApiKey,
-    model: model ?? { provider: "google", model: "gemini-2.5-flash-preview-05-20" } as ModelConfig,
+    model: model ?? { provider: "google", model: "gemini-3-flash-preview" } as ModelConfig,
     subAgentModel,
     apiKeys: getApiKeys(),
     maxSteps,

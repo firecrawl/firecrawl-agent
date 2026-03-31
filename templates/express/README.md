@@ -39,7 +39,7 @@ Run the agent. Supports streaming (SSE) and non-streaming responses.
   "schema": {},
   "columns": [],
   "urls": [],
-  "model": { "provider": "google", "model": "gemini-2.5-flash-preview-05-20" },
+  "model": { "provider": "google", "model": "gemini-3-flash-preview" },
   "maxSteps": 15,
   "skills": []
 }

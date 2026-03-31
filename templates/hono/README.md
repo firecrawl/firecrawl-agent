@@ -25,7 +25,7 @@ Server starts on `http://localhost:3000` (override with `PORT`).
 
 ## Model selection
 
-Set `MODEL_PROVIDER` and `MODEL_ID` env vars, or pass `model` in the request body. Defaults to `google` / `gemini-2.5-flash-preview-05-20`.
+Set `MODEL_PROVIDER` and `MODEL_ID` env vars, or pass `model` in the request body. Defaults to `google` / `gemini-3-flash-preview`.
 
 ## Endpoints
 

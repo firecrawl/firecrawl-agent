@@ -10,7 +10,7 @@ const app = new Hono();
 
 function envModel(): ModelConfig {
   const provider = (process.env.MODEL_PROVIDER ?? "google") as ModelConfig["provider"];
-  const model = process.env.MODEL_ID ?? "gemini-2.5-flash-preview-05-20";
+  const model = process.env.MODEL_ID ?? "gemini-3-flash-preview";
   return { provider, model };
 }
 
