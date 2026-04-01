@@ -74,10 +74,10 @@ export interface AgentConfig {
 // --- Agent Core public API types ---
 
 export interface CreateAgentOptions {
-  /** Pre-built toolkit (search, scrape, interact, etc.) */
-  toolkit: Toolkit;
-  /** @deprecated Use `toolkit` instead. Kept for backwards compatibility. */
-  firecrawlApiKey?: string;
+  /** Firecrawl API key — used to build the default toolkit */
+  firecrawlApiKey: string;
+  /** Override the default Firecrawl toolkit with a custom one */
+  toolkit?: Toolkit;
   model: ModelConfig;
   subAgentModel?: ModelConfig;
   apiKeys?: Record<string, string>;

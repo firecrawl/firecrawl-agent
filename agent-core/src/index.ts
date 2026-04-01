@@ -8,6 +8,7 @@ export { discoverSkills, buildDomainIndex } from "./skills/discovery";
 export { createSkillTools } from "./skills/tools";
 export { parseSkillBody } from "./skills/parser";
 export { formatOutput, bashExec, initBashWithFiles, listBashFiles, readBashFile } from "./tools";
+export { buildFirecrawlToolkit } from "./toolkit";
 export { loadOrchestratorPrompt } from "./orchestrator/loader";
 export { loadWorkerPrompt } from "./worker/loader";
 

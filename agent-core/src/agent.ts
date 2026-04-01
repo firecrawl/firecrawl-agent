@@ -3,6 +3,7 @@ import { createOrchestrator, type OrchestratorOptions } from "./orchestrator";
 import { resolveModel } from "./resolve-model";
 import { discoverSkills } from "./skills/discovery";
 import { workerProgress } from "./worker";
+import { buildFirecrawlToolkit } from "./toolkit";
 import type {
   CreateAgentOptions,
   Toolkit,
@@ -173,8 +174,12 @@ Do not use emojis.`,
 
   // --- Private helpers ---
 
+  private _toolkit: Toolkit | null = null;
+
   private getToolkit(): Toolkit {
-    return this.options.toolkit;
+    if (this._toolkit) return this._toolkit;
+    this._toolkit = this.options.toolkit ?? buildFirecrawlToolkit(this.options.firecrawlApiKey);
+    return this._toolkit;
   }
 
   private async buildOrchestrator(params: RunParams) {
@@ -265,12 +270,10 @@ Do not use emojis.`,
  * @example
  * ```ts
  * import { createAgent } from '@firecrawl/agent-core'
- * import { FirecrawlTools } from 'firecrawl-aisdk'
  *
- * const { systemPrompt, ...tools } = FirecrawlTools({ apiKey: 'fc-...' })
  * const agent = createAgent({
- *   toolkit: { tools, systemPrompt },
- *   model: { provider: 'google', model: 'gemini-3-flash-preview' }
+ *   firecrawlApiKey: 'fc-...',
+ *   model: { provider: 'anthropic', model: 'claude-sonnet-4-20250514' }
  * })
  *
  * const result = await agent.run({ prompt: 'get Vercel pricing' })

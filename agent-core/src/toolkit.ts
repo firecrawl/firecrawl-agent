@@ -1,5 +1,5 @@
 import { FirecrawlTools } from "firecrawl-aisdk";
-import type { Toolkit } from "@agent-core";
+import type { Toolkit } from "./types";
 
 /**
  * Build a Toolkit from a Firecrawl API key. This is the single place where

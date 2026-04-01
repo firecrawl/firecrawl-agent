@@ -1,6 +1,5 @@
 import { ToolLoopAgent, stepCountIs } from "ai";
-import { resolveModel, formatOutput, bashExec, createSkillTools, discoverSkills } from "@agent-core";
-import { buildFirecrawlToolkit } from "@/lib/toolkit";
+import { resolveModel, formatOutput, bashExec, createSkillTools, discoverSkills, buildFirecrawlToolkit } from "@agent-core";
 import { getTaskModel } from "@/config";
 import { getFirecrawlKey, getProviderKey } from "@/lib/config/keys";
 
