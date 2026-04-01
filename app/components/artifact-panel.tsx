@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import type { UIMessage } from "ai";
 import { cn } from "@/utils/cn";
 import StreamdownBlock from "@/components/shared/streamdown-block";
@@ -12,6 +12,69 @@ function isToolPart(part: { type: string }): boolean {
 interface FormattedOutput {
   format: "text" | "json" | "csv";
   content: string;
+}
+
+// Infer a JSON schema from actual data
+function inferSchema(value: unknown): Record<string, unknown> {
+  if (value === null || value === undefined) return { type: "null" };
+  if (typeof value === "boolean") return { type: "boolean" };
+  if (typeof value === "number") return Number.isInteger(value) ? { type: "integer" } : { type: "number" };
+  if (typeof value === "string") return { type: "string" };
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return { type: "array", items: {} };
+    // Merge schemas from all items to get a unified item schema
+    const itemSchemas = value.slice(0, 5).map(inferSchema);
+    const merged = mergeSchemas(itemSchemas);
+    return { type: "array", items: merged };
+  }
+
+  if (typeof value === "object") {
+    const properties: Record<string, unknown> = {};
+    const required: string[] = [];
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      properties[k] = inferSchema(v);
+      if (v !== null && v !== undefined) required.push(k);
+    }
+    const schema: Record<string, unknown> = { type: "object", properties };
+    if (required.length > 0) schema.required = required;
+    return schema;
+  }
+
+  return {};
+}
+
+function mergeSchemas(schemas: Record<string, unknown>[]): Record<string, unknown> {
+  if (schemas.length === 0) return {};
+  if (schemas.length === 1) return schemas[0];
+
+  // If all are objects, merge their properties
+  const allObjects = schemas.every((s) => s.type === "object");
+  if (allObjects) {
+    const allProps = new Map<string, Record<string, unknown>[]>();
+    const allKeys = new Set<string>();
+    for (const s of schemas) {
+      const props = (s.properties ?? {}) as Record<string, Record<string, unknown>>;
+      for (const [k, v] of Object.entries(props)) {
+        allKeys.add(k);
+        if (!allProps.has(k)) allProps.set(k, []);
+        allProps.get(k)!.push(v);
+      }
+    }
+    const mergedProps: Record<string, unknown> = {};
+    for (const k of allKeys) {
+      const propSchemas = allProps.get(k)!;
+      mergedProps[k] = propSchemas.length === 1 ? propSchemas[0] : mergeSchemas(propSchemas);
+    }
+    // Required = keys present in ALL items
+    const required = [...allKeys].filter((k) => allProps.get(k)!.length === schemas.length);
+    const result: Record<string, unknown> = { type: "object", properties: mergedProps };
+    if (required.length > 0) result.required = required;
+    return result;
+  }
+
+  // If types differ, just return the first
+  return schemas[0];
 }
 
 function extractFormattedOutput(messages: UIMessage[]): FormattedOutput & { streaming: boolean } | null {
@@ -226,6 +289,27 @@ export default function ArtifactPanel({ messages, isRunning, onRequestFormat, on
   const [codeLang, setCodeLang] = useState<"curl" | "fetch" | "python">("curl");
   const [copied, setCopied] = useState(false);
 
+  // Infer schema from output data when it becomes available
+  const inferredSchema = useMemo(() => {
+    if (!formatted || formatted.streaming || formatted.format !== "json") return null;
+    try {
+      const parsed = JSON.parse(formatted.content);
+      return inferSchema(parsed);
+    } catch { return null; }
+  }, [formatted]);
+
+  // The schema to use in code snippets: user-provided takes precedence, then inferred
+  const codeSchema = schema ?? inferredSchema ?? undefined;
+
+  // Auto-expand code section when output finishes (first time only)
+  const autoExpandedRef = useRef(false);
+  useEffect(() => {
+    if (formatted && !formatted.streaming && !autoExpandedRef.current) {
+      setShowCode(true);
+      autoExpandedRef.current = true;
+    }
+  }, [formatted]);
+
   if (!formatted) return null;
 
   const fmt = formatted.format;
@@ -312,7 +396,7 @@ export default function ArtifactPanel({ messages, isRunning, onRequestFormat, on
               type="button"
               className="flex items-center gap-4 text-mono-x-small text-black-alpha-32 hover:text-accent-black transition-colors"
               onClick={() => {
-                navigator.clipboard.writeText(buildCodeSnippet(codeLang, prompt ?? "", schema, urls));
+                navigator.clipboard.writeText(buildCodeSnippet(codeLang, prompt ?? "", codeSchema, urls));
                 setCopied(true);
                 setTimeout(() => setCopied(false), 1500);
               }}
@@ -320,8 +404,13 @@ export default function ArtifactPanel({ messages, isRunning, onRequestFormat, on
               {copied ? "Copied" : "Copy"}
             </button>
           </div>
-          <pre className="px-14 pb-10 text-[12px] font-mono leading-[1.6] text-accent-black whitespace-pre-wrap overflow-auto max-h-[200px]">
-            {buildCodeSnippet(codeLang, prompt ?? "", schema, urls)}
+          {inferredSchema && !schema && (
+            <div className="px-14 pb-4">
+              <span className="text-mono-x-small text-black-alpha-24">Schema inferred from output — rerun with this schema for consistent results</span>
+            </div>
+          )}
+          <pre className="px-14 pb-10 text-[12px] font-mono leading-[1.6] text-accent-black whitespace-pre-wrap overflow-auto max-h-[280px]">
+            {buildCodeSnippet(codeLang, prompt ?? "", codeSchema, urls)}
           </pre>
         </div>
       )}
