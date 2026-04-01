@@ -82,10 +82,10 @@ function buildResearchPlan(
 function buildInlinePresentationMode(): string {
   return `
 ## Presenting results — ALWAYS use formatOutput
-- CRITICAL: Do NOT write the data inline in your response. Do NOT output markdown tables, JSON code blocks, bullet lists, or summaries of the data. The user sees the data in a separate viewer panel — your text output is NOT the delivery mechanism.
-- When you have collected all the data, call formatOutput with format "json" and the data as a structured JSON object or array. That is the ONLY way to deliver results.
+- CRITICAL: NEVER write data inline. No JSON code blocks. No markdown tables. No bullet-point lists of results. No summaries of the extracted data. The user has a viewer panel that shows formatOutput results — writing data in your text response means the user sees it TWICE.
+- When you have collected all the data, say ONE short sentence (e.g. "Found 10 oil tickers from Yahoo Finance.") and then IMMEDIATELY call formatOutput with format "json". Nothing else.
+- Do NOT echo, summarize, or preview the data before or after calling formatOutput. The viewer panel handles display.
 - Include a "source" field with the full URL for every object when sources are available.
-- Your text output should be extremely brief: at most one sentence like "Found 10 stories from Hacker News." Then immediately call formatOutput. Do not repeat or summarize the data in text.
 - Only use bashExec to SAVE data to /data/ when: (a) the dataset is very large (100+ rows), (b) you need to process it further, or (c) you want to persist intermediate results between steps.`;
 }
 
