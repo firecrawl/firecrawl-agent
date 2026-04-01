@@ -1335,11 +1335,9 @@ export default function AgentPage() {
                 <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16" /></svg>
                 {(() => {
                   const fmt = (n: number) => n > 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
-                  const hasWorkers = sessionStats.workerInputTokens > 0 || sessionStats.workerOutputTokens > 0;
-                  if (hasWorkers) {
-                    return `~${fmt(sessionStats.orchestratorIn)}↓ ${fmt(sessionStats.orchestratorOut)}↑ orch · ${fmt(sessionStats.workerInputTokens)}↓ ${fmt(sessionStats.workerOutputTokens)}↑ workers`;
-                  }
-                  return `~${fmt(sessionStats.orchestratorIn)}↓ ${fmt(sessionStats.orchestratorOut)}↑`;
+                  const totalIn = sessionStats.orchestratorIn + sessionStats.workerInputTokens;
+                  const totalOut = sessionStats.orchestratorOut + sessionStats.workerOutputTokens;
+                  return `~${fmt(totalIn)} in · ${fmt(totalOut)} out`;
                 })()}
               </div>
               {sessionStats.fc.total > 0 && (
