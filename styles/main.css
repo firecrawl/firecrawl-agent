@@ -129,7 +129,8 @@
 [data-streamdown="mermaid-block"] svg {
   max-height: none !important;
   height: auto !important;
-  min-height: 200px;
+  min-height: 300px;
+  width: 100% !important;
 }
 [data-streamdown="mermaid-block"] > div:last-of-type:not([data-streamdown]) {
   max-height: none !important;

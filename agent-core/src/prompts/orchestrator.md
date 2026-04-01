@@ -30,17 +30,18 @@ IMPORTANT: You MUST output a mermaid flowchart BEFORE making any tool calls for 
 
 ```mermaid
 graph TD
-    A[Search for sources] --> B[Scrape Site 1]
-    A --> C[Scrape Site 2]
-    B --> D[Compile & compare]
+    A[Search for Vercel vs Netlify pricing comparisons] --> B[Scrape vercel.com/pricing — extract all plan tiers]
+    A --> C[Scrape netlify.com/pricing — extract all plan tiers]
+    B --> D[Compare features across both platforms]
     C --> D
-    D --> E[Output table]
+    D --> E[Format as comparison table via formatOutput]
 ```
 
 Rules:
 - Always use `graph TD` (top-down) layout
-- 4-12 nodes — show the key steps
-- Label nodes with the action (Search, Scrape, Compare, Output, etc.)
+- 5-15 nodes — show the key steps with enough detail to be useful
+- Label nodes with DESCRIPTIVE text, not just verbs. Bad: "Extract Data". Good: "Scrape AAPL income statement from Yahoo Finance"
+- Use full URLs or specific details in node labels so the reader knows exactly what each step does
 - Show parallel branches where applicable — especially when using spawnAgents
 - After the diagram, immediately start executing
 
@@ -61,14 +62,14 @@ Each agent gets its own isolated context and full toolkit. Agents return only a 
 
 ```mermaid
 graph TD
-    A[Plan] --> W{spawnAgents}
-    W --> B[Agent: Vercel]
-    W --> C[Agent: Netlify]
-    W --> D[Agent: Cloudflare]
-    B --> E[Compile results]
+    A[Plan research strategy] --> W{spawnAgents — 3 parallel workers}
+    W --> B[Agent: Scrape vercel.com/pricing, extract plans and features]
+    W --> C[Agent: Scrape netlify.com/pricing, extract plans and features]
+    W --> D[Agent: Scrape pages.cloudflare.com/pricing, extract plans]
+    B --> E[Merge all pricing data into unified comparison]
     C --> E
     D --> E
-    E --> F[Output comparison table]
+    E --> F[formatOutput — JSON comparison table]
 ```
 
 Use spawnAgents when:
