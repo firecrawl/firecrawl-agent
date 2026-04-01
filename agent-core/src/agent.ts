@@ -70,21 +70,31 @@ export class FirecrawlAgent {
   }
 
   /**
-   * Stream agent events as an async generator.
+   * Stream agent events as an async generator. Events are yielded in real-time
+   * as the agent executes — tool calls, results, and text appear as they happen.
    */
   async *stream(params: RunParams): AsyncGenerator<AgentEvent> {
     workerProgress.clear();
     const orchestrator = await this.buildOrchestrator(params);
-    const events: AgentEvent[] = [];
 
-    const result = await orchestrator.generate({
+    // Channel: callback pushes events, generator pulls them
+    const queue: AgentEvent[] = [];
+    let resolve: (() => void) | null = null;
+    let done = false;
+
+    const push = (event: AgentEvent) => {
+      queue.push(event);
+      if (resolve) { resolve(); resolve = null; }
+    };
+
+    const generatePromise = orchestrator.generate({
       prompt: params.prompt,
       onStepFinish: ({ text, toolCalls, toolResults, usage }) => {
-        if (text) events.push({ type: "text", content: text });
+        if (text) push({ type: "text", content: text });
         for (const tc of toolCalls ?? []) {
           if (!tc) continue;
           const c = tc as Record<string, unknown>;
-          events.push({
+          push({
             type: "tool-call",
             toolName: tc.toolName,
             input: c.args ?? c.input,
@@ -93,37 +103,47 @@ export class FirecrawlAgent {
         for (const tr of toolResults ?? []) {
           if (!tr) continue;
           const r = tr as Record<string, unknown>;
-          events.push({
+          push({
             type: "tool-result",
             toolName: tr.toolName,
             output: r.output ?? r.result,
           });
         }
-        if (usage) events.push({ type: "usage", usage });
+        if (usage) push({ type: "usage", usage });
       },
+    }).then((result) => {
+      const steps = this.mapSteps(result.steps);
+      const extracted = this.extractFormattedOutput(result.steps, params.format);
+      const workerUsage = this.sumWorkerUsage();
+
+      push({
+        type: "done",
+        text: extracted?.content ?? result.text ?? "",
+        steps,
+        usage: {
+          inputTokens: (result.usage?.inputTokens ?? 0) + workerUsage.inputTokens,
+          outputTokens: (result.usage?.outputTokens ?? 0) + workerUsage.outputTokens,
+          totalTokens: (result.usage?.totalTokens ?? 0) + workerUsage.totalTokens,
+        },
+      });
+      done = true;
+      if (resolve) { resolve(); resolve = null; }
     });
 
-    // Yield any buffered events
-    for (const event of events) {
-      yield event;
+    // Yield events as they arrive
+    while (true) {
+      if (queue.length > 0) {
+        yield queue.shift()!;
+        continue;
+      }
+      if (done) break;
+      await new Promise<void>((r) => { resolve = r; });
     }
 
-    const steps = this.mapSteps(result.steps);
-    const extracted = this.extractFormattedOutput(result.steps, params.format);
+    // Drain any remaining
+    while (queue.length > 0) yield queue.shift()!;
 
-    const workerUsage = this.sumWorkerUsage();
-    const combinedUsage = {
-      inputTokens: (result.usage?.inputTokens ?? 0) + workerUsage.inputTokens,
-      outputTokens: (result.usage?.outputTokens ?? 0) + workerUsage.outputTokens,
-      totalTokens: (result.usage?.totalTokens ?? 0) + workerUsage.totalTokens,
-    };
-
-    yield {
-      type: "done",
-      text: extracted?.content ?? result.text ?? "",
-      steps,
-      usage: combinedUsage,
-    };
+    await generatePromise;
   }
 
   /**
