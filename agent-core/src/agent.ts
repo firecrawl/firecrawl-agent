@@ -127,6 +127,60 @@ export class FirecrawlAgent {
   }
 
   /**
+   * Return a Web Response with SSE stream. Works with Next.js, Hono, Bun, etc.
+   */
+  toResponse(params: RunParams): Response {
+    const encoder = new TextEncoder();
+    const self = this;
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const event of self.stream(params)) {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
+            );
+          }
+        } catch (err) {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: "error", error: String(err) })}\n\n`),
+          );
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  }
+
+  /**
+   * Pipe SSE events directly to an Express/Node response object.
+   */
+  async pipeSSE(
+    params: RunParams,
+    res: { setHeader(k: string, v: string): void; write(chunk: string): void; end(): void },
+  ): Promise<void> {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+
+    try {
+      for await (const event of this.stream(params)) {
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      }
+    } catch (err) {
+      res.write(`data: ${JSON.stringify({ type: "error", error: String(err) })}\n\n`);
+    } finally {
+      res.end();
+    }
+  }
+
+  /**
    * Generate an execution plan without running the agent.
    */
   async plan(prompt: string): Promise<string> {
