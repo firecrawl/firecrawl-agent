@@ -620,7 +620,8 @@ export default function AgentPage() {
   const messages = isACP ? acpChat.messages : sdkChat.messages;
   const status = isACP ? acpChat.status : sdkChat.status;
   const stop = isACP ? acpChat.stop : sdkChat.stop;
-  const clearMessages = () => { sdkChat.setMessages([]); };
+  const chatError = isACP ? null : sdkChat.error;
+  const clearMessages = () => { sdkChat.setMessages([]); sdkChat.clearError?.(); };
 
   const sendMessage = useCallback((opts: { text: string }) => {
     setSidebarCollapsed(true);
@@ -630,6 +631,7 @@ export default function AgentPage() {
         bin: config.model.bin ?? config.model.model,
       });
     } else {
+      sdkChat.clearError?.();
       sdkChat.sendMessage(opts).catch((err) => {
         console.error("sendMessage failed:", err);
       });
@@ -1426,6 +1428,14 @@ export default function AgentPage() {
         {/* Bottom section */}
         {messages.length > 0 && (
           <div className="mt-20 pt-16 border-t border-border-faint">
+            {/* Error display */}
+            {chatError && (
+              <div className="mb-10 px-14 py-10 rounded-10 border border-accent-crimson/20 bg-accent-crimson/5 text-body-small text-accent-black">
+                <span className="text-accent-crimson text-label-small">Error: </span>
+                {chatError.message || "Something went wrong"}
+              </div>
+            )}
+
             {/* Follow-up input */}
             <div
               className={cn("bg-accent-white rounded-12 overflow-hidden transition-opacity", isRunning && "opacity-50 pointer-events-none")}
