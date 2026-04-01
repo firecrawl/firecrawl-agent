@@ -41,6 +41,8 @@ export interface WorkerResult {
 
 // --- Worker tool ---
 
+const WORKER_TIMEOUT_MS = 120_000; // 2 minutes per worker
+
 export interface WorkerToolOptions {
   maxWorkers?: number;
   workerMaxSteps?: number;
@@ -86,6 +88,13 @@ export function createWorkerTool(
 
       const results: WorkerResult[] = await Promise.all(
         limited.map(async (task) => {
+          // Per-worker timeout: abort if stuck
+          const workerAbort = new AbortController();
+          const timer = setTimeout(() => workerAbort.abort(), WORKER_TIMEOUT_MS);
+          if (abortSignal) {
+            abortSignal.addEventListener("abort", () => workerAbort.abort(), { once: true });
+          }
+
           try {
             const workerInstructions = await loadWorkerPrompt({
               TASK_ID: task.id,
@@ -99,7 +108,7 @@ export function createWorkerTool(
 
             const result = await worker.generate({
               prompt: task.prompt,
-              abortSignal,
+              abortSignal: workerAbort.signal,
               onStepFinish: ({ toolCalls, usage }) => {
                 const prev = workerProgress.get(task.id);
                 const prevLog = prev?.stepLog ?? [];
@@ -144,6 +153,7 @@ export function createWorkerTool(
               },
             });
 
+            clearTimeout(timer);
             const tokens = workerProgress.get(task.id)?.tokens ?? 0;
             const donePrev = workerProgress.get(task.id);
             workerProgress.set(task.id, {
@@ -173,7 +183,12 @@ export function createWorkerTool(
                 text: s.text?.slice(0, 200) ?? "",
               })),
             };
-          } catch (err) {
+          } catch (err: unknown) {
+            clearTimeout(timer);
+            const isTimeout = err instanceof Error && err.name === "AbortError";
+            const message = isTimeout
+              ? `Worker "${task.id}" timed out after ${WORKER_TIMEOUT_MS / 1000}s`
+              : err instanceof Error ? err.message : "Unknown error";
             workerProgress.set(task.id, {
               id: task.id,
               status: "error",
@@ -186,7 +201,7 @@ export function createWorkerTool(
             return {
               id: task.id,
               status: "error" as const,
-              result: err instanceof Error ? err.message : "Unknown error",
+              result: message,
               steps: 0,
               tokens: 0,
               stepDetails: [],

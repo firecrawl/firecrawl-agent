@@ -128,6 +128,10 @@ export class FirecrawlAgent {
       });
       done = true;
       if (resolve) { resolve(); resolve = null; }
+    }).catch((err) => {
+      push({ type: "error", error: err instanceof Error ? err.message : String(err) });
+      done = true;
+      if (resolve) { resolve(); resolve = null; }
     });
 
     // Yield events as they arrive
