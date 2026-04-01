@@ -331,6 +331,15 @@ export default function ArtifactPanel({ messages, isRunning, onRequestFormat, on
   const [codeLang, setCodeLang] = useState<"curl" | "fetch" | "python">("curl");
   const [copied, setCopied] = useState(false);
 
+  // Reset code panel when new output arrives
+  const prevContentRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (formatted && !formatted.streaming && formatted.content !== prevContentRef.current) {
+      setShowCode(false);
+      prevContentRef.current = formatted.content;
+    }
+  }, [formatted]);
+
   // Infer schema from output data when it becomes available
   const inferredSchema = useMemo(() => {
     if (!formatted || formatted.streaming || formatted.format !== "json") return null;
