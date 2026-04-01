@@ -1169,17 +1169,7 @@ function extractTimeline(messages: UIMessage[]): TimelineItem[] {
             status,
           });
         } else if (toolName === "lookup_site_playbook") {
-          const siteOutput = output as { found?: boolean; platform?: string; playbook?: string; skill?: string; message?: string };
-          const label = siteOutput.found
-            ? `${siteOutput.platform} playbook`
-            : `No playbook for ${String(input.url ?? "")}`;
-          items.push({
-            type: "skill",
-            skillName: label,
-            text: siteOutput.found ? `Site-specific navigation for ${siteOutput.platform}` : siteOutput.message,
-            skillInstructions: siteOutput.playbook,
-            status,
-          });
+          // Site playbooks are sub-resources, not top-level skills — don't show them as cards
         } else if (toolName === "load_skill" || toolName === "read_skill_resource") {
           const skillOutput = output as { name?: string; instructions?: string; error?: string; available_site_playbooks?: string[] };
           const desc = skillOutput.instructions
