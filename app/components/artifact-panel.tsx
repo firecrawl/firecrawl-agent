@@ -149,9 +149,8 @@ function extractFormattedOutput(messages: UIMessage[]): FormattedOutput & { stre
           if (input.data !== undefined) {
             content = typeof input.data === "string" ? input.data : JSON.stringify(input.data, null, 2);
           }
-          if (content) {
-            return { format: format as FormattedOutput["format"], content, streaming: true };
-          }
+          // Show streaming state even before data arrives
+          return { format: format as FormattedOutput["format"], content: content || "...", streaming: true };
         }
       }
     }
