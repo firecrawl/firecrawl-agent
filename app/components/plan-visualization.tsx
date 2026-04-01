@@ -1314,32 +1314,15 @@ export default function PlanVisualization({
           case "subagent":
             return <SubAgentCard key={i} item={item} />;
           case "format": {
-            const fmtLabel: Record<string, string> = { csv: "CSV", json: "JSON", text: "Report" };
-            const skillLabel = fmtLabel[item.formatType ?? "text"] ?? "Export";
-            if (item.status === "running") {
-              return <SkillLoad key={i} name={`${skillLabel}`} description="Formatting output..." status={item.status} />;
-            }
+            const fmtLabel: Record<string, string> = { csv: "CSV", json: "JSON", text: "Markdown" };
+            const label = fmtLabel[item.formatType ?? "text"] ?? "Output";
             return (
-              <button
-                key={i}
-                type="button"
-                className="w-full my-12 rounded-10 border border-border-faint overflow-hidden text-left hover:bg-black-alpha-2 transition-all group"
-                onClick={() => onArtifactClick?.()}
-              >
-                <div className="flex items-center gap-8 px-14 py-10">
-                  <span className="flex items-center justify-center w-28 h-20 rounded-4 bg-black-alpha-4 text-mono-x-small text-black-alpha-48 flex-shrink-0">{"{}"}</span>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-label-medium text-accent-black">{skillLabel}</span>
-                    <div className="text-body-small text-black-alpha-40">Output ready</div>
-                  </div>
-                  <svg className="w-14 h-14 text-accent-forest flex-shrink-0" fill="none" viewBox="0 0 16 16">
-                    <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <svg fill="none" height="14" viewBox="0 0 24 24" width="14" className="text-black-alpha-24 group-hover:text-accent-black transition-colors flex-shrink-0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 18l6-6-6-6" />
-                  </svg>
-                </div>
-              </button>
+              <div key={i} className="flex items-center gap-6 my-8">
+                <span className="text-mono-x-small text-black-alpha-32 bg-black-alpha-4 px-8 py-2 rounded-4">{label}</span>
+                {item.status === "running" && (
+                  <span className="inline-block w-4 h-4 rounded-full bg-heat-100 animate-pulse" />
+                )}
+              </div>
             );
           }
           case "workers":
