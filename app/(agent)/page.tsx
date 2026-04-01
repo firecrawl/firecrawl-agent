@@ -1437,7 +1437,7 @@ export default function AgentPage() {
               <div className="flex items-center gap-8 px-16 py-12">
                 <input
                   className="flex-1 bg-transparent text-body-medium text-accent-black placeholder:text-black-alpha-32 focus:outline-none"
-                  placeholder={isRunning ? "Waiting for response..." : "Ask a follow-up..."}
+                  placeholder="Ask a follow-up..."
                   value={followUp}
                   disabled={isRunning}
                   onChange={(e) => setFollowUp(e.target.value)}
