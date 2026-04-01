@@ -1486,12 +1486,12 @@ export default function AgentPage() {
 
             {/* Suggestions */}
             {!isRunning && suggestions.length > 0 && (
-              <div className="flex flex-col gap-4 mt-8">
+              <div className="flex flex-wrap gap-6 mt-10">
                 {suggestions.slice(0, 3).map((s, i) => (
                   <button
                     key={i}
                     type="button"
-                    className="w-full px-16 py-10 rounded-8 border border-border-faint text-body-small text-black-alpha-48 hover:border-black-alpha-16 hover:text-accent-black transition-all text-left"
+                    className="px-12 py-6 rounded-8 text-body-small text-black-alpha-40 bg-black-alpha-2 hover:bg-black-alpha-4 hover:text-accent-black transition-all text-left"
                     onClick={() => {
                       setSuggestions([]);
                       sendMessage({ text: s });
