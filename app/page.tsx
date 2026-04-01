@@ -1320,7 +1320,7 @@ export default function AgentPage() {
         {/* Session stats scoreboard */}
         {messages.length > 0 && (
           <div className="mt-16 mb-8">
-            <div className="flex items-center justify-end gap-12">
+            <div className="flex items-center justify-end gap-x-12 gap-y-4 flex-wrap">
               <div className="flex items-center gap-4 text-mono-x-small text-black-alpha-32">
                 <ProviderModelIcon icon={currentModelIcon} size={12} />
                 {currentModelName}
