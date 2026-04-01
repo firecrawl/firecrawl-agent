@@ -24,7 +24,7 @@ function HighlightedCode({ code, lang }: { code: string; lang: string }) {
     const shikiLang = shikiLangMap[lang] ?? lang;
     codeToHtml(code, {
       lang: shikiLang,
-      theme: "github-dark",
+      theme: "github-light",
     })
       .then((result) => {
         if (prevKey.current === key) setHtml(result);
@@ -34,7 +34,7 @@ function HighlightedCode({ code, lang }: { code: string; lang: string }) {
 
   if (!html) {
     return (
-      <pre className="px-14 py-12 text-[12px] font-mono leading-[1.6] text-gray-300 bg-[#0d1117] whitespace-pre-wrap overflow-auto max-h-[280px] rounded-8">
+      <pre className="px-14 pb-10 text-[12px] font-mono leading-[1.6] text-accent-black whitespace-pre-wrap overflow-auto max-h-[280px]">
         {code}
       </pre>
     );
@@ -42,7 +42,7 @@ function HighlightedCode({ code, lang }: { code: string; lang: string }) {
 
   return (
     <div
-      className="px-14 py-12 text-[12px] leading-[1.6] overflow-auto max-h-[280px] bg-[#0d1117] rounded-8 [&_pre]:!bg-transparent [&_pre]:!p-0 [&_pre]:!m-0 [&_pre]:whitespace-pre-wrap [&_code]:!font-mono"
+      className="px-14 pb-10 text-[12px] leading-[1.6] overflow-auto max-h-[280px] [&_pre]:!bg-transparent [&_pre]:!p-0 [&_pre]:!m-0 [&_pre]:whitespace-pre-wrap [&_code]:!font-mono"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
@@ -343,14 +343,7 @@ export default function ArtifactPanel({ messages, isRunning, onRequestFormat, on
   // The schema to use in code snippets: user-provided takes precedence, then inferred
   const codeSchema = schema ?? inferredSchema ?? undefined;
 
-  // Auto-expand code section when output finishes (first time only)
-  const autoExpandedRef = useRef(false);
-  useEffect(() => {
-    if (formatted && !formatted.streaming && !autoExpandedRef.current) {
-      setShowCode(true);
-      autoExpandedRef.current = true;
-    }
-  }, [formatted]);
+
 
   if (!formatted) return null;
 
@@ -416,8 +409,8 @@ export default function ArtifactPanel({ messages, isRunning, onRequestFormat, on
 
       {/* Code snippet panel */}
       {showCode && (
-        <div className="border-b border-border-faint bg-[#0d1117]">
-          <div className="px-14 py-8 flex items-center gap-4">
+        <div className="border-b border-border-faint bg-black-alpha-2">
+          <div className="px-14 py-6 flex items-center gap-4">
             {(["curl", "fetch", "python"] as const).map((lang) => (
               <button
                 key={lang}
@@ -425,8 +418,8 @@ export default function ArtifactPanel({ messages, isRunning, onRequestFormat, on
                 className={cn(
                   "px-8 py-3 rounded-6 text-mono-x-small transition-all",
                   codeLang === lang
-                    ? "bg-[#1f2937] text-white"
-                    : "text-gray-500 hover:text-gray-300",
+                    ? "bg-accent-white text-accent-black shadow-sm"
+                    : "text-black-alpha-40 hover:text-accent-black",
                 )}
                 onClick={() => setCodeLang(lang)}
               >
@@ -436,7 +429,7 @@ export default function ArtifactPanel({ messages, isRunning, onRequestFormat, on
             <div className="flex-1" />
             <button
               type="button"
-              className="flex items-center gap-4 text-mono-x-small text-gray-500 hover:text-gray-300 transition-colors"
+              className="flex items-center gap-4 text-mono-x-small text-black-alpha-32 hover:text-accent-black transition-colors"
               onClick={() => {
                 navigator.clipboard.writeText(buildCodeSnippet(codeLang, prompt ?? "", codeSchema, urls));
                 setCopied(true);
@@ -448,7 +441,7 @@ export default function ArtifactPanel({ messages, isRunning, onRequestFormat, on
           </div>
           {inferredSchema && !schema && (
             <div className="px-14 pb-4">
-              <span className="text-mono-x-small text-gray-500">Schema inferred from output — rerun with this schema for consistent results</span>
+              <span className="text-mono-x-small text-black-alpha-24">Schema inferred from output — rerun with this schema for consistent results</span>
             </div>
           )}
           <HighlightedCode code={buildCodeSnippet(codeLang, prompt ?? "", codeSchema, urls)} lang={codeLang} />
