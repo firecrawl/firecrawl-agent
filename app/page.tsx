@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { AgentConfig, ModelConfig } from "@agent-core";
@@ -164,6 +164,7 @@ function PlusMenu({
   const [schemaPaste, setSchemaPaste] = useState("");
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [maxH, setMaxH] = useState(400);
+  const [pos, setPos] = useState<{ left: number; bottom: number; width: number } | null>(null);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -173,12 +174,21 @@ function PlusMenu({
     return () => document.removeEventListener("mousedown", handler);
   }, [onClose]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!ref.current) return;
-    const parent = ref.current.parentElement;
-    if (!parent) return;
-    const rect = parent.getBoundingClientRect();
-    const available = rect.top - 12;
+    // Walk up to find the input card container (max-w-640 rounded-16)
+    let card = ref.current.parentElement;
+    while (card && !card.classList.contains("max-w-640")) {
+      card = card.parentElement;
+    }
+    if (!card) return;
+    const cardRect = card.getBoundingClientRect();
+    setPos({
+      left: cardRect.left,
+      bottom: window.innerHeight - cardRect.top + 6,
+      width: cardRect.width,
+    });
+    const available = cardRect.top - 12;
     setMaxH(Math.max(200, Math.min(420, available)));
   }, [activePanel]);
 
@@ -206,8 +216,12 @@ function PlusMenu({
   return (
     <div
       ref={ref}
-      className="absolute bottom-full left-0 mb-6 bg-accent-white rounded-12 border border-border-muted overflow-hidden flex max-w-[520px]"
-      style={{ boxShadow: "0px 16px 32px -8px rgba(0,0,0,0.08), 0px 4px 12px -2px rgba(0,0,0,0.04)", maxHeight: maxH }}
+      className="fixed bg-accent-white rounded-12 border border-border-muted overflow-hidden flex"
+      style={{
+        boxShadow: "0px 16px 32px -8px rgba(0,0,0,0.08), 0px 4px 12px -2px rgba(0,0,0,0.04)",
+        maxHeight: maxH,
+        ...(pos ? { left: pos.left, bottom: pos.bottom, width: pos.width } : { left: 0, bottom: 0 }),
+      }}
     >
       {/* Left nav */}
       <div className="w-160 flex-shrink-0 py-6 px-6 flex flex-col gap-1 border-r border-border-faint">
