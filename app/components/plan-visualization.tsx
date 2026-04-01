@@ -681,6 +681,41 @@ interface WorkerLiveProgress {
   stepLog?: { tool: string; detail: string; input: Record<string, unknown> }[];
 }
 
+/** Extract the first URL from a string (prompt text, detail, JSON, etc.) */
+function extractUrl(text: string): string | null {
+  const m = text.match(/https?:\/\/[^\s"',)}\]]+/);
+  return m ? m[0] : null;
+}
+
+/** Describe a worker step in a clean, human-readable way */
+function describeWorkerStep(step: { tool: string; detail: string; input: Record<string, unknown> }): {
+  label: string;
+  url: string | null;
+  icon: "search" | "scrape" | "interact" | "bash" | "skill" | "other";
+} {
+  const url = extractUrl(step.detail) || extractUrl(JSON.stringify(step.input));
+  switch (step.tool) {
+    case "search":
+      return { label: `Searched: "${step.input.query ?? step.detail}"`, url: null, icon: "search" };
+    case "scrape":
+      return { label: url ? new URL(url).hostname : step.detail, url, icon: "scrape" };
+    case "interact":
+      return { label: url ? `Interacting with ${new URL(url).hostname}` : "Interacting", url, icon: "interact" };
+    case "bashExec":
+    case "bash_exec":
+      return { label: step.detail || "Running command", url: null, icon: "bash" };
+    case "load_skill":
+    case "lookup_site_playbook":
+      return { label: step.detail || step.tool, url: null, icon: "skill" };
+    case "formatOutput":
+      return { label: "Formatting output", url: null, icon: "other" };
+    case "thinking":
+      return { label: "Processing...", url: null, icon: "other" };
+    default:
+      return { label: step.detail || step.tool, url: extractUrl(step.detail), icon: "other" };
+  }
+}
+
 function WorkerCard({ id, prompt, result, workerStatus, liveProgress, stepDetails }: {
   id: string;
   prompt: string;
@@ -691,18 +726,35 @@ function WorkerCard({ id, prompt, result, workerStatus, liveProgress, stepDetail
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  // Show latest action with full detail from step log
-  const lastStep = liveProgress?.stepLog?.[liveProgress.stepLog.length - 1];
+  // Parse the current activity into a clean description
   const lastMeaningfulStep = liveProgress?.stepLog?.filter((s) => s.tool !== "thinking").pop();
-  const activityText = workerStatus === "done"
-    ? (result ? result.slice(0, 80) : lastMeaningfulStep?.detail || prompt.slice(0, 80))
-    : workerStatus === "running" && lastStep
-      ? (lastStep.tool === "thinking" ? (lastMeaningfulStep?.detail || "Processing...") : (lastStep.detail || lastStep.tool))
-      : prompt.slice(0, 80);
+  const currentStep = lastMeaningfulStep ? describeWorkerStep(lastMeaningfulStep) : null;
+
+  // Extract primary URL from prompt for the initial state
+  const promptUrl = extractUrl(prompt);
+  const promptDomain = promptUrl ? getDomain(promptUrl) : null;
+
+  // Determine what to show as subtitle
+  let subtitleDomain: string | null = null;
+  let subtitleText: string;
+
+  if (workerStatus === "done" && result) {
+    subtitleText = result.slice(0, 80);
+  } else if (workerStatus === "running" && currentStep) {
+    subtitleDomain = currentStep.url ? getDomain(currentStep.url) : null;
+    subtitleText = currentStep.label;
+  } else {
+    subtitleDomain = promptDomain;
+    subtitleText = promptDomain ? promptUrl! : prompt.slice(0, 80);
+  }
+
+  // Show interact indicator when actively interacting
+  const isInteracting = workerStatus === "running" && currentStep?.icon === "interact";
 
   return (
     <div className={cn(
       "rounded-10 border overflow-hidden transition-all",
+      isInteracting ? "border-accent-iris/30" :
       workerStatus === "error" ? "border-accent-crimson/20" : "border-border-faint hover:border-black-alpha-16",
     )}>
       <button
@@ -720,12 +772,20 @@ function WorkerCard({ id, prompt, result, workerStatus, liveProgress, stepDetail
             <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
         )}
-        {workerStatus === "running" && (
+        {workerStatus === "running" && !isInteracting && (
           <div className="w-5 h-5 rounded-full bg-heat-100 animate-pulse flex-shrink-0" />
         )}
-        <div className="flex-1 min-w-0">
-          <div className="text-label-medium text-accent-black">{id}</div>
-          <div className="text-body-small text-black-alpha-40 truncate">{activityText}</div>
+        {isInteracting && (
+          <svg className="w-14 h-14 text-accent-iris animate-pulse flex-shrink-0" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M7 2l1.5 3.5L12 7l-3.5 1.5L7 12l-1.5-3.5L2 7l3.5-1.5z" />
+          </svg>
+        )}
+        <div className="flex items-center gap-6 flex-1 min-w-0">
+          {subtitleDomain && <Favicon domain={subtitleDomain} />}
+          <div className="min-w-0 flex-1">
+            <div className="text-label-medium text-accent-black">{id}</div>
+            <div className="text-body-small text-black-alpha-40 truncate">{subtitleText}</div>
+          </div>
         </div>
         <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24 flex-shrink-0", expanded && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
           <path d="M6 9l6 6 6-6" />
@@ -740,9 +800,18 @@ function WorkerCard({ id, prompt, result, workerStatus, liveProgress, stepDetail
                 <div key={si} className="flex items-start gap-6">
                   <div className="w-16 h-16 rounded-full bg-black-alpha-4 flex-center flex-shrink-0 mt-2 text-mono-x-small text-black-alpha-32">{si + 1}</div>
                   <div className="min-w-0 flex-1">
-                    {step.toolCalls.map((tc, ti) => (
-                      <div key={ti} className="text-mono-x-small text-black-alpha-48 truncate">{tc.name}: {tc.input}</div>
-                    ))}
+                    {step.toolCalls.map((tc, ti) => {
+                      const tcUrl = extractUrl(tc.input);
+                      const tcDomain = tcUrl ? getDomain(tcUrl) : null;
+                      return (
+                        <div key={ti} className="flex items-center gap-4 text-black-alpha-48">
+                          {tcDomain && <Favicon domain={tcDomain} />}
+                          <span className="text-mono-x-small truncate">
+                            {tc.name === "scrape" && tcDomain ? tcDomain : tc.name === "interact" && tcDomain ? `interact ${tcDomain}` : `${tc.name}: ${tc.input}`}
+                          </span>
+                        </div>
+                      );
+                    })}
                     {step.text && <div className="text-body-small text-black-alpha-32 truncate mt-1">{step.text}</div>}
                   </div>
                 </div>
@@ -757,15 +826,18 @@ function WorkerCard({ id, prompt, result, workerStatus, liveProgress, stepDetail
           )}
           {workerStatus === "running" && !result && liveProgress?.stepLog && liveProgress.stepLog.length > 0 && (
             <div className="px-14 py-8 flex flex-col gap-3">
-              {liveProgress.stepLog.map((step, si) => (
-                <div key={si} className="flex items-start gap-6">
-                  <span className="text-mono-x-small text-black-alpha-24 w-16 flex-shrink-0 mt-2">{si + 1}</span>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-mono-x-small text-black-alpha-32 bg-black-alpha-4 px-6 py-1 rounded-4">{step.tool}</span>
-                    {step.detail && <div className="text-body-small text-black-alpha-48 truncate mt-1">{step.detail}</div>}
+              {liveProgress.stepLog.filter((s) => s.tool !== "thinking").map((step, si) => {
+                const desc = describeWorkerStep(step);
+                const domain = desc.url ? getDomain(desc.url) : null;
+                return (
+                  <div key={si} className="flex items-center gap-6">
+                    {domain ? <Favicon domain={domain} /> : (
+                      <span className="text-mono-x-small text-black-alpha-32 bg-black-alpha-4 px-6 py-1 rounded-4">{step.tool}</span>
+                    )}
+                    <div className="text-body-small text-black-alpha-48 truncate">{desc.label}</div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
           {workerStatus === "running" && !result && (!liveProgress?.stepLog || liveProgress.stepLog.length === 0) && (
