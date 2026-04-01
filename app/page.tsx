@@ -1336,66 +1336,74 @@ export default function AgentPage() {
         {sparkMode ? (
           <div className="mt-8">
             {sparkLoading && (
-              <div className="rounded-12 border border-border-muted bg-accent-white overflow-hidden" style={{ boxShadow: "0px 4px 16px -4px rgba(0,0,0,0.06)" }}>
-                <div className="flex items-center gap-8 px-16 py-10 border-b border-border-faint bg-black-alpha-2">
+              <div className="my-12 rounded-10 border border-heat-40 shadow-sm overflow-hidden">
+                <div className="flex items-center gap-8 px-14 py-10">
                   <ProviderModelIcon icon="firecrawl" size={16} />
                   <span className="text-label-small text-accent-black">
                     {config.model.model === "spark-1-pro" ? "Spark 1 Pro" : "Spark 1 Mini"}
                   </span>
-                  <span className="text-mono-x-small px-6 py-1 rounded-4 bg-amber-50 text-amber-600 animate-pulse">processing</span>
+                  <span className="text-mono-x-small text-heat-100 bg-heat-8 px-4 py-1 rounded-4 animate-pulse">processing</span>
                 </div>
-                <div className="flex flex-col items-center gap-12 py-32 px-16">
-                  <div className="w-28 h-28 border-3 border-heat-100 border-t-transparent rounded-full animate-spin" />
-                  <div className="text-body-small text-black-alpha-48 text-center">
-                    Searching, navigating, and extracting data...
+                <div className="border-t border-border-faint bg-background-lighter p-14">
+                  <div className="flex items-center gap-10">
+                    <div className="w-16 h-16 border-2 border-heat-100 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                    <span className="text-body-small text-black-alpha-48">Searching, navigating, and extracting data...</span>
                   </div>
-                  <div className="text-mono-x-small text-black-alpha-24">This may take a few minutes for complex queries</div>
+                  <div className="text-mono-x-small text-black-alpha-24 mt-6 ml-26">This may take a few minutes for complex queries</div>
                 </div>
               </div>
             )}
             {sparkError && (
-              <div className="rounded-12 border border-accent-crimson/20 bg-accent-crimson/5 p-16">
-                <div className="text-label-small text-accent-crimson mb-4">Error</div>
-                <div className="text-body-small text-accent-black">{sparkError}</div>
-                <button
-                  type="button"
-                  className="mt-10 px-12 py-6 rounded-8 text-label-small bg-accent-crimson/10 text-accent-crimson hover:bg-accent-crimson/20 transition-all"
-                  onClick={() => { setHasSubmitted(false); setSparkMode(false); setSparkError(null); }}
-                >
-                  Back
-                </button>
+              <div className="my-12 rounded-10 border border-border-faint overflow-hidden">
+                <div className="flex items-center gap-8 px-14 py-10">
+                  <ProviderModelIcon icon="firecrawl" size={16} />
+                  <span className="text-label-small text-accent-black">
+                    {config.model.model === "spark-1-pro" ? "Spark 1 Pro" : "Spark 1 Mini"}
+                  </span>
+                  <span className="text-mono-x-small text-accent-crimson bg-accent-crimson/8 px-4 py-1 rounded-4">failed</span>
+                </div>
+                <div className="border-t border-border-faint bg-background-lighter p-14">
+                  <div className="text-body-small text-accent-black">{sparkError}</div>
+                  <button
+                    type="button"
+                    className="mt-10 px-12 py-6 rounded-8 text-label-small text-black-alpha-48 hover:text-accent-black bg-black-alpha-4 hover:bg-black-alpha-8 transition-all"
+                    onClick={() => { setHasSubmitted(false); setSparkMode(false); setSparkError(null); }}
+                  >
+                    Back
+                  </button>
+                </div>
               </div>
             )}
             {sparkResult && (
-              <div className="rounded-12 border border-border-muted bg-accent-white overflow-hidden" style={{ boxShadow: "0px 4px 16px -4px rgba(0,0,0,0.06)" }}>
-                <div className="flex items-center justify-between px-16 py-10 border-b border-border-faint bg-black-alpha-2">
+              <div className="my-12 rounded-10 border border-border-faint overflow-hidden">
+                <div className="flex items-center justify-between px-14 py-10">
                   <div className="flex items-center gap-8">
                     <ProviderModelIcon icon="firecrawl" size={16} />
                     <span className="text-label-small text-accent-black">
                       {config.model.model === "spark-1-pro" ? "Spark 1 Pro" : "Spark 1 Mini"}
                     </span>
                     <span className={cn(
-                      "text-mono-x-small px-6 py-1 rounded-4",
-                      sparkResult.status === "completed" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700",
+                      "text-mono-x-small px-4 py-1 rounded-4",
+                      sparkResult.status === "completed" ? "text-heat-100 bg-heat-8" : "text-black-alpha-48 bg-black-alpha-4",
                     )}>
                       {sparkResult.status}
                     </span>
                   </div>
-                  {sparkResult.creditsUsed != null && (
-                    <span className="text-mono-x-small text-black-alpha-32">{sparkResult.creditsUsed} credits</span>
-                  )}
+                  <span className="text-mono-x-small text-black-alpha-32">
+                    {sparkResult.creditsUsed ?? 0} credit{sparkResult.creditsUsed !== 1 ? "s" : ""}
+                  </span>
                 </div>
-                <div className="p-16 overflow-auto" style={{ maxHeight: "60vh", scrollbarWidth: "thin" }}>
+                <div className="border-t border-border-faint bg-background-lighter p-14 max-h-500 overflow-auto no-scrollbar">
                   <pre className="text-mono-small text-accent-black whitespace-pre-wrap break-words">
                     {typeof sparkResult.data === "string"
                       ? sparkResult.data
                       : JSON.stringify(sparkResult.data, null, 2)}
                   </pre>
                 </div>
-                <div className="flex items-center gap-8 px-16 py-10 border-t border-border-faint">
+                <div className="flex items-center gap-6 px-14 py-8 border-t border-border-faint">
                   <button
                     type="button"
-                    className="px-12 py-6 rounded-8 text-label-small bg-black-alpha-4 text-accent-black hover:bg-black-alpha-8 transition-all"
+                    className="px-10 py-5 rounded-8 text-label-small text-black-alpha-48 hover:text-accent-black bg-black-alpha-4 hover:bg-black-alpha-8 transition-all"
                     onClick={() => {
                       const text = typeof sparkResult.data === "string"
                         ? sparkResult.data
@@ -1407,7 +1415,7 @@ export default function AgentPage() {
                   </button>
                   <button
                     type="button"
-                    className="px-12 py-6 rounded-8 text-label-small bg-black-alpha-4 text-accent-black hover:bg-black-alpha-8 transition-all"
+                    className="px-10 py-5 rounded-8 text-label-small text-black-alpha-48 hover:text-accent-black bg-black-alpha-4 hover:bg-black-alpha-8 transition-all"
                     onClick={() => {
                       setSparkMode(false);
                       setSparkResult(null);
