@@ -177,9 +177,9 @@ function PlusMenu({
     <div
       ref={ref}
       className="absolute bottom-full left-0 mb-6 w-320 bg-accent-white rounded-12 border border-border-muted overflow-hidden flex flex-col"
-      style={{ boxShadow: "0px 16px 32px -8px rgba(0,0,0,0.08), 0px 4px 12px -2px rgba(0,0,0,0.04)", maxHeight: "min(420px, 60vh)" }}
+      style={{ boxShadow: "0px 16px 32px -8px rgba(0,0,0,0.08), 0px 4px 12px -2px rgba(0,0,0,0.04)", maxHeight: "min(400px, 50vh)" }}
     >
-      <div className="px-6 py-6 flex flex-col gap-1">
+      <div className="px-6 py-6 flex flex-col gap-1 overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
         {/* Plan toggle */}
         <button
           type="button"
