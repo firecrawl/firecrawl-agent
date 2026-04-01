@@ -372,13 +372,35 @@ export default function ArtifactPanel({ messages, isRunning, onRequestFormat, on
       {/* Header */}
       <div className="px-14 py-10 border-b border-border-faint flex items-center gap-8">
         {isStreaming ? (
-          <span className="text-mono-x-small text-black-alpha-32 flex-1 flex items-center gap-4">
+          <span className="text-mono-x-small text-black-alpha-32 flex items-center gap-4">
             <span className="inline-block w-4 h-4 rounded-full bg-heat-100 animate-pulse" />
             Streaming...
           </span>
         ) : (
-          <span className="flex-1" />
+          <div className="flex items-center gap-4">
+            {([
+              { id: "JSON", active: isJson },
+              { id: "CSV", active: isCsv },
+              { id: "Markdown", active: !isJson && !isCsv },
+            ] as const).map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                disabled={f.active}
+                className={cn(
+                  "px-8 py-4 rounded-6 text-mono-x-small transition-all",
+                  f.active
+                    ? "bg-black-alpha-4 text-accent-black"
+                    : "text-black-alpha-32 hover:text-accent-black hover:bg-black-alpha-4",
+                )}
+                onClick={() => { if (!f.active) onRequestFormat(f.id); }}
+              >
+                {f.id}
+              </button>
+            ))}
+          </div>
         )}
+        <span className="flex-1" />
         {!isStreaming && (
           <>
             <button
@@ -471,32 +493,7 @@ export default function ArtifactPanel({ messages, isRunning, onRequestFormat, on
         )}
       </div>
 
-      {/* Regenerate as different format */}
-      {!isStreaming && (
-        <div className="px-12 py-10 border-t border-border-faint flex items-center gap-6">
-          <span className="text-mono-x-small text-black-alpha-32 mr-4">Regenerate as</span>
-          {([
-            { id: "JSON", icon: "{}", active: isJson },
-            { id: "CSV", icon: "⊞", active: isCsv },
-            { id: "Markdown", icon: "¶", active: !isJson && !isCsv },
-          ] as const).map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              disabled={f.active}
-              className={cn(
-                "px-8 py-4 rounded-6 text-mono-x-small transition-all",
-                f.active
-                  ? "bg-black-alpha-4 text-black-alpha-32 cursor-default"
-                  : "text-black-alpha-48 hover:text-accent-black hover:bg-black-alpha-4",
-              )}
-              onClick={() => { if (!f.active) onRequestFormat(f.id); }}
-            >
-              {f.id}
-            </button>
-          ))}
-        </div>
-      )}
+
     </div>
   );
 }
