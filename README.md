@@ -6,6 +6,10 @@ Built on [Firecrawl](https://firecrawl.dev/) and [firecrawl-aisdk](https://www.n
 
 ## Get started
 
+### Option 1: CLI
+
+Build the CLI once, then scaffold projects from anywhere:
+
 ```bash
 cd cli && npm install && npm run build && npm link
 ```
@@ -21,39 +25,72 @@ firecrawl-agent init my-agent
   Hono (Serverless)      Fast, lightweight API — ideal for edge and serverless
 ```
 
-Pick a template, and you're running. The CLI auto-detects your Firecrawl API key and installs everything.
-
-Or skip the prompts entirely:
+The CLI auto-detects your Firecrawl API key, scaffolds the project, and installs dependencies. Or skip prompts entirely:
 
 ```bash
-firecrawl-agent init my-agent -t next                          # Full UI
+firecrawl-agent init my-agent -t next                            # Full UI
 firecrawl-agent init my-agent -t express --key anthropic=sk-...  # API server with keys
-firecrawl-agent init my-agent --from user/repo                 # From any repo with agent-manifest.json
+firecrawl-agent init my-agent --from user/repo                   # From external repo
 ```
 
-## How it works
+See [`cli/`](./cli/) for the full CLI reference.
+
+### Option 2: Clone
+
+```bash
+git clone https://github.com/mendableai/firecrawl-agent.git
+cd firecrawl-agent
+npm install
+cp .env.local.example .env.local   # add your FIRECRAWL_API_KEY
+npm run dev                         # http://localhost:3000
+```
+
+## Architecture
 
 ```mermaid
 graph TD
-    A[Prompt] --> B[Orchestrator]
-    B --> C[Search]
-    B --> D[Scrape]
-    B --> E[Interact]
-    B -->|Complex tasks| F[Parallel Workers]
-    F --> G[Worker 1]
-    F --> H[Worker 2]
-    F --> I[Worker 3]
-    C --> J[Structured Results]
-    D --> J
-    E --> J
-    G --> J
-    H --> J
-    I --> J
+    subgraph "Firecrawl Toolkit"
+        SEARCH[Search]
+        SCRAPE[Scrape]
+        INTERACT[Interact]
+    end
+
+    subgraph "Agent Core"
+        ORC[Orchestrator]
+        ORC --> SEARCH
+        ORC --> SCRAPE
+        ORC --> INTERACT
+        ORC --> SKILLS[Skills]
+        ORC -->|Complex tasks| WORKERS[Parallel Workers]
+        WORKERS --> W1[Worker]
+        WORKERS --> W2[Worker]
+        WORKERS --> W3[Worker]
+    end
+
+    subgraph "Templates"
+        NEXT["Next.js — Full UI"]
+        EXPRESS["Express — API"]
+        HONO["Hono — Serverless"]
+    end
+
+    NEXT --> ORC
+    EXPRESS --> ORC
+    HONO --> ORC
+
+    subgraph "Clients"
+        SDK["SDKs — 17 languages"]
+        CURL["curl / HTTP"]
+        LIB["Direct import"]
+    end
+
+    SDK -->|"POST /v1/run"| NEXT
+    CURL -->|"POST /v1/run"| EXPRESS
+    LIB --> ORC
 ```
 
 ## Use as an API or a library
 
-**API** — deploy any template, call `POST /v1/run` from any language.
+**API** — deploy any template, call `POST /v1/run` from any language:
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/run \
@@ -61,7 +98,7 @@ curl -X POST http://localhost:3000/api/v1/run \
   -d '{"prompt": "Compare pricing for Vercel vs Netlify", "format": "json"}'
 ```
 
-**Library** — import directly, no server needed.
+**Library** — import directly, no server needed:
 
 ```typescript
 import { createAgent } from '@firecrawl/agent-core'
@@ -74,15 +111,26 @@ const agent = createAgent({
 const result = await agent.run({ prompt: 'Compare pricing for Vercel vs Netlify' })
 ```
 
+## Templates
+
+| Template | What you get | Best for |
+|----------|-------------|----------|
+| [**Next.js**](./templates/next/) | Full web app — chat UI, conversation history, settings, streaming visualization | Teams, demos, full experience |
+| [**Express**](./templates/express/) | Lightweight API server with `POST /v1/run` | Backend services, self-hosted |
+| [**Hono**](./templates/hono/) | Fast serverless API with SSE streaming | Edge, serverless, Cloudflare |
+
+All templates share the same [agent core](./agent-core/) and expose the same [API](./agent-core/openapi.yaml). Pick the one that fits your stack.
+
 ## Project structure
 
 | Directory | What's inside |
 |-----------|--------------|
-| [`cli/`](./cli/) | CLI tool — `init`, `dev`, `deploy` |
-| [`agent-core/`](./agent-core/) | Core agent logic, tools, skills, OpenAPI spec |
-| [`templates/`](./templates/) | Next.js, Express, Hono server templates |
+| [`cli/`](./cli/) | CLI tool — `init`, `dev`, `deploy` commands |
+| [`agent-core/`](./agent-core/) | Core agent logic, orchestrator, skills, tools, [OpenAPI spec](./agent-core/openapi.yaml) |
+| [`templates/`](./templates/) | Server templates — [Next.js](./templates/next/), [Express](./templates/express/), [Hono](./templates/hono/) |
 | [`sdks/`](./sdks/) | Auto-generated clients for 17 languages |
-| [`deploy/`](./deploy/) | Vercel, Railway, Docker configs |
+| [`examples/`](./examples/) | Working examples for every SDK language |
+| [`deploy/`](./deploy/) | Platform configs — [Vercel](./deploy/vercel/), [Railway](./deploy/railway/), [Docker](./deploy/docker/) |
 
 ## License
 
