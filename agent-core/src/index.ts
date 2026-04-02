@@ -1,5 +1,5 @@
 // Public API
-export { createAgent, FirecrawlAgent } from "./agent";
+export { createAgent, createAgentFromEnv, FirecrawlAgent } from "./agent";
 export { createOrchestrator, type OrchestratorOptions } from "./orchestrator";
 export { createWorkerTool, workerProgress, type WorkerProgress, type WorkerResult } from "./worker";
 export { createSubAgentTools } from "./orchestrator/sub-agents";

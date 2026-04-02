@@ -6,6 +6,7 @@ import { workerProgress } from "./worker";
 import { buildFirecrawlToolkit } from "./toolkit";
 import type {
   CreateAgentOptions,
+  ModelConfig,
   Toolkit,
   RunParams,
   RunResult,
@@ -360,4 +361,37 @@ Do not use emojis.`,
  */
 export function createAgent(options: CreateAgentOptions): FirecrawlAgent {
   return new FirecrawlAgent(options);
+}
+
+/**
+ * Create an agent configured entirely from environment variables.
+ * Reads FIRECRAWL_API_KEY, MODEL_PROVIDER, MODEL_ID, and all provider keys.
+ * Throws if FIRECRAWL_API_KEY is not set.
+ */
+export function createAgentFromEnv(
+  overrides?: Partial<CreateAgentOptions>
+): FirecrawlAgent {
+  const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
+  if (!firecrawlApiKey) throw new Error("FIRECRAWL_API_KEY not set");
+
+  const apiKeys: Record<string, string> = {};
+  const envMap: Record<string, string> = {
+    ANTHROPIC_API_KEY: "anthropic",
+    OPENAI_API_KEY: "openai",
+    GOOGLE_GENERATIVE_AI_API_KEY: "google",
+    AI_GATEWAY_API_KEY: "gateway",
+  };
+  for (const [env, id] of Object.entries(envMap)) {
+    if (process.env[env]) apiKeys[id] = process.env[env]!;
+  }
+
+  return new FirecrawlAgent({
+    firecrawlApiKey,
+    model: {
+      provider: (process.env.MODEL_PROVIDER ?? "google") as ModelConfig["provider"],
+      model: process.env.MODEL_ID ?? "gemini-3-flash-preview",
+    },
+    apiKeys,
+    ...overrides,
+  });
 }
