@@ -38,7 +38,7 @@ See [`cli/`](./cli/) for the full CLI reference.
 ### Option 2: Clone
 
 ```bash
-git clone https://github.com/mendableai/firecrawl-agent.git
+git clone https://github.com/firecrawl/firecrawl-agent.git
 cd firecrawl-agent
 npm install
 cp .env.local.example .env.local   # add your FIRECRAWL_API_KEY
