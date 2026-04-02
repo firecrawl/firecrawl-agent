@@ -22,18 +22,10 @@ export interface ProviderEntry {
   hint: string;
 }
 
-export interface DeployPlatformEntry {
-  id: string;
-  name: string;
-  configPath: string;
-  command: string;
-}
-
 export interface Manifest {
   version: number;
   templates: TemplateEntry[];
   providers: ProviderEntry[];
-  deployPlatforms: DeployPlatformEntry[];
 }
 
 let cached: Manifest | null = null;
@@ -113,6 +105,3 @@ export function getProviders(): ProviderEntry[] {
   return (cached ?? loadManifest()).providers;
 }
 
-export function getDeployPlatforms(): DeployPlatformEntry[] {
-  return (cached ?? loadManifest()).deployPlatforms;
-}

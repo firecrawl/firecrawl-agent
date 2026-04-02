@@ -73,12 +73,11 @@ All templates share the same [agent core](./agent-core/) and expose the same API
 
 | Directory | What's inside |
 |-----------|--------------|
-| [`cli/`](./cli/) | CLI tool — `init`, `dev`, `deploy` commands |
 | [`agent-core/`](./agent-core/) | Core agent logic, orchestrator, skills, tools, [OpenAPI spec](./agent-core/openapi.yaml) |
 | [`templates/`](./templates/) | Server templates — [Next.js](./templates/next/), [Express](./templates/express/), [Hono](./templates/hono/) |
 | [`sdks/`](./sdks/) | Auto-generated clients for 17 languages |
 | [`examples/`](./examples/) | Working examples for every SDK language |
-| [`deploy/`](./deploy/) | Platform configs — [Vercel](./deploy/vercel/), [Railway](./deploy/railway/), [Docker](./deploy/docker/) |
+| [`cli/`](./cli/) | CLI tool — `init`, `dev`, `deploy` (generates Vercel, Railway, Docker configs) |
 
 ## Architecture
 
