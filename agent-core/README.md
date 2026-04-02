@@ -1,6 +1,6 @@
 # Agent Core
 
-The core agent logic. Pure TypeScript, no framework dependencies. Built on [firecrawl-aisdk](https://www.npmjs.com/package/firecrawl-aisdk).
+The core agent logic. Built on [firecrawl-aisdk](https://www.npmjs.com/package/firecrawl-aisdk) and the [Vercel AI SDK](https://sdk.vercel.ai/).
 
 This is what all [templates](../agent-templates/) share. You can also use it directly as a library.
 
