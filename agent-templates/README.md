@@ -20,7 +20,7 @@ firecrawl-agent init my-agent -t <template>
 
 All templates import from [agent-core](../agent-core/). The core logic — orchestration, tools, skills — is identical. Templates only differ in the HTTP layer.
 
-All expose the same `POST /v1/run` endpoint described in the [OpenAPI spec](../agent-core/openapi.yaml). Any [SDK](../sdks/) or [example](../examples/) works with any template.
+All expose the same `POST /v1/run` endpoint described in the [OpenAPI spec](../agent-core/openapi.yaml). Any [SDK](../agent-sdks/) or [example](../agent-examples/) works with any template.
 
 ## Deploy
 

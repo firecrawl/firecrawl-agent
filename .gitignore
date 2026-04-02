@@ -7,7 +7,6 @@ next-env.d.ts
 .firecrawl/
 data/
 tmp/
-__tests__/
 .DS_Store
 .playwright-mcp/
 cli/dist/

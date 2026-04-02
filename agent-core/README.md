@@ -2,7 +2,7 @@
 
 The core agent logic. Pure TypeScript, no framework dependencies. Built on [firecrawl-aisdk](https://www.npmjs.com/package/firecrawl-aisdk).
 
-This is what all [templates](../templates/) share. You can also use it directly as a library.
+This is what all [templates](../agent-templates/) share. You can also use it directly as a library.
 
 ## Quick start
 
@@ -100,7 +100,7 @@ createAgent()
 
 ## OpenAPI spec
 
-[`openapi.yaml`](./openapi.yaml) describes the HTTP API. All [templates](../templates/) implement it, all [SDKs](../sdks/) are generated from it.
+[`openapi.yaml`](./openapi.yaml) describes the HTTP API. All [templates](../agent-templates/) implement it, all [SDKs](../agent-sdks/) are generated from it.
 
 ## Files
 

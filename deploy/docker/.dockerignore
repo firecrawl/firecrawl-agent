@@ -1,8 +1,0 @@
-node_modules
-.next
-.git
-sdks
-tests
-examples
-*.md
-.env*

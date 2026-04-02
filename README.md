@@ -6,8 +6,6 @@ Built on [Firecrawl](https://firecrawl.dev/) and [firecrawl-aisdk](https://www.n
 
 ## Get started
 
-### CLI
-
 ```bash
 firecrawl agent init my-agent
 ```
@@ -53,9 +51,9 @@ const result = await agent.run({ prompt: 'Compare pricing for Vercel vs Netlify'
 
 | Template | What you get | Best for |
 |----------|-------------|----------|
-| [**Next.js**](./templates/next/) | Full web app — chat UI, conversation history, settings, streaming visualization | Teams, demos, full experience |
-| [**Express**](./templates/express/) | Lightweight API server with `POST /v1/run` | Backend services, self-hosted |
-| [**Hono**](./templates/hono/) | Fast serverless API with SSE streaming | Edge, serverless, Cloudflare |
+| [**Next.js**](./agent-templates/next/) | Full web app — chat UI, conversation history, settings, streaming visualization | Teams, demos, full experience |
+| [**Express**](./agent-templates/express/) | Lightweight API server with `POST /v1/run` | Backend services, self-hosted |
+| [**Hono**](./agent-templates/hono/) | Fast serverless API with SSE streaming | Edge, serverless, Cloudflare |
 
 All templates share the same [agent core](./agent-core/) and expose the same API.
 
@@ -64,10 +62,10 @@ All templates share the same [agent core](./agent-core/) and expose the same API
 | Directory | What's inside |
 |-----------|--------------|
 | [`agent-core/`](./agent-core/) | Core agent logic, orchestrator, skills, tools, [OpenAPI spec](./agent-core/openapi.yaml) |
-| [`templates/`](./templates/) | Server templates — [Next.js](./templates/next/), [Express](./templates/express/), [Hono](./templates/hono/) |
-| [`sdks/`](./sdks/) | Auto-generated clients for 17 languages |
-| [`examples/`](./examples/) | Working examples for every SDK language |
-| [`cli/`](./cli/) | CLI tool — `init`, `dev`, `deploy` (generates Vercel, Railway, Docker configs) |
+| [`agent-templates/`](./agent-templates/) | Server templates — [Next.js](./agent-templates/next/), [Express](./agent-templates/express/), [Hono](./agent-templates/hono/) |
+| [`agent-sdks/`](./agent-sdks/) | Auto-generated clients for 17 languages |
+| [`agent-examples/`](./agent-examples/) | Working examples for every SDK language |
+| [`cli/`](./cli/) | CLI tool — `init`, `dev`, `deploy` |
 
 ## Architecture
 

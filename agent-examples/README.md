@@ -53,6 +53,6 @@ AGENT_URL=https://my-agent.railway.app/api/v1 python examples/python-basic/main.
 
 ## Two integration paths
 
-**HTTP** — POST to `/v1/run`, get JSON back. All examples except typescript-ai-sdk use this. Works with any [template](../templates/).
+**HTTP** — POST to `/v1/run`, get JSON back. All examples except typescript-ai-sdk use this. Works with any [template](../agent-templates/).
 
 **Library** — import [agent-core](../agent-core/) directly as TypeScript. No server needed. See [typescript-ai-sdk](./typescript-ai-sdk/).

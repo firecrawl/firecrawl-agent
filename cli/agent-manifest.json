@@ -5,7 +5,7 @@
       "id": "next",
       "name": "Next.js (Full UI)",
       "description": "Complete web app with chat UI, conversation history, settings panel",
-      "path": "templates/next",
+      "path": "agent-templates/next",
       "requiredEnvVars": ["FIRECRAWL_API_KEY"],
       "optionalEnvVars": [
         "ANTHROPIC_API_KEY",
@@ -21,7 +21,7 @@
       "id": "express",
       "name": "Express (API only)",
       "description": "Lightweight Node.js API server with /v1/run endpoint",
-      "path": "templates/express",
+      "path": "agent-templates/express",
       "requiredEnvVars": ["FIRECRAWL_API_KEY"],
       "optionalEnvVars": [
         "ANTHROPIC_API_KEY",
@@ -35,7 +35,7 @@
       "id": "hono",
       "name": "Hono (Serverless)",
       "description": "Fast, lightweight API — ideal for edge and serverless",
-      "path": "templates/hono",
+      "path": "agent-templates/hono",
       "requiredEnvVars": ["FIRECRAWL_API_KEY"],
       "optionalEnvVars": [
         "ANTHROPIC_API_KEY",
