@@ -1,40 +1,40 @@
 import express from "express";
-import { createAgent, discoverSkills } from "../../agent-core/src";
+import { createAgent } from "../../agent-core/src";
 import type { RunParams, ModelConfig } from "../../agent-core/src";
 
 const app = express();
 app.use(express.json());
 
-const DEFAULT_MAX_STEPS = 15;
-const MAX_STEPS_LIMIT = 50;
+const DEFAULT_MODEL: ModelConfig = {
+  provider: (process.env.MODEL_PROVIDER ?? "google") as ModelConfig["provider"],
+  model: process.env.MODEL_ID ?? "gemini-3-flash-preview",
+};
 
-function getApiKeys(): Record<string, string> {
-  const keys: Record<string, string> = {};
-  if (process.env.ANTHROPIC_API_KEY) keys.anthropic = process.env.ANTHROPIC_API_KEY;
-  if (process.env.OPENAI_API_KEY) keys.openai = process.env.OPENAI_API_KEY;
-  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) keys.google = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-  return keys;
+const API_KEYS: Record<string, string> = {};
+for (const [env, id] of Object.entries({
+  ANTHROPIC_API_KEY: "anthropic",
+  OPENAI_API_KEY: "openai",
+  GOOGLE_GENERATIVE_AI_API_KEY: "google",
+  AI_GATEWAY_API_KEY: "gateway",
+})) {
+  if (process.env[env]) API_KEYS[id] = process.env[env]!;
 }
 
 app.post("/v1/run", async (req, res) => {
-  const { prompt, stream = false, format, schema, columns, urls, model, subAgentModel, maxSteps: rawMaxSteps, skills } = req.body;
-
+  const { prompt, stream, format, schema, columns, urls, model, maxSteps, skills } = req.body;
   if (!prompt) return res.status(400).json({ error: "prompt is required" });
 
   const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
-  if (!firecrawlApiKey) return res.status(500).json({ error: "FIRECRAWL_API_KEY is not configured" });
-
-  const maxSteps = Math.min(Math.max(1, rawMaxSteps ?? DEFAULT_MAX_STEPS), MAX_STEPS_LIMIT);
+  if (!firecrawlApiKey) return res.status(500).json({ error: "FIRECRAWL_API_KEY not set" });
 
   const agent = createAgent({
     firecrawlApiKey,
-    model: model ?? { provider: "google", model: "gemini-3-flash-preview" } as ModelConfig,
-    subAgentModel,
-    apiKeys: getApiKeys(),
-    maxSteps,
+    model: model ?? DEFAULT_MODEL,
+    apiKeys: API_KEYS,
+    maxSteps: Math.min(Math.max(1, maxSteps ?? 15), 50),
   });
 
-  const runParams: RunParams = { prompt, urls, schema, format, columns, skills };
+  const params: RunParams = { prompt, urls, schema, format, columns, skills };
 
   try {
     if (stream) {
@@ -42,14 +42,12 @@ app.post("/v1/run", async (req, res) => {
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
       res.flushHeaders();
-
-      for await (const event of agent.stream(runParams)) {
+      for await (const event of agent.stream(params)) {
         res.write(`data: ${JSON.stringify(event)}\n\n`);
       }
       res.end();
     } else {
-      const result = await agent.run(runParams);
-      res.json(result);
+      res.json(await agent.run(params));
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -57,11 +55,6 @@ app.post("/v1/run", async (req, res) => {
     res.write(`data: ${JSON.stringify({ type: "error", error: message })}\n\n`);
     res.end();
   }
-});
-
-app.get("/v1/skills", async (_req, res) => {
-  const skills = await discoverSkills();
-  res.json(skills.map((s) => ({ name: s.name, description: s.description, category: s.category ?? "Other", resources: s.resources })));
 });
 
 const port = Number(process.env.PORT) || 3000;
