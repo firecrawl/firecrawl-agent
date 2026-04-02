@@ -29,6 +29,17 @@ export function createInitCommand(): Command {
     .option('--api-key <key>', 'Firecrawl API key')
     .option('--key <provider=key>', 'Provider API key (repeatable, e.g. --key anthropic=sk-...)', collect, [])
     .option('--skip-install', 'Skip npm install')
+    .addHelpText('after', `
+Examples:
+  $ firecrawl-agent init                                    # interactive
+  $ firecrawl-agent init my-app -t next                     # Next.js with full UI
+  $ firecrawl-agent init my-app -t express                  # Express API server
+  $ firecrawl-agent init my-app -t hono                     # Hono serverless
+  $ firecrawl-agent init my-app -t express --api-key fc-... # with Firecrawl key
+  $ firecrawl-agent init my-app -t next --key anthropic=sk-... --key openai=sk-...
+  $ firecrawl-agent init my-app --from user/repo            # from external repo
+  $ firecrawl-agent init my-app --from ./local-templates    # from local path
+`)
     .action(async (projectName: string, options: InitOptions) => {
       await handleInit(projectName, options);
     });

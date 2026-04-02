@@ -11,6 +11,14 @@ export function createDeployCommand(): Command {
     .description('Deploy your Firecrawl Agent project')
     .argument('[dir]', 'Project directory', '.')
     .option('-p, --platform <platform>', 'Deploy platform (vercel, railway, docker)')
+    .addHelpText('after', `
+Examples:
+  $ firecrawl-agent deploy                  # interactive platform picker
+  $ firecrawl-agent deploy my-app           # deploy my-app/
+  $ firecrawl-agent deploy -p vercel        # deploy to Vercel
+  $ firecrawl-agent deploy -p railway       # deploy to Railway
+  $ firecrawl-agent deploy -p docker        # build and run Docker container
+`)
     .action(async (dir: string, options: { platform?: string }) => {
       const projectDir = path.resolve(process.cwd(), dir);
 

@@ -8,6 +8,11 @@ export function createDevCommand(): Command {
   return new Command('dev')
     .description('Start the development server')
     .argument('[dir]', 'Project directory', '.')
+    .addHelpText('after', `
+Examples:
+  $ firecrawl-agent dev                     # run in current directory
+  $ firecrawl-agent dev my-app              # run in my-app/
+`)
     .action(async (dir: string) => {
       const projectDir = path.resolve(process.cwd(), dir);
       const pkgPath = path.join(projectDir, 'package.json');
