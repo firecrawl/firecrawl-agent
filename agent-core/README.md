@@ -191,7 +191,7 @@ const result = await agent.run({
 
 #### Export skill
 
-Turn any run into a reusable, deterministic skill (SKILL.md + workflow.mjs + schema.json):
+Turn any run into a reusable skill:
 
 ```typescript
 // Run a task and export it as a repeatable workflow
@@ -274,15 +274,49 @@ Set API keys via `apiKeys` option or environment variables (`GOOGLE_GENERATIVE_A
 
 ## Architecture
 
+```mermaid
+graph TD
+    A[createAgent] --> B[Orchestrator]
+
+    B --> T[Firecrawl Toolkit]
+    T --> T1[search]
+    T --> T2[scrape]
+    T --> T3[interact]
+
+    B --> S[Skills]
+    S --> S1[SKILL.md files]
+    S --> S2[Site playbooks]
+
+    B --> W[spawnAgents]
+    W --> W1[Worker 1]
+    W --> W2[Worker 2]
+    W --> W3[Worker N]
+
+    B --> SA[Sub-Agents]
+    SA --> SA1[Custom instructions]
+    SA --> SA2[Per-agent model]
+    SA --> SA3[Scoped tools + skills]
+
+    B --> O[Output]
+    O --> O1[formatOutput]
+    O --> O2[bashExec]
+
+    style A fill:#f5f5f5,stroke:#333
+    style B fill:#ff6b35,stroke:#333,color:#fff
+    style T fill:#fff,stroke:#ddd
+    style S fill:#fff,stroke:#ddd
+    style W fill:#fff,stroke:#ddd
+    style SA fill:#fff,stroke:#ddd
+    style O fill:#fff,stroke:#ddd
 ```
-createAgent()
-  └── Orchestrator
-        ├── Firecrawl tools (search, scrape, interact)
-        ├── Skills (domain-specific knowledge)
-        ├── Parallel workers (concurrent sub-tasks)
-        ├── Bash sandbox
-        └── Output formatter (JSON, CSV, Markdown)
-```
+
+The core is a **Vercel AI SDK `ToolLoopAgent`** with an opinionated setup:
+
+- **Firecrawl toolkit** — search, scrape, interact via [firecrawl-aisdk](https://www.npmjs.com/package/firecrawl-aisdk)
+- **Skills** — reusable SKILL.md files that teach the agent domain-specific procedures
+- **Parallel workers** — `spawnAgents` fans out independent tasks across concurrent workers
+- **Sub-agents** — named agents with their own model, tools, skills, and instructions
+- **Output** — `formatOutput` for structured data, `bashExec` for data processing
 
 ## OpenAPI spec
 
