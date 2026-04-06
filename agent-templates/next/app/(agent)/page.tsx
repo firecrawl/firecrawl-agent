@@ -661,10 +661,12 @@ export default function AgentPage() {
   useEffect(() => {
     if (modelPreferenceLoaded || !providerConfigLoaded || !acpAvailabilityLoaded) return;
 
-    setConfig((prev) => ({
-      ...prev,
-      model: resolveInitialModel(restoredModelPreference, configuredProviders, acpAgents),
-    }));
+    const resolved = resolveInitialModel(restoredModelPreference, configuredProviders, acpAgents);
+    // Clear stale localStorage if the saved preference wasn't usable
+    if (restoredModelPreference && !isPreferredModelUsable(restoredModelPreference, configuredProviders, acpAgents)) {
+      window.localStorage.removeItem(MODEL_PREFERENCE_STORAGE_KEY);
+    }
+    setConfig((prev) => ({ ...prev, model: resolved }));
     setModelPreferenceLoaded(true);
   }, [
     acpAgents,
