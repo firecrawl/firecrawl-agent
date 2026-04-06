@@ -1,6 +1,8 @@
 # Express Template
 
-Lightweight API server with a single `POST /v1/run` endpoint.
+Standard Node.js API server — use this for traditional deployments (Railway, Docker, VPS).
+
+Single `POST /v1/run` endpoint powered by [agent-core](../../agent-core/). See the [OpenAPI spec](../../agent-core/openapi.yaml) for full parameter docs.
 
 ## Install
 
@@ -22,8 +24,7 @@ FIRECRAWL_API_KEY=fc-...            # required
 ANTHROPIC_API_KEY=...               # at least one model provider
 OPENAI_API_KEY=...
 GOOGLE_GENERATIVE_AI_API_KEY=...
-AI_GATEWAY_API_KEY=...
-MODEL_PROVIDER=google               # default provider (google, anthropic, openai, gateway)
+MODEL_PROVIDER=google               # default provider
 MODEL_ID=gemini-3-flash-preview     # default model
 PORT=3000
 ```
@@ -35,12 +36,12 @@ PORT=3000
 ```bash
 curl -X POST http://localhost:3000/v1/run \
   -H "Content-Type: application/json" \
-  -d '{"prompt": "Get pricing for Vercel"}'
+  -d '{"prompt": "Get pricing for Vercel", "format": "json"}'
 ```
 
-Set `"stream": true` for Server-Sent Events.
+**Parameters:** `prompt` (required), `stream`, `format` (`json` | `csv` | `markdown`), `schema`, `urls`, `skills`, `subAgents`, `maxSteps`. See the [OpenAPI spec](../../agent-core/openapi.yaml) for details.
 
-**Body:** `prompt` (required), `stream`, `format` (`json`|`csv`|`markdown`), `schema`, `columns`, `urls`, `model`, `maxSteps`, `skills`.
+**Streaming:** set `"stream": true` — returns Server-Sent Events with tool calls, results, and text as they happen.
 
 ## Deploy
 

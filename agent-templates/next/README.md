@@ -23,7 +23,7 @@ npm run dev                         # http://localhost:3000
 - **Parallel agent tracking** — live progress for each worker with browser view when using interact
 - **Structured output** — JSON viewer, CSV table, markdown renderer with download
 - **Save as Skill** — generate a reusable SKILL.md from any successful conversation
-- **Model selector** — switch between providers and models from the UI (BYOK)
+- **Model selector** — switch between providers and models from the UI (BYOK — Bring Your Own Key)
 - **Settings panel** — configure API keys, default provider, custom OpenAI-compatible endpoints
 - **File upload** — upload CSV, JSON, or text files for the agent to process
 - **Conversation history** — SQLite-backed history with search (optional, off by default)

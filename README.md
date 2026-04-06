@@ -30,6 +30,17 @@ firecrawl-agent init my-agent -t next
 > cd .internal/cli && npm install && npm run build && npm link
 > ```
 
+## How it works
+
+The agent combines web tools with an AI model in a loop — it plans, acts, observes, and repeats until the task is done.
+
+- **Tools** — search, scrape, interact (browser automation), and map. Provided by [firecrawl-aisdk](https://www.npmjs.com/package/firecrawl-aisdk), configurable per-agent.
+- **Skills** — reusable SKILL.md files that teach the agent domain-specific procedures: how to navigate a site, what to extract, how to paginate. Auto-matched by URL via site playbooks.
+- **Sub-agents** — parallel agents for independent tasks. The orchestrator spawns workers dynamically, or you pre-configure named agents with their own model, tools, and skills.
+- **Output** — structured results via `formatOutput` (JSON, CSV, Markdown) and data processing via `bashExec` (jq, awk, sed).
+
+See the [agent-core README](./agent-core/) for the full API reference.
+
 ## Usage
 
 **As a library** - import directly, no server needed:
