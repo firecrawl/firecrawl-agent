@@ -135,15 +135,19 @@ export async function createSubAgentTools(
       preloadedSkills += await loadSkillContent(skillName, skills);
     }
 
+    const customInstr = config.instructions
+      ? `\n\nAdditional instructions:\n${config.instructions}`
+      : "";
+
     const subAgent = new ToolLoopAgent({
       model,
       instructions: `You are a sub-agent named "${config.name}". ${config.description}
 
 You have the full toolkit: search, scrape, interact, bash, formatOutput, and skills.${skillCatalog}
 
-When finished, write a clear summary of what you found.${preloadedSkills}`,
+When finished, write a clear summary of what you found.${preloadedSkills}${customInstr}`,
       tools,
-      stopWhen: stepCountIs(10),
+      stopWhen: stepCountIs(config.maxSteps ?? 10),
     });
 
     subAgentTools[`subagent_${config.id}`] = makeSubagentTool(

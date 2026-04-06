@@ -34,9 +34,11 @@ export interface SubAgentConfig {
   id: string;
   name: string;
   description: string;
+  instructions?: string;
   model: ModelConfig;
   tools: ("search" | "scrape" | "interact" | "map")[];
   skills: string[];
+  maxSteps?: number;
 }
 
 export interface SitePlaybook {
@@ -99,6 +101,8 @@ export interface RunParams {
   skillInstructions?: Record<string, string>;
   subAgents?: SubAgentConfig[];
   maxSteps?: number;
+  /** When true, post-processes the run into a reusable skill (SKILL.md + workflow.mjs + schema.json) */
+  exportSkill?: boolean;
   onStep?: (event: StepEvent) => void;
 }
 
@@ -129,10 +133,18 @@ export interface StepDetail {
   toolResults: { name: string; output: unknown }[];
 }
 
+export interface ExportedSkill {
+  name: string;
+  skillMd: string;
+  workflow: string;
+  schema: string;
+}
+
 export interface RunResult {
   text: string;
   data?: string;
   format?: string;
   steps: StepDetail[];
   usage: { inputTokens: number; outputTokens: number; totalTokens: number };
+  exportedSkill?: ExportedSkill;
 }

@@ -1,0 +1,16 @@
+# SubAgentConfig
+
+## Properties
+
+Name | Type | Description | Notes
+------------ | ------------- | ------------- | -------------
+**id** | **string** | Unique identifier for this sub-agent (used as the tool name suffix). |
+**name** | **string** | Human-readable name shown in the tool description. |
+**description** | **string** | What this sub-agent does. Included in the tool description for the orchestrator. |
+**instructions** | **string** | Custom instructions appended to the sub-agent&#39;s system prompt. | [optional]
+**model** | [**\FirecrawlAgent\Model\ModelConfig**](ModelConfig.md) |  | [optional]
+**tools** | **string[]** | Firecrawl tools available to this sub-agent. | [optional]
+**skills** | **string[]** | Skills to pre-load for this sub-agent. | [optional]
+**max_steps** | **int** | Maximum steps before the sub-agent stops. | [optional] [default to 10]
+
+[[Back to Model list]](../../README.md#models) [[Back to API list]](../../README.md#endpoints) [[Back to README]](../../README.md)

@@ -5,11 +5,11 @@ const app = express();
 app.use(express.json());
 
 app.post("/v1/run", async (req, res) => {
-  const { prompt, stream, format, schema, columns, urls, model, maxSteps, skills } = req.body;
+  const { prompt, stream, model, maxSteps, ...rest } = req.body;
   if (!prompt) return res.status(400).json({ error: "prompt is required" });
 
   const agent = createAgentFromEnv(model ? { model } : undefined);
-  const params = { prompt, urls, schema, format, columns, skills, maxSteps };
+  const params = { prompt, maxSteps, ...rest };
 
   try {
     if (stream) {

@@ -137,6 +137,26 @@ components:
           items:
             type: string
           description: Skills to pre-load for this run.
+        skillInstructions:
+          type: object
+          additionalProperties:
+            type: string
+          description: >
+            Per-skill custom instructions. Keys are skill names, values are
+            instruction strings appended when the skill is loaded.
+        subAgents:
+          type: array
+          items:
+            $ref: "#/components/schemas/SubAgentConfig"
+          description: >
+            Sub-agents available during this run. Each sub-agent becomes a
+            tool the orchestrator can delegate tasks to.
+        exportSkill:
+          type: boolean
+          default: false
+          description: >
+            When true, post-processes the run into a reusable skill package
+            (SKILL.md + workflow.mjs + schema.json) returned in the response.
 
     RunResponse:
       type: object
@@ -157,17 +177,77 @@ components:
             $ref: "#/components/schemas/StepDetail"
         usage:
           $ref: "#/components/schemas/Usage"
+        exportedSkill:
+          $ref: "#/components/schemas/ExportedSkill"
+
+    ExportedSkill:
+      type: object
+      description: >
+        A reusable skill package generated from the run's tool call history.
+        Present when exportSkill=true in the request.
+      properties:
+        name:
+          type: string
+          description: Slug identifier for the skill.
+        skillMd:
+          type: string
+          description: Full SKILL.md content with frontmatter.
+        workflow:
+          type: string
+          description: Deterministic workflow.mjs script content.
+        schema:
+          type: string
+          description: Expected output schema.json content.
 
     ModelConfig:
       type: object
       properties:
         provider:
           type: string
-          enum: [anthropic, openai, google, gateway]
+          enum: [anthropic, openai, google, gateway, firecrawl, acp]
           description: LLM provider.
         model:
           type: string
           description: Model identifier (e.g. "gemini-3-flash-preview", "claude-sonnet-4-6").
+
+    SubAgentConfig:
+      type: object
+      required:
+        - id
+        - name
+        - description
+      properties:
+        id:
+          type: string
+          description: Unique identifier for this sub-agent (used as the tool name suffix).
+        name:
+          type: string
+          description: Human-readable name shown in the tool description.
+        description:
+          type: string
+          description: What this sub-agent does. Included in the tool description for the orchestrator.
+        instructions:
+          type: string
+          description: Custom instructions appended to the sub-agent's system prompt.
+        model:
+          $ref: "#/components/schemas/ModelConfig"
+        tools:
+          type: array
+          items:
+            type: string
+            enum: [search, scrape, interact, map]
+          description: Firecrawl tools available to this sub-agent.
+        skills:
+          type: array
+          items:
+            type: string
+          description: Skills to pre-load for this sub-agent.
+        maxSteps:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 10
+          description: Maximum steps before the sub-agent stops.
 
     StepDetail:
       type: object

@@ -6,11 +6,11 @@ import { createAgentFromEnv } from "../../agent-core/src";
 const app = new Hono();
 
 app.post("/v1/run", async (c) => {
-  const { prompt, stream, format, schema, columns, urls, model, maxSteps, skills } = await c.req.json();
+  const { prompt, stream, model, maxSteps, ...rest } = await c.req.json();
   if (!prompt) return c.json({ error: "prompt is required" }, 400);
 
   const agent = createAgentFromEnv(model ? { model } : undefined);
-  const params = { prompt, urls, schema, format, columns, skills, maxSteps };
+  const params = { prompt, maxSteps, ...rest };
 
   if (stream) {
     return streamSSE(c, async (sseStream) => {

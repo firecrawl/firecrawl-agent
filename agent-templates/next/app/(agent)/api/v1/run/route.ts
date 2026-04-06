@@ -21,25 +21,15 @@ export async function POST(req: Request) {
   const {
     prompt,
     stream = false,
-    format,
-    schema,
-    columns,
-    urls,
     model: modelOverride,
     subAgentModel: subAgentModelOverride,
     maxSteps: rawMaxSteps,
-    skills,
-  } = body as {
-    prompt: string;
+    ...rest
+  } = body as RunParams & {
     stream?: boolean;
-    format?: "json" | "csv" | "markdown";
-    schema?: Record<string, unknown>;
-    columns?: string[];
-    urls?: string[];
     model?: ModelConfig;
     subAgentModel?: ModelConfig;
     maxSteps?: number;
-    skills?: string[];
   };
 
   if (!prompt) {
@@ -83,11 +73,7 @@ export async function POST(req: Request) {
 
   const runParams: RunParams = {
     prompt,
-    urls,
-    schema,
-    format,
-    columns,
-    skills,
+    ...rest,
   };
 
   try {

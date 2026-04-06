@@ -2,10 +2,15 @@ import { generateText } from "ai";
 import { createOrchestrator, type OrchestratorOptions } from "./orchestrator";
 import { resolveModel } from "./resolve-model";
 import { discoverSkills } from "./skills/discovery";
+import { parseSkillBody } from "./skills/parser";
 import { workerProgress } from "./worker";
 import { buildFirecrawlToolkit } from "./toolkit";
+import fs from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
 import type {
   CreateAgentOptions,
+  ExportedSkill,
   ModelConfig,
   Toolkit,
   RunParams,
@@ -57,7 +62,7 @@ export class FirecrawlAgent {
     const extracted = this.extractFormattedOutput(result.steps, params.format);
     const workerUsage = this.sumWorkerUsage();
 
-    return {
+    const runResult: RunResult = {
       text: result.text ?? "",
       data: extracted?.content,
       format: extracted?.format ?? params.format,
@@ -68,6 +73,12 @@ export class FirecrawlAgent {
         totalTokens: (result.usage?.totalTokens ?? 0) + workerUsage.totalTokens,
       },
     };
+
+    if (params.exportSkill) {
+      runResult.exportedSkill = await this.exportAsSkill(params, steps);
+    }
+
+    return runResult;
   }
 
   /**
@@ -340,6 +351,86 @@ Do not use emojis.`,
       }
     }
     return null;
+  }
+
+  /**
+   * Post-process a completed run into a reusable skill package.
+   * Loads the export-workflow skill instructions and feeds the step history
+   * to the model to generate SKILL.md + workflow.mjs + schema.json.
+   */
+  private async exportAsSkill(
+    params: RunParams,
+    steps: StepDetail[],
+  ): Promise<ExportedSkill> {
+    const model = await resolveModel(this.options.model, this.options.apiKeys);
+
+    // Load the export-workflow skill instructions
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const skillPath = path.join(
+      this.options.skillsDir ?? path.join(__dirname, "skills", "definitions"),
+      "export-workflow",
+      "SKILL.md",
+    );
+    let skillInstructions: string;
+    try {
+      const raw = await fs.readFile(skillPath, "utf-8");
+      skillInstructions = parseSkillBody(raw);
+    } catch {
+      skillInstructions =
+        "Convert the tool call history into a reusable SKILL.md, workflow.mjs, and schema.json.";
+    }
+
+    // Serialize the step history for the model
+    const stepHistory = steps.map((step, i) => {
+      const calls = step.toolCalls.map(
+        (tc) => `  ${tc.name}(${JSON.stringify(tc.input)})`,
+      );
+      const results = step.toolResults.map(
+        (tr) =>
+          `  ${tr.name} → ${JSON.stringify(tr.output).slice(0, 500)}`,
+      );
+      return `Step ${i + 1}:\n${calls.join("\n")}\n${results.join("\n")}`;
+    });
+
+    const { text } = await generateText({
+      model,
+      system: `${skillInstructions}
+
+You are post-processing a completed agent run. Generate three files based on the tool call history below.
+
+Return your response as a single JSON object with these keys:
+- "name": a slug for the skill (e.g. "vercel-pricing")
+- "skillMd": the full SKILL.md content (with frontmatter)
+- "workflow": the full workflow.mjs content
+- "schema": the full schema.json content
+
+Return ONLY the JSON object, no markdown fences or explanation.`,
+      prompt: `Original prompt: ${params.prompt}
+${params.urls?.length ? `URLs: ${params.urls.join(", ")}` : ""}
+${params.schema ? `Schema: ${JSON.stringify(params.schema)}` : ""}
+
+Tool call history:
+${stepHistory.join("\n\n")}`,
+      maxOutputTokens: 4096,
+    });
+
+    try {
+      const parsed = JSON.parse(text);
+      return {
+        name: parsed.name ?? "exported-skill",
+        skillMd: parsed.skillMd ?? "",
+        workflow: parsed.workflow ?? "",
+        schema: parsed.schema ?? "",
+      };
+    } catch {
+      // If model didn't return valid JSON, return raw text as the skill
+      return {
+        name: "exported-skill",
+        skillMd: text,
+        workflow: "",
+        schema: "",
+      };
+    }
   }
 }
 

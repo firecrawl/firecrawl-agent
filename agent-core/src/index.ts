@@ -17,6 +17,7 @@ export type {
   CreateAgentOptions,
   RunParams,
   RunResult,
+  ExportedSkill,
   StepEvent,
   AgentEvent,
   StepDetail,
