@@ -22,7 +22,7 @@ graph LR
         Orchestrator
         Skills
         Agents["Sub-Agents"]
-        Output["formatOutput + bashExec"]
+        Output["Output (JSON, CSV, Markdown)"]
     end
 
     firecrawl-aisdk -- "web tools" --> Orchestrator
