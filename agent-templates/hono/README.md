@@ -22,7 +22,8 @@ FIRECRAWL_API_KEY=fc-...            # required
 ANTHROPIC_API_KEY=...               # at least one model provider
 OPENAI_API_KEY=...
 GOOGLE_GENERATIVE_AI_API_KEY=...
-MODEL_PROVIDER=google               # default provider (google, anthropic, openai)
+AI_GATEWAY_API_KEY=...
+MODEL_PROVIDER=google               # default provider (google, anthropic, openai, gateway)
 MODEL_ID=gemini-3-flash-preview     # default model
 PORT=3000
 ```

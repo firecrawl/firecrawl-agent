@@ -5,6 +5,7 @@ import { resolveModel } from "../resolve-model";
 import { createSkillTools } from "../skills/tools";
 import { parseSkillBody } from "../skills/parser";
 import { formatOutput, bashExec } from "../tools";
+import { createWorkerTool } from "../worker";
 import fs from "fs/promises";
 import path from "path";
 
@@ -97,16 +98,19 @@ async function loadSkillContent(
 }
 
 function buildFullToolset(
+  model: LanguageModel,
   toolkit: Toolkit,
   skills: SkillMetadata[],
   enabledTools?: ("search" | "scrape" | "interact" | "map")[],
   customInstructions?: Record<string, string>,
+  workerOptions?: { maxWorkers?: number; workerMaxSteps?: number },
 ): ToolSet {
   const baseTools = (enabledTools && toolkit.createFiltered)
     ? toolkit.createFiltered(enabledTools)
     : toolkit.tools;
   const skillTools = createSkillTools(skills, customInstructions);
-  return { ...baseTools, ...skillTools, formatOutput, bashExec };
+  const spawnAgents = createWorkerTool(model, toolkit, skills, workerOptions);
+  return { ...baseTools, ...skillTools, spawnAgents, formatOutput, bashExec };
 }
 
 export async function createSubAgentTools(
@@ -116,6 +120,7 @@ export async function createSubAgentTools(
   parentModel?: LanguageModel,
   customInstructions?: Record<string, string>,
   apiKeys?: Record<string, string>,
+  workerOptions?: { maxWorkers?: number; workerMaxSteps?: number },
 ): Promise<ToolSet> {
   const subAgentTools: ToolSet = {};
   const skillCatalog = buildSkillCatalog(skills);
@@ -124,10 +129,12 @@ export async function createSubAgentTools(
   for (const config of configs) {
     const model = await resolveModel(config.model, apiKeys);
     const tools = buildFullToolset(
+      model,
       toolkit,
       skills,
       config.tools,
       customInstructions,
+      workerOptions,
     );
 
     let preloadedSkills = "";
@@ -144,6 +151,8 @@ export async function createSubAgentTools(
       instructions: `You are a sub-agent named "${config.name}". ${config.description}
 
 You have the full toolkit: search, scrape, interact, bash, formatOutput, and skills.${skillCatalog}
+
+If the task splits into 2+ independent collection tasks, use spawnAgents to parallelize them.
 
 When finished, write a clear summary of what you found.${preloadedSkills}${customInstr}`,
       tools,
@@ -163,10 +172,12 @@ When finished, write a clear summary of what you found.${preloadedSkills}${custo
   if (!builtinModel) return subAgentTools;
 
   const builtinTools = buildFullToolset(
+    builtinModel,
     toolkit,
     skills,
     undefined,
     customInstructions,
+    workerOptions,
   );
 
   for (const builtin of BUILTIN_SUBAGENTS) {
@@ -176,7 +187,7 @@ When finished, write a clear summary of what you found.${preloadedSkills}${custo
       model: builtinModel,
       instructions: `You are a sub-agent: "${builtin.name}". ${builtin.description}.
 
-You have the full toolkit: search, scrape, interact, bash, formatOutput, and skills. Use whatever tools you need to complete the task.${skillCatalog}${preloadedSkill}`,
+You have the full toolkit: search, scrape, interact, bash, formatOutput, skills, and spawnAgents. Use whatever tools you need to complete the task.${skillCatalog}${preloadedSkill}`,
       tools: builtinTools,
       stopWhen: stepCountIs(builtin.maxSteps),
     });

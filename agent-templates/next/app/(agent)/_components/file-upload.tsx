@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { cn } from "@/utils/cn";
-import type { UploadedFile } from "@agent-core";
+import type { UploadedFile } from "@/agent-core-types";
 
 export default function FileUpload({
   uploads,

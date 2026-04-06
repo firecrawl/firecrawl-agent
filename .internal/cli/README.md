@@ -18,7 +18,7 @@ This gives you the `firecrawl-agent` command globally.
 
 ### `firecrawl-agent init`
 
-Create a new project. Picks a template, detects your API keys, scaffolds everything.
+Create a new project. Picks a template, asks which provider to use by default, detects your API keys, and scaffolds everything.
 
 ```bash
 firecrawl-agent init my-agent
@@ -33,6 +33,14 @@ firecrawl-agent init my-agent
   Express (API only)     Lightweight Node.js API server with /v1/run endpoint
   Hono (Serverless)      Fast, lightweight API - ideal for edge and serverless
 
+? Default model provider
+❯ Google Gemini          gemini-3-flash-preview
+  OpenAI (GPT)           gpt-5.4
+  Anthropic (Claude)     claude-sonnet-4-6
+  AI Gateway             openai/gpt-5.4
+
+Creating a new Firecrawl Agent app in /Users/you/my-agent
+
 ✓ Next.js (Full UI) template scaffolded
 ✓ Created .env.local
 ✓ Dependencies installed
@@ -46,6 +54,7 @@ Ready!  /Users/you/my-agent
 
 ```bash
 firecrawl-agent init my-agent -t next                            # pick template
+firecrawl-agent init my-agent -t next --provider openai          # set the default provider
 firecrawl-agent init my-agent -t express --api-key fc-...        # set Firecrawl key
 firecrawl-agent init my-agent -t hono --key anthropic=sk-...     # set provider keys
 firecrawl-agent init my-agent -t express --key openai=sk-... --key google=AIza...
@@ -59,6 +68,7 @@ firecrawl-agent init my-agent -t express --skip-install          # don't run npm
 | Flag | Description |
 |------|-------------|
 | `-t, --template <id>` | `next`, `express`, or `hono` |
+| `--provider <id>` | Default model provider - `anthropic`, `openai`, `google`, or `gateway` |
 | `--api-key <key>` | Firecrawl API key |
 | `--key <provider=key>` | Provider key (repeatable) - `anthropic`, `openai`, `google`, `gateway` |
 | `--from <source>` | External GitHub repo (`user/repo`) or local path |

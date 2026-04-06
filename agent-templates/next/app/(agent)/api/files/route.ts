@@ -1,4 +1,4 @@
-import { listBashFiles, readBashFile } from "@agent-core";
+import { listBashFiles, readBashFile } from "@/agent-core";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);

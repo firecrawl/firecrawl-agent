@@ -1,14 +1,18 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { AgentConfig, ModelConfig } from "@agent-core";
+import type { AgentConfig, ModelConfig } from "@/agent-core-types";
 import { AVAILABLE_MODELS, PROVIDER_META, type Provider } from "@agent/_lib/config/models";
+import { getExperimentalFeatures } from "@agent/_config";
 import ProviderModelIcon from "./provider-icon";
 import { cn } from "@/utils/cn";
 
 type KeyStatus = { configured: boolean; masked: string; source: string };
-type ConfigResponse = { keys: Record<string, KeyStatus>; hosted: boolean; writable: boolean };
+type ValueStatus = { configured: boolean; value: string; source: string };
+type ConfigResponse = { keys: Record<string, KeyStatus>; values: Record<string, ValueStatus>; hosted: boolean; writable: boolean };
 type SkillInfo = { name: string; description: string; category: string; resources: string[] };
+
+const EXPERIMENTAL = getExperimentalFeatures();
 
 function GearIcon() {
   return (
@@ -25,6 +29,7 @@ const PROVIDERS = [
   { id: "openai", label: "OpenAI", icon: "openai", envVar: "OPENAI_API_KEY", placeholder: "sk-...", description: "GPT and o-series models.", required: false, hasModels: true, provider: "openai" as Provider },
   { id: "google", label: "Google AI", icon: "gemini", envVar: "GOOGLE_GENERATIVE_AI_API_KEY", placeholder: "AI...", description: "Gemini models.", required: false, hasModels: true, provider: "google" as Provider },
   { id: "gateway", label: "AI Gateway", icon: "vercel", envVar: "AI_GATEWAY_API_KEY", placeholder: "vck_...", description: "Vercel AI Gateway. Access multiple providers through a single key.", required: false, hasModels: true, provider: "gateway" as Provider },
+  ...(EXPERIMENTAL.customOpenAI ? [{ id: "customOpenAI", label: "Custom OpenAI", icon: "openai", envVar: "CUSTOM_OPENAI_API_KEY", placeholder: "sk-...", description: "Any OpenAI-compatible provider using your own base URL and model IDs.", required: false, hasModels: true, provider: "custom-openai" as Provider, extraField: { id: "customOpenAIBaseURL", label: "Base URL", placeholder: "https://openrouter.ai/api/v1", help: "Saved separately and used as the default base URL for the custom-openai provider." } }] : []),
 ];
 
 const OPERATIONS = [
@@ -68,20 +73,30 @@ function SidebarItem({ active, icon, label, right, onClick }: { active: boolean;
 function ProviderView({
   provider,
   status,
+  extraStatus,
   keyDraft,
+  extraDraft,
   onDraftChange,
+  onExtraDraftChange,
   onSave,
   onRemove,
+  onSaveExtra,
+  onRemoveExtra,
   saving,
   saveMsg,
   hosted,
 }: {
   provider: typeof PROVIDERS[number];
   status?: KeyStatus;
+  extraStatus?: ValueStatus;
   keyDraft: string;
+  extraDraft: string;
   onDraftChange: (v: string) => void;
+  onExtraDraftChange: (v: string) => void;
   onSave: () => void;
   onRemove: () => void;
+  onSaveExtra: () => void;
+  onRemoveExtra: () => void;
   saving: boolean;
   saveMsg: string;
   hosted: boolean;
@@ -176,6 +191,37 @@ function ProviderView({
           {hosted ? "Keys stored in memory for this session. Set environment variables in your hosting provider for persistence." : `Stored securely in .env.local as ${provider.envVar}`}
         </div>
       </div>
+
+      {provider.extraField && (
+        <div>
+          <div className="text-label-medium text-accent-black mb-10">{provider.extraField.label}</div>
+          <div className="flex items-center gap-10">
+            <input
+              type="url"
+              className="flex-1 bg-background-base border border-black-alpha-8 rounded-12 px-16 py-12 text-body-medium placeholder:text-black-alpha-20 focus:border-heat-100 focus:outline-none"
+              placeholder={provider.extraField.placeholder}
+              value={extraDraft}
+              onChange={(e) => onExtraDraftChange(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") onSaveExtra(); }}
+            />
+            <button
+              type="button"
+              disabled={saving || (!extraDraft.trim() && !extraStatus?.configured)}
+              className={cn(
+                "px-16 py-10 rounded-12 text-label-small transition-all",
+                extraDraft.trim() || extraStatus?.configured ? "bg-accent-black text-accent-white hover:bg-black-alpha-80" : "bg-black-alpha-4 text-black-alpha-24 cursor-not-allowed"
+              )}
+              onClick={extraDraft.trim() ? onSaveExtra : onRemoveExtra}
+            >
+              {saving ? "Saving..." : extraDraft.trim() ? (extraStatus?.configured ? "Update" : "Save") : "Remove"}
+            </button>
+          </div>
+          {extraStatus?.configured && !extraDraft.trim() && (
+            <div className="mt-8 text-mono-x-small text-black-alpha-20 break-all">Current: {extraStatus.value}</div>
+          )}
+          <div className="mt-10 text-mono-x-small text-black-alpha-20">{provider.extraField.help}</div>
+        </div>
+      )}
 
       {provider.hasModels && provider.provider && (
         <div>
@@ -421,8 +467,10 @@ export default function SettingsPanel({ config, onChange }: { config: AgentConfi
   const [open, setOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("firecrawl");
   const [keyStatuses, setKeyStatuses] = useState<Record<string, KeyStatus>>({});
+  const [valueStatuses, setValueStatuses] = useState<Record<string, ValueStatus>>({});
   const [hosted, setHosted] = useState(false);
   const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({});
+  const [valueDrafts, setValueDrafts] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
   const [skills, setSkills] = useState<SkillInfo[]>([]);
@@ -430,7 +478,12 @@ export default function SettingsPanel({ config, onChange }: { config: AgentConfi
   const fetchKeys = useCallback(async () => {
     try {
       const res = await fetch("/api/config");
-      if (res.ok) { const data: ConfigResponse = await res.json(); setKeyStatuses(data.keys); setHosted(data.hosted); }
+      if (res.ok) {
+        const data: ConfigResponse = await res.json();
+        setKeyStatuses(data.keys);
+        setValueStatuses(data.values ?? {});
+        setHosted(data.hosted);
+      }
     } catch { /* noop */ }
   }, []);
 
@@ -467,6 +520,37 @@ export default function SettingsPanel({ config, onChange }: { config: AgentConfi
       const res = await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ keys: { [id]: "" } }) });
       const data = await res.json();
       if (res.ok) { setKeyStatuses(data.keys); setSaveMsg("Key removed"); setTimeout(() => setSaveMsg(""), 3000); }
+    } catch { /* noop */ }
+    finally { setSaving(false); }
+  };
+
+  const saveValue = async (id: string) => {
+    const value = valueDrafts[id]?.trim();
+    if (!value) return;
+    setSaving(true); setSaveMsg("");
+    try {
+      const res = await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: { [id]: value } }) });
+      const data = await res.json();
+      if (res.ok) {
+        setValueStatuses(data.values ?? {});
+        setValueDrafts((prev) => ({ ...prev, [id]: "" }));
+        setSaveMsg(hosted ? "Saved for this session" : "Saved to .env.local");
+        setTimeout(() => setSaveMsg(""), 3000);
+      } else setSaveMsg(data.error || "Failed to save");
+    } catch { setSaveMsg("Network error"); }
+    finally { setSaving(false); }
+  };
+
+  const removeValue = async (id: string) => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: { [id]: "" } }) });
+      const data = await res.json();
+      if (res.ok) {
+        setValueStatuses(data.values ?? {});
+        setSaveMsg("Value removed");
+        setTimeout(() => setSaveMsg(""), 3000);
+      }
     } catch { /* noop */ }
     finally { setSaving(false); }
   };
@@ -543,10 +627,15 @@ export default function SettingsPanel({ config, onChange }: { config: AgentConfi
                   <ProviderView
                     provider={activeProvider}
                     status={keyStatuses[activeProvider.id]}
+                    extraStatus={activeProvider.extraField ? valueStatuses[activeProvider.extraField.id] : undefined}
                     keyDraft={keyDrafts[activeProvider.id] ?? ""}
+                    extraDraft={activeProvider.extraField ? (valueDrafts[activeProvider.extraField.id] ?? "") : ""}
                     onDraftChange={(v) => setKeyDrafts((prev) => ({ ...prev, [activeProvider.id]: v }))}
+                    onExtraDraftChange={(v) => activeProvider.extraField && setValueDrafts((prev) => ({ ...prev, [activeProvider.extraField.id]: v }))}
                     onSave={() => saveKey(activeProvider.id)}
                     onRemove={() => removeKey(activeProvider.id)}
+                    onSaveExtra={() => activeProvider.extraField && saveValue(activeProvider.extraField.id)}
+                    onRemoveExtra={() => activeProvider.extraField && removeValue(activeProvider.extraField.id)}
                     saving={saving}
                     saveMsg={saveMsg}
                     hosted={hosted}

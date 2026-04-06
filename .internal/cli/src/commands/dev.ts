@@ -4,6 +4,10 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { error, info } from '../utils/ui';
 
+function getNpmCommand(): string {
+  return process.platform === 'win32' ? 'npm.cmd' : 'npm';
+}
+
 export function createDevCommand(): Command {
   return new Command('dev')
     .description('Start the development server')
@@ -31,10 +35,9 @@ Examples:
       info(`Starting dev server in ${dir === '.' ? 'current directory' : dir}...`);
       console.log('');
 
-      const child = spawn('npm', ['run', 'dev'], {
+      const child = spawn(getNpmCommand(), ['run', 'dev'], {
         cwd: projectDir,
         stdio: 'inherit',
-        shell: true,
       });
 
       child.on('exit', (code) => {

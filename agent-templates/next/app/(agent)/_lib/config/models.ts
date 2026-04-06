@@ -13,9 +13,13 @@ export const AVAILABLE_MODELS = {
   ],
   openai: [
     { id: "gpt-5.4", name: "GPT-5.4", icon: "openai" },
-    { id: "gpt-4.1", name: "GPT-4.1", icon: "openai" },
-    { id: "o3", name: "o3", icon: "openai" },
-    { id: "o4-mini", name: "o4-mini", icon: "openai" },
+    { id: "gpt-5.4-mini", name: "GPT-5.4 mini", icon: "openai" },
+    { id: "gpt-5.4-nano", name: "GPT-5.4 nano", icon: "openai" },
+  ],
+  "custom-openai": [
+    { id: "gpt-5.4", name: "GPT-5.4", icon: "openai" },
+    { id: "gpt-5.4-mini", name: "GPT-5.4 mini", icon: "openai" },
+    { id: "gpt-5.4-nano", name: "GPT-5.4 nano", icon: "openai" },
   ],
   google: [
     { id: "gemini-3-flash-preview", name: "Gemini 3 Flash", icon: "gemini" },
@@ -34,6 +38,7 @@ export const PROVIDER_META: Record<string, { name: string; icon: string }> = {
   gateway: { name: "AI Gateway", icon: "vercel" },
   anthropic: { name: "Anthropic", icon: "anthropic" },
   openai: { name: "OpenAI", icon: "openai" },
+  "custom-openai": { name: "Custom OpenAI", icon: "openai" },
   google: { name: "Google", icon: "google" },
   firecrawl: { name: "Firecrawl Agent", icon: "firecrawl" },
   acp: { name: "Local Agent (ACP)", icon: "acp" },

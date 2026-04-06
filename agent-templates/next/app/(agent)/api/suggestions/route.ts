@@ -1,16 +1,7 @@
 import { generateText } from "ai";
 import { getTaskModel } from "@agent/_config";
-import { resolveModel } from "@agent-core";
-import { getProviderKey } from "@agent/_lib/config/keys";
-
-function getApiKeys() {
-  const keys: Record<string, string> = {};
-  for (const p of ["anthropic", "openai", "google", "gateway"] as const) {
-    const k = getProviderKey(p);
-    if (k) keys[p] = k;
-  }
-  return keys;
-}
+import { resolveModel } from "@/agent-core";
+import { getProviderApiKeys, hydrateModelConfig } from "@agent/_lib/config/keys";
 
 export async function POST(req: Request) {
   const { prompt, summary } = (await req.json()) as {
@@ -19,7 +10,7 @@ export async function POST(req: Request) {
   };
 
   try {
-    const model = await resolveModel(getTaskModel("suggestions"), getApiKeys());
+    const model = await resolveModel(hydrateModelConfig(getTaskModel("suggestions")), getProviderApiKeys());
 
     const { text } = await generateText({
       model,

@@ -9,7 +9,7 @@ Use it as a [library](./agent-core/), deploy it as an [API service](./agent-temp
 ## Get started
 
 ```bash
-firecrawl agent init my-agent
+firecrawl-agent init my-agent
 ```
 
 ```
@@ -22,13 +22,12 @@ firecrawl agent init my-agent
 Auto-detects your Firecrawl API key, scaffolds the project, and installs dependencies. Or skip prompts:
 
 ```bash
-firecrawl agent init my-agent -t next
+firecrawl-agent init my-agent -t next
 ```
 
-> **Note:** `firecrawl agent init` is coming soon to the [Firecrawl CLI](https://www.npmjs.com/package/firecrawl-cli). While this repo is in development, build the CLI locally:
+> **Install the CLI:**
 > ```bash
 > cd .internal/cli && npm install && npm run build && npm link
-> firecrawl-agent init my-agent
 > ```
 
 ## Usage

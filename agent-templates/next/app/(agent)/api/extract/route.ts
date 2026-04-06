@@ -1,7 +1,8 @@
 import { generateText, stepCountIs, ToolLoopAgent } from "ai";
-import { resolveModel, formatOutput, bashExec, createSkillTools, discoverSkills, buildFirecrawlToolkit } from "@agent-core";
+import { resolveModel, formatOutput, bashExec, createSkillTools, discoverSkills, buildFirecrawlToolkit } from "@/agent-core";
 import { getTaskModel } from "@agent/_config";
-import { getFirecrawlKey, getProviderKey } from "@agent/_lib/config/keys";
+import { getFirecrawlKey, getProviderApiKeys, hydrateModelConfig } from "@agent/_lib/config/keys";
+import type { ModelConfig } from "@/agent-core";
 
 export const maxDuration = 300;
 
@@ -68,16 +69,12 @@ export async function POST(req: Request) {
 
   try {
     const extractDefault = getTaskModel("extract");
-    const apiKeys: Record<string, string> = {};
-    for (const p of ["anthropic", "openai", "google", "gateway"] as const) {
-      const k = getProviderKey(p);
-      if (k) apiKeys[p] = k;
-    }
+    const apiKeys = getProviderApiKeys();
 
-    const model = await resolveModel({
-      provider: (provider ?? extractDefault.provider) as "anthropic" | "openai" | "google" | "gateway",
+    const model = await resolveModel(hydrateModelConfig({
+      provider: (provider ?? extractDefault.provider) as ModelConfig["provider"],
       model: modelId ?? extractDefault.model,
-    }, apiKeys);
+    }), apiKeys);
 
     const toolkit = buildFirecrawlToolkit(firecrawlApiKey);
 

@@ -29,6 +29,17 @@ export async function resolveModel(
       const { createOpenAI } = await import("@ai-sdk/openai");
       return createOpenAI({ apiKey: keyFor("openai") })(config.model);
     }
+    case "custom-openai": {
+      const { createOpenAI } = await import("@ai-sdk/openai");
+      const baseURL = config.baseURL || apiKeys?.["custom-openai:baseURL"];
+      if (!baseURL) {
+        throw new Error("CUSTOM_OPENAI_BASE_URL is not configured for the custom-openai provider");
+      }
+      return createOpenAI({
+        apiKey: keyFor("custom-openai"),
+        baseURL,
+      })(config.model);
+    }
     case "google": {
       const { createGoogleGenerativeAI } = await import("@ai-sdk/google");
       return createGoogleGenerativeAI({ apiKey: keyFor("google") })(config.model);

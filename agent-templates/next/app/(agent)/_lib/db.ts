@@ -4,48 +4,59 @@ import path from "path";
 const DB_PATH = path.join(process.cwd(), "data", "firecrawl-agent.db");
 
 let db: Database.Database | null = null;
+let dbError: Error | null = null;
 
 export function getDb(): Database.Database {
   if (db) return db;
+  if (dbError) throw dbError;
 
-  // Ensure data directory exists
-  const fs = require("fs");
-  const dir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  try {
+    // Ensure data directory exists
+    const fs = require("fs");
+    const dir = path.dirname(DB_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-  db = new Database(DB_PATH);
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
+    db = new Database(DB_PATH);
+    db.pragma("journal_mode = WAL");
+    db.pragma("foreign_keys = ON");
 
-  // Create tables
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS conversations (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      config TEXT NOT NULL DEFAULT '{}',
-      created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-      updated_at INTEGER NOT NULL DEFAULT (unixepoch())
-    );
+    // Create tables
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS conversations (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        config TEXT NOT NULL DEFAULT '{}',
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+      );
 
-    CREATE TABLE IF NOT EXISTS messages (
-      id TEXT PRIMARY KEY,
-      conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-      role TEXT NOT NULL,
-      content TEXT NOT NULL DEFAULT '',
-      parts TEXT NOT NULL DEFAULT '[]',
-      created_at INTEGER NOT NULL DEFAULT (unixepoch())
-    );
+      CREATE TABLE IF NOT EXISTS messages (
+        id TEXT PRIMARY KEY,
+        conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL DEFAULT '',
+        parts TEXT NOT NULL DEFAULT '[]',
+        created_at INTEGER NOT NULL DEFAULT (unixepoch())
+      );
 
-    CREATE INDEX IF NOT EXISTS idx_messages_conversation
-      ON messages(conversation_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_messages_conversation
+        ON messages(conversation_id, created_at);
 
-    CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
-  `);
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+    `);
+  } catch (error) {
+    dbError = error instanceof Error ? error : new Error(String(error));
+    throw dbError;
+  }
 
   return db;
+}
+
+export function getDbErrorMessage() {
+  return dbError?.message ?? null;
 }
 
 // --- Conversations ---

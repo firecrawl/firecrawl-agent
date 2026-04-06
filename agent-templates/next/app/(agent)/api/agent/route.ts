@@ -1,8 +1,8 @@
 import { createAgentUIStreamResponse } from "ai";
-import { createOrchestrator, type OrchestratorOptions } from "@agent-core";
-import { buildFirecrawlToolkit } from "@agent-core";
-import type { AgentConfig } from "@agent-core";
-import { getFirecrawlKey, getProviderKey } from "@agent/_lib/config/keys";
+import { createOrchestrator, type OrchestratorOptions } from "@/agent-core";
+import { buildFirecrawlToolkit } from "@/agent-core";
+import type { AgentConfig } from "@/agent-core";
+import { getFirecrawlKey, getProviderApiKeys, hydrateModelConfig } from "@agent/_lib/config/keys";
 import { config as globalConfig } from "@agent/_config";
 
 export const maxDuration = 300;
@@ -21,15 +21,18 @@ export async function POST(req: Request) {
     );
   }
 
-  const apiKeys: Record<string, string> = {};
-  for (const p of ["anthropic", "openai", "google", "gateway"] as const) {
-    const k = getProviderKey(p);
-    if (k) apiKeys[p] = k;
-  }
+  const apiKeys = getProviderApiKeys();
 
   try {
     const opts: OrchestratorOptions = {
-      config,
+      config: {
+        ...config,
+        model: hydrateModelConfig(config.model),
+        subAgentModel: config.subAgentModel ? hydrateModelConfig(config.subAgentModel) : undefined,
+        operationModels: config.operationModels
+          ? Object.fromEntries(Object.entries(config.operationModels).map(([key, value]) => [key, hydrateModelConfig(value)]))
+          : undefined,
+      },
       toolkit: buildFirecrawlToolkit(firecrawlApiKey),
       apiKeys,
       maxWorkers: globalConfig.maxWorkers,

@@ -1,6 +1,6 @@
 import { generateText } from "ai";
-import { resolveModel } from "@agent-core";
-import { getProviderKey } from "@agent/_lib/config/keys";
+import { resolveModel } from "@/agent-core";
+import { getProviderApiKeys, hydrateModelConfig } from "@agent/_lib/config/keys";
 import { getBackgroundModel } from "@agent/_config";
 
 export async function POST(req: Request) {
@@ -10,13 +10,9 @@ export async function POST(req: Request) {
     return Response.json({ error: "description is required" }, { status: 400 });
   }
 
-  const apiKeys: Record<string, string> = {};
-  for (const p of ["anthropic", "openai", "google", "gateway"] as const) {
-    const k = getProviderKey(p);
-    if (k) apiKeys[p] = k;
-  }
+  const apiKeys = getProviderApiKeys();
 
-  const modelConfig = getBackgroundModel();
+  const modelConfig = hydrateModelConfig(getBackgroundModel());
 
   try {
     const model = await resolveModel(modelConfig, apiKeys);

@@ -1,7 +1,7 @@
-import { createAgent } from "@agent-core";
-import { getFirecrawlKey, getProviderKey } from "@agent/_lib/config/keys";
+import { createAgent } from "@/agent-core";
+import { getFirecrawlKey, getProviderApiKeys, hydrateModelConfig } from "@agent/_lib/config/keys";
 import { config as globalConfig, getTaskModel } from "@agent/_config";
-import type { RunParams, ModelConfig } from "@agent-core";
+import type { RunParams, ModelConfig } from "@/agent-core";
 
 export const maxDuration = 300;
 
@@ -50,21 +50,17 @@ export async function POST(req: Request) {
   );
 
   const queryDefault = getTaskModel("query");
-  const model = modelOverride ?? {
+  const model = hydrateModelConfig(modelOverride ?? {
     provider: queryDefault.provider,
     model: queryDefault.model,
-  };
+  });
 
-  const apiKeys: Record<string, string> = {};
-  for (const p of ["anthropic", "openai", "google", "gateway"] as const) {
-    const k = getProviderKey(p);
-    if (k) apiKeys[p] = k;
-  }
+  const apiKeys = getProviderApiKeys();
 
   const agent = createAgent({
     firecrawlApiKey,
     model: model as ModelConfig,
-    subAgentModel: subAgentModelOverride as ModelConfig | undefined,
+    subAgentModel: subAgentModelOverride ? hydrateModelConfig(subAgentModelOverride as ModelConfig) : undefined,
     apiKeys,
     maxSteps,
     maxWorkers: globalConfig.maxWorkers,

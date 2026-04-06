@@ -1,13 +1,17 @@
 "use client";
 
 import { AVAILABLE_MODELS, type Provider } from "@agent/_lib/config/models";
-import type { ModelConfig } from "@agent-core";
+import { getExperimentalFeatures } from "@agent/_config";
+import type { ModelConfig } from "@/agent-core-types";
 import { cn } from "@/utils/cn";
+
+const EXPERIMENTAL = getExperimentalFeatures();
 
 const PROVIDERS: { id: Provider; name: string }[] = [
   { id: "gateway", name: "AI Gateway" },
   { id: "anthropic", name: "Anthropic" },
   { id: "openai", name: "OpenAI" },
+  ...(EXPERIMENTAL.customOpenAI ? [{ id: "custom-openai" as Provider, name: "Custom OpenAI" }] : []),
   { id: "google", name: "Google" },
 ];
 
@@ -43,17 +47,26 @@ export default function ModelSelector({
           ))}
         </select>
 
-        <select
-          className="flex-1 bg-accent-white border border-black-alpha-8 rounded-8 px-10 py-6 text-body-medium appearance-none cursor-pointer hover:border-black-alpha-12 focus:border-heat-100 focus:outline-none transition-all"
-          value={value.model}
-          onChange={(e) => onChange({ ...value, model: e.target.value })}
-        >
-          {models.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
+        {value.provider === "custom-openai" ? (
+          <input
+            className="flex-1 bg-accent-white border border-black-alpha-8 rounded-8 px-10 py-6 text-body-medium placeholder:text-black-alpha-32 hover:border-black-alpha-12 focus:border-heat-100 focus:outline-none transition-all"
+            placeholder="Custom model ID"
+            value={value.model}
+            onChange={(e) => onChange({ ...value, model: e.target.value })}
+          />
+        ) : (
+          <select
+            className="flex-1 bg-accent-white border border-black-alpha-8 rounded-8 px-10 py-6 text-body-medium appearance-none cursor-pointer hover:border-black-alpha-12 focus:border-heat-100 focus:outline-none transition-all"
+            value={value.model}
+            onChange={(e) => onChange({ ...value, model: e.target.value })}
+          >
+            {models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="relative">
@@ -67,6 +80,18 @@ export default function ModelSelector({
           }
         />
       </div>
+
+      {value.provider === "custom-openai" && (
+        <div className="relative">
+          <input
+            type="url"
+            className="w-full bg-accent-white border border-black-alpha-8 rounded-8 px-10 py-6 text-body-medium placeholder:text-black-alpha-32 hover:border-black-alpha-12 focus:border-heat-100 focus:outline-none transition-all"
+            placeholder="Base URL (optional — uses server default)"
+            value={value.baseURL ?? ""}
+            onChange={(e) => onChange({ ...value, baseURL: e.target.value || undefined })}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { AgentConfig } from "@agent-core";
+import type { AgentConfig } from "@/agent-core-types";
 import ModelSelector from "./model-selector";
 import SkillSelector from "./skill-selector";
 import SubAgentConfigurator from "./sub-agent-config";

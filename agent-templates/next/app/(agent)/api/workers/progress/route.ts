@@ -1,4 +1,4 @@
-import { workerProgress } from "@agent-core";
+import { workerProgress } from "@/agent-core";
 
 export async function GET() {
   const entries: Record<string, unknown> = {};

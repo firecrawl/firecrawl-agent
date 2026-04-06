@@ -1,19 +1,10 @@
 import { generateText } from "ai";
-import type { AgentConfig } from "@agent-core";
-import { discoverSkills, resolveModel } from "@agent-core";
+import type { AgentConfig } from "@/agent-core";
+import { discoverSkills, resolveModel } from "@/agent-core";
 import { getTaskModel } from "@agent/_config";
-import { getProviderKey } from "@agent/_lib/config/keys";
+import { getProviderApiKeys, hydrateModelConfig } from "@agent/_lib/config/keys";
 
 export const maxDuration = 60;
-
-function getApiKeys() {
-  const keys: Record<string, string> = {};
-  for (const p of ["anthropic", "openai", "google", "gateway"] as const) {
-    const k = getProviderKey(p);
-    if (k) keys[p] = k;
-  }
-  return keys;
-}
 
 export async function POST(req: Request) {
   const { prompt, config } = (await req.json()) as {
@@ -26,7 +17,7 @@ export async function POST(req: Request) {
     ? `\nAvailable skills: ${skills.map((s) => `${s.name} (${s.description.slice(0, 60)})`).join(", ")}`
     : "";
 
-  const model = await resolveModel(getTaskModel("plan"), getApiKeys());
+  const model = await resolveModel(hydrateModelConfig(getTaskModel("plan")), getProviderApiKeys());
 
   const { text } = await generateText({
     model,

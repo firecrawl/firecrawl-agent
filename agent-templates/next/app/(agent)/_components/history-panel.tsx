@@ -25,14 +25,20 @@ function formatRelativeTime(epoch: number): string {
 export default function HistoryPanel({
   onSelect,
   currentId,
+  enabled = true,
 }: {
   onSelect: (id: string, title: string) => void;
   currentId?: string;
+  enabled?: boolean;
 }) {
   const [conversations, setConversations] = useState<ConversationEntry[]>([]);
   const [show, setShow] = useState(false);
 
   const refresh = () => {
+    if (!enabled) {
+      setConversations([]);
+      return;
+    }
     fetch("/api/conversations")
       .then((r) => r.json())
       .then(setConversations)
@@ -40,8 +46,11 @@ export default function HistoryPanel({
   };
 
   useEffect(() => {
+    if (!enabled) return;
     refresh();
-  }, []);
+  }, [enabled]);
+
+  if (!enabled) return null;
 
   if (conversations.length === 0) return null;
 
