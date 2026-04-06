@@ -309,7 +309,7 @@ Set API keys via `apiKeys` option or environment variables (`GOOGLE_GENERATIVE_A
 
 ## OpenAPI spec
 
-[`openapi.yaml`](./openapi.yaml) describes the HTTP API. All [templates](../agent-templates/) implement it, all [SDKs](../agent-sdks/) are generated from it.
+[`openapi.yaml`](./openapi.yaml) describes the HTTP API. All [templates](../agent-templates/) implement it.
 
 ### API examples
 

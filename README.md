@@ -4,7 +4,7 @@
 
 AI-powered web research agent built on the [Firecrawl AI SDK](https://www.npmjs.com/package/firecrawl-aisdk) toolkit. Give it a prompt - it searches, scrapes, and extracts structured data from any website.
 
-Use it as a [library](./agent-core/), deploy it as an [API service](./agent-templates/), call it from [any language](./agent-sdks/), or scaffold a full-stack app with the [CLI](#get-started). MIT licensed.
+Use it as a [library](./agent-core/), deploy it as an [API service](./agent-templates/), call it from any language via the [OpenAPI spec](./agent-core/openapi.yaml), or scaffold a full-stack app with the [CLI](#get-started). MIT licensed.
 
 ## Get started
 
@@ -74,7 +74,7 @@ All templates share the same [agent core](./agent-core/) and expose the same API
 |-----------|--------------|
 | [`agent-core/`](./agent-core/) | Core agent logic, orchestrator, skills, tools, [OpenAPI spec](./agent-core/openapi.yaml) |
 | [`agent-templates/`](./agent-templates/) | Server templates - [Next.js](./agent-templates/next/), [Express](./agent-templates/express/), [Hono](./agent-templates/hono/) |
-| [`agent-sdks/`](./agent-sdks/) | Auto-generated SDKs from the [OpenAPI spec](./agent-core/openapi.yaml) |
+| [`.internal/experimental/agent-sdks/`](./.internal/experimental/agent-sdks/) | Auto-generated SDKs from the [OpenAPI spec](./agent-core/openapi.yaml) (experimental) |
 | [`.internal/cli/`](./.internal/cli/) | CLI tool - `init`, `dev`, `deploy` |
 
 ## Architecture
