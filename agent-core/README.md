@@ -21,23 +21,22 @@ graph LR
     subgraph agent-core
         Orchestrator
         Skills
-        Workers["Parallel Workers"]
-        SubAgents["Sub-Agents"]
+        Agents["Sub-Agents"]
+        Output["formatOutput + bashExec"]
     end
 
     firecrawl-aisdk -- "web tools" --> Orchestrator
     ToolLoopAgent -- "agent loop" --> Orchestrator
     Orchestrator --> Skills
-    Orchestrator --> Workers
-    Orchestrator --> SubAgents
+    Orchestrator --> Agents
+    Orchestrator --> Output
 ```
 
 Agent-core combines [firecrawl-aisdk](https://www.npmjs.com/package/firecrawl-aisdk) (web tools) with the [Vercel AI SDK](https://sdk.vercel.ai/) (agent loop) and adds:
 
-- **Skills** — SKILL.md files that teach the agent how to navigate specific sites, what to extract, how to paginate. Auto-matched by URL via site playbooks.
-- **Parallel workers** — `spawnAgents` fans out independent tasks across concurrent agents, each with their own context.
-- **Sub-agents** — named agents with their own model, instructions, and scoped tools/skills.
-- **Output** — `formatOutput` for structured JSON/CSV/markdown, `bashExec` for data processing.
+- **Skills** — SKILL.md files that teach the agent how to navigate specific sites, what to extract, and how to paginate. Auto-matched by URL via site playbooks.
+- **Sub-agents** — parallel agents spawned dynamically (`spawnAgents`) or pre-configured with their own model, instructions, and scoped tools/skills.
+- **Output** — `formatOutput` for structured JSON/CSV/markdown, `bashExec` for data processing with jq/awk/sed.
 - **Context compaction** — automatic summarization when approaching token limits.
 
 ## Quick start
