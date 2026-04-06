@@ -12,16 +12,16 @@ export const config = {
   // ═══════════════════════════════════════════
   // Anthropic (Claude)
   // ═══════════════════════════════════════════
-  // orchestrator: { provider: "anthropic", model: "claude-sonnet-4-6" } satisfies ModelRef,
-  // subAgent:     { provider: "anthropic", model: "claude-sonnet-4-6" } satisfies ModelRef,
-  // background:   { provider: "anthropic", model: "claude-haiku-4-5-20251001" } satisfies ModelRef,
+  orchestrator: { provider: "anthropic", model: "claude-sonnet-4-6" } satisfies ModelRef,
+  subAgent:     { provider: "anthropic", model: "claude-sonnet-4-6" } satisfies ModelRef,
+  background:   { provider: "anthropic", model: "claude-haiku-4-5-20251001" } satisfies ModelRef,
 
   // ═══════════════════════════════════════════
   // Google (Gemini)
   // ═══════════════════════════════════════════
-  orchestrator: { provider: "google", model: "gemini-3-flash-preview" } satisfies ModelRef,
-  subAgent:     { provider: "google", model: "gemini-3-flash-preview" } satisfies ModelRef,
-  background:   { provider: "google", model: "gemini-3-flash-preview" } satisfies ModelRef,
+  // orchestrator: { provider: "google", model: "gemini-3-flash-preview" } satisfies ModelRef,
+  // subAgent:     { provider: "google", model: "gemini-3-flash-preview" } satisfies ModelRef,
+  // background:   { provider: "google", model: "gemini-3-flash-preview" } satisfies ModelRef,
 
   // ═══════════════════════════════════════════
   // OpenAI (GPT)

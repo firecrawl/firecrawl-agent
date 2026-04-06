@@ -1573,7 +1573,10 @@ export default function AgentPage() {
             {chatError && (
               <div className="mb-10 px-14 py-10 rounded-10 border border-accent-crimson/20 bg-accent-crimson/5 text-body-small text-accent-black">
                 <span className="text-accent-crimson text-label-small">Error: </span>
-                {chatError.message || "Something went wrong"}
+                {(() => {
+                  const msg = chatError.message || "Something went wrong";
+                  try { const parsed = JSON.parse(msg); return parsed.error ?? msg; } catch { return msg; }
+                })()}
               </div>
             )}
 
@@ -1697,20 +1700,26 @@ export default function AgentPage() {
               </div>
             )}
 
-            {!isRunning && (experimentalFeatures.generateSkillMd || experimentalFeatures.generateWorkflowMd) && (
-              <div className="flex items-center justify-end gap-8 flex-wrap mt-12">
-                {experimentalFeatures.generateSkillMd && (
-                  <button
-                    type="button"
-                    className="px-12 py-8 rounded-12 text-label-small border border-black-alpha-8 hover:border-black-alpha-16 hover:bg-black-alpha-4 transition-all"
-                    onClick={() => {
-                      setDocGeneratorKind("skill");
-                      if (!docName) setDocName("session-skill");
-                    }}
-                  >
-                    Generate SKILL.md
-                  </button>
-                )}
+            {!isRunning && experimentalFeatures.generateSkillMd && (
+              <div className="flex items-center gap-8 mt-12">
+                <button
+                  type="button"
+                  className="flex items-center gap-6 px-12 py-8 rounded-12 text-label-small border border-black-alpha-8 hover:border-black-alpha-16 hover:bg-black-alpha-4 transition-all"
+                  onClick={() => {
+                    setDocGeneratorKind("skill");
+                    if (!docName) setDocName("session-skill");
+                  }}
+                >
+                  <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-black-alpha-32">
+                    <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" />
+                  </svg>
+                  Save as Skill
+                </button>
+                <span className="text-body-small text-black-alpha-24" title="Run a task until you get the result you want, then save it as a reusable skill. The agent analyzes what worked and creates a step-by-step procedure you can run again.">
+                  <svg fill="none" height="14" viewBox="0 0 24 24" width="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-black-alpha-24 hover:text-black-alpha-48 transition-colors cursor-help">
+                    <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
+                  </svg>
+                </span>
               </div>
             )}
 

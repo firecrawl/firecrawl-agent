@@ -248,7 +248,7 @@ function ScrapeResult({
             {scrapeQuery ? `"${scrapeQuery}"` : url}
           </div>
         </div>
-        {scrapeQuery && (
+        {scrapeQuery && !isInteract && (
           <span className="px-6 py-2 rounded-4 text-[10px] font-medium uppercase tracking-wider bg-gray-100 text-gray-500 flex-shrink-0">query</span>
         )}
         {domain && <Favicon domain={domain} />}
@@ -366,7 +366,7 @@ function InteractCard({ item }: { item: TimelineItem }) {
               {item.scrapeQuery ? `"${item.scrapeQuery}"` : subtitle}
             </div>
           </div>
-          {item.scrapeQuery && (
+          {item.scrapeQuery && item.type !== "interact" && (
             <span className="px-6 py-2 rounded-4 text-[10px] font-medium uppercase tracking-wider bg-gray-100 text-gray-500 flex-shrink-0">query</span>
           )}
           {domain && <Favicon domain={domain} />}
@@ -737,13 +737,18 @@ interface WorkerLiveProgress {
   currentTool?: string;
   currentInput?: string;
   tokens: number;
+  liveViewUrl?: string;
   stepLog?: { tool: string; detail: string; input: Record<string, unknown> }[];
 }
 
 /** Extract the first URL from a string (prompt text, detail, JSON, etc.) */
 function extractUrl(text: string): string | null {
-  const m = text.match(/https?:\/\/[^\s"',)}\]]+/);
-  return m ? m[0] : null;
+  try {
+    const m = text.match(/https?:\/\/[^\s"'<>,)]+/);
+    return m ? m[0].replace(/[}\]]$/, "") : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Describe a worker step in a clean, human-readable way */
@@ -758,8 +763,14 @@ function describeWorkerStep(step: { tool: string; detail: string; input: Record<
       return { label: `Searched: "${step.input.query ?? step.detail}"`, url: null, icon: "search" };
     case "scrape":
       return { label: url ? new URL(url).hostname : step.detail, url, icon: "scrape" };
-    case "interact":
-      return { label: url ? `Interacting with ${new URL(url).hostname}` : "Interacting", url, icon: "interact" };
+    case "interact": {
+      const prompt = String(step.input.prompt ?? step.input.instruction ?? step.input.code ?? "").slice(0, 80);
+      const hostname = url ? (() => { try { return new URL(url).hostname; } catch { return url; } })() : null;
+      const label = prompt
+        ? (hostname ? `${hostname} — ${prompt}` : prompt)
+        : (hostname ? `Interacting with ${hostname}` : "Interacting");
+      return { label, url, icon: "interact" };
+    }
     case "bashExec":
     case "bash_exec":
       return { label: step.detail || "Running command", url: null, icon: "bash" };
@@ -790,7 +801,7 @@ function WorkerCard({ id, prompt, result, workerStatus, liveProgress, stepDetail
   const currentStep = lastMeaningfulStep ? describeWorkerStep(lastMeaningfulStep) : null;
 
   // Extract primary URL from prompt for the initial state
-  const promptUrl = extractUrl(prompt);
+  const promptUrl = prompt ? extractUrl(prompt) : null;
   const promptDomain = promptUrl ? getDomain(promptUrl) : null;
 
   // Determine what to show as subtitle
@@ -807,7 +818,7 @@ function WorkerCard({ id, prompt, result, workerStatus, liveProgress, stepDetail
     subtitleText = currentStep.label;
   } else {
     subtitleDomain = promptDomain;
-    subtitleText = promptDomain ? promptUrl! : prompt.slice(0, 80);
+    subtitleText = promptDomain ? promptUrl! : (prompt ?? "").slice(0, 80);
   }
 
   // Show interact indicator when actively interacting
@@ -834,13 +845,8 @@ function WorkerCard({ id, prompt, result, workerStatus, liveProgress, stepDetail
             <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
         )}
-        {workerStatus === "running" && !isInteracting && (
+        {workerStatus === "running" && (
           <div className="w-5 h-5 rounded-full bg-heat-100 animate-pulse flex-shrink-0" />
-        )}
-        {isInteracting && (
-          <svg className="w-14 h-14 text-accent-iris animate-pulse flex-shrink-0" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M7 2l1.5 3.5L12 7l-3.5 1.5L7 12l-1.5-3.5L2 7l3.5-1.5z" />
-          </svg>
         )}
         <div className="flex items-center gap-6 flex-1 min-w-0">
           {subtitleDomain && <Favicon domain={subtitleDomain} />}
@@ -855,6 +861,12 @@ function WorkerCard({ id, prompt, result, workerStatus, liveProgress, stepDetail
       </button>
       {expanded && (
         <div className="border-t border-border-faint">
+          {/* Live browser view */}
+          {liveProgress?.liveViewUrl && (
+            <div className="border-b border-border-faint">
+              <iframe src={liveProgress.liveViewUrl} className="w-full border-0" style={{ height: 350 }} title="Live browser view" />
+            </div>
+          )}
           {/* Step timeline */}
           {stepDetails && stepDetails.length > 0 && (
             <div className="px-14 py-8 flex flex-col gap-3">
@@ -1384,7 +1396,7 @@ export default function PlanVisualization({
                 scrapeFormats={item.scrapeFormats}
                 pageTitle={item.pageTitle}
                 statusCode={item.statusCode}
-                isInteract={false}
+                isInteract={item.type === "interact"}
                 isLatest={i === timeline.length - 1}
               />
             ) : (

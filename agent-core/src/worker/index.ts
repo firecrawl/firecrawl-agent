@@ -16,6 +16,7 @@ export interface WorkerProgress {
   tokens: number;
   inputTokens: number;
   outputTokens: number;
+  liveViewUrl?: string;
   stepLog: { tool: string; detail: string; input: Record<string, unknown> }[];
 }
 
@@ -109,9 +110,21 @@ export function createWorkerTool(
             const result = await worker.generate({
               prompt: task.prompt,
               abortSignal: workerAbort.signal,
-              onStepFinish: ({ toolCalls, usage }) => {
+              onStepFinish: ({ toolCalls, toolResults, usage }) => {
                 const prev = workerProgress.get(task.id);
                 const prevLog = prev?.stepLog ?? [];
+
+                // Extract liveViewUrl from interact tool results
+                let liveViewUrl = prev?.liveViewUrl;
+                for (const tr of toolResults ?? []) {
+                  if (!tr) continue;
+                  const r = tr as Record<string, unknown>;
+                  if (r.toolName === "interact") {
+                    const out = (r.output ?? r.result ?? {}) as Record<string, unknown>;
+                    const url = out.liveViewUrl ?? out.interactiveLiveViewUrl;
+                    if (typeof url === "string" && url) liveViewUrl = url;
+                  }
+                }
 
                 const newSteps = (toolCalls ?? []).map((call) => {
                   const c = (call ?? {}) as Record<string, unknown>;
@@ -120,7 +133,10 @@ export function createWorkerTool(
                   let detail = "";
                   if (name === "search") detail = `Searched: "${args.query ?? ""}"`;
                   else if (name === "scrape") detail = `${args.url ?? ""}`;
-                  else if (name === "interact") detail = `${args.url ?? ""}`;
+                  else if (name === "interact") {
+                    const prompt = String(args.prompt ?? args.instruction ?? args.code ?? "").slice(0, 100);
+                    detail = prompt ? `${args.url ?? ""} — ${prompt}` : `${args.url ?? ""}`;
+                  }
                   else if (name === "bashExec" || name === "bash_exec")
                     detail = String(args.command ?? "").slice(0, 80);
                   else if (name === "load_skill")
@@ -148,6 +164,7 @@ export function createWorkerTool(
                     (prev?.inputTokens ?? 0) + (usage?.inputTokens ?? 0),
                   outputTokens:
                     (prev?.outputTokens ?? 0) + (usage?.outputTokens ?? 0),
+                  liveViewUrl,
                   stepLog: [...prevLog, ...newSteps],
                 });
               },
