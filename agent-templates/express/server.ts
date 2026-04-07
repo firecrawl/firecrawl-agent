@@ -1,5 +1,5 @@
 import express from "express";
-import { createAgentFromEnv } from "../../agent-core/src";
+import { createAgentFromEnv } from "@firecrawl/agent-core";
 
 const app = express();
 app.use(express.json());

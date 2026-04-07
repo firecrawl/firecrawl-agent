@@ -307,7 +307,7 @@ function SkillPanel({ messages, prompt, onClose }: SkillPanelProps) {
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedPath, setSavedPath] = useState<string | null>(null);
-  const contentRef = useRef<HTMLPreElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const generate = useCallback(async () => {
     setGenerating(true);

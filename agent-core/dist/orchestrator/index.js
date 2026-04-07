@@ -1,0 +1,308 @@
+import { ToolLoopAgent, stepCountIs } from "ai";
+import { resolveModel } from "../resolve-model";
+import { createSkillTools } from "../skills/tools";
+import { createSubAgentTools } from "./sub-agents";
+import { createWorkerTool } from "../worker";
+import { formatOutput, bashExec, initBashWithFiles } from "../tools";
+import { discoverSkills } from "../skills/discovery";
+import { loadOrchestratorPrompt } from "./loader";
+import { createPrepareStepWithCompaction } from "./compaction";
+function extractFieldPaths(obj, prefix = "", depth = 0) {
+  if (depth > 4) return [prefix || "(nested)"];
+  if (Array.isArray(obj)) {
+    if (obj.length === 0) return [`${prefix}[]`];
+    const item = obj[0];
+    if (typeof item === "object" && item !== null) {
+      return extractFieldPaths(item, `${prefix}[]`, depth + 1);
+    }
+    return [`${prefix}[] (get ALL items)`];
+  }
+  if (typeof obj === "object" && obj !== null) {
+    const paths = [];
+    for (const [key, value] of Object.entries(obj)) {
+      const fieldPath = prefix ? `${prefix}.${key}` : key;
+      if (typeof value === "object" && value !== null) {
+        paths.push(...extractFieldPaths(value, fieldPath, depth + 1));
+      } else {
+        paths.push(fieldPath);
+      }
+    }
+    return paths;
+  }
+  return prefix ? [prefix] : [];
+}
+function buildResearchPlan(schema, columns) {
+  const lines = [
+    "",
+    "<research_plan>",
+    "The user has defined a schema that serves as your research checklist. You MUST find data for every field before presenting results.",
+    ""
+  ];
+  if (schema) {
+    lines.push("Target schema:", "```json", JSON.stringify(schema, null, 2), "```", "");
+    const fields = extractFieldPaths(schema);
+    if (fields.length > 0) {
+      lines.push("Data collection checklist:");
+      for (const field of fields) {
+        lines.push(`- ${field}`);
+      }
+      lines.push("");
+    }
+  }
+  if (columns?.length) {
+    lines.push("Required columns (each is a data point to collect):");
+    for (const col of columns) {
+      lines.push(`- ${col}`);
+    }
+    lines.push("");
+  }
+  lines.push(
+    "Do NOT present results until you have attempted every field. If a field cannot be found after searching, set it to null.",
+    "When using spawnAgents, include the relevant fields from this checklist in each worker's prompt.",
+    "</research_plan>",
+    ""
+  );
+  return lines.join("\n");
+}
+function buildInlinePresentationMode() {
+  return `
+<presentation_policy>
+CRITICAL: NEVER write data inline. No JSON code blocks. No markdown tables. No bullet-point lists of results. No summaries of the extracted data. The user has a viewer panel that shows formatOutput results \u2014 writing data in your text response means the user sees it TWICE.
+
+When you have collected all the data, say ONE short sentence (e.g. "Found 10 oil tickers from Yahoo Finance.") and then IMMEDIATELY call formatOutput with format "json". Nothing else.
+
+Do NOT echo, summarize, or preview the data before or after calling formatOutput. The viewer panel handles display.
+ALWAYS include a "sources" array in every object with the full URLs you scraped the data from. This is mandatory. Example: "sources": ["https://openai.com/about", "https://crunchbase.com/organization/openai"]
+Only use bashExec to SAVE data to /data/ when: (a) the dataset is very large (100+ rows), (b) you need to process it further, or (c) you want to persist intermediate results.
+</presentation_policy>`;
+}
+function buildStructuredPresentationMode(schema, columns) {
+  const lines = [
+    "",
+    "<presentation_policy>",
+    "A schema has been provided. You MUST call formatOutput to deliver the final result.",
+    "",
+    "Rules:",
+    "- Gather ALL data from your research plan before calling formatOutput.",
+    "- Match the schema EXACTLY \u2014 use null for missing fields, never omit keys.",
+    "- Arrays must be arrays even for single items.",
+    '- Numbers must be actual numbers, not strings like "$1,000".',
+    "- CRITICAL: Do NOT stream the data inline. Do NOT output markdown tables, JSON code blocks, bullet lists, or summaries of the data. The user sees the data in a separate viewer panel. Your text output should be at most one sentence, then call formatOutput.",
+    "- You may save intermediate results to /data/ with bashExec as you go, but the FINAL output MUST go through formatOutput.",
+    "- Use bashExec with jq to aggregate, transform, or merge data before calling formatOutput if needed.",
+    `- ALWAYS include a "sources" array in every object with the full URLs you scraped the data from. This is mandatory even if the schema doesn't explicitly include it.`
+  ];
+  if (schema) {
+    lines.push(
+      "",
+      'When finished, call formatOutput with format "json" and the data matching this schema.'
+    );
+  } else if (columns?.length) {
+    lines.push(
+      "",
+      `When finished, call formatOutput with format "csv" and columns: ${JSON.stringify(columns)}.`
+    );
+  }
+  lines.push("</presentation_policy>");
+  return lines.join("\n");
+}
+async function createOrchestrator(options) {
+  const {
+    config,
+    toolkit,
+    apiKeys,
+    skillsDir,
+    maxWorkers = 6,
+    workerMaxSteps = 10,
+    compactionModel
+  } = options;
+  const model = await resolveModel(config.model, apiKeys);
+  const skills = await discoverSkills(skillsDir);
+  const skillTools = createSkillTools(skills, config.skillInstructions);
+  const subAgentModelResolved = config.subAgentModel ? await resolveModel(config.subAgentModel, apiKeys) : model;
+  const subAgentTools = await createSubAgentTools(
+    config.subAgents ?? [],
+    toolkit,
+    skills,
+    subAgentModelResolved,
+    config.skillInstructions,
+    apiKeys,
+    { maxWorkers, workerMaxSteps }
+  );
+  const researchPlan = config.schema || config.columns ? buildResearchPlan(config.schema, config.columns) : "";
+  const workflowSteps = `
+When handling a request:
+1. Determine the task type and what data the user needs.
+2. Output a mermaid flowchart showing your plan (see planning_policy below).
+3. If URLs are provided, call lookup_site_playbook for site-specific navigation.
+4. Execute the plan \u2014 search, scrape, paginate, spawn parallel agents as needed.
+5. Verify completeness against the schema/checklist before presenting results.
+6. Call formatOutput with the collected data. The task is not done until formatOutput is called.`;
+  const appSections = [];
+  appSections.push(`<planning_policy>
+IMPORTANT: You MUST output a mermaid flowchart BEFORE making any tool calls for research or data collection tasks. The only exception is simple formatting/export tasks (e.g. "format as JSON") \u2014 just do those directly.
+
+\`\`\`mermaid
+graph TD
+    A[Search for Vercel vs Netlify pricing comparisons] --> B[Scrape vercel.com/pricing \u2014 extract all plan tiers]
+    A --> C[Scrape netlify.com/pricing \u2014 extract all plan tiers]
+    B --> D[Compare features across both platforms]
+    C --> D
+    D --> E[Format as comparison table via formatOutput]
+\`\`\`
+
+Rules:
+- Always use \`graph TD\` (top-down) layout.
+- 5-15 nodes with DESCRIPTIVE labels. Bad: "Extract Data". Good: "Scrape AAPL income statement from Yahoo Finance".
+- Include full URLs or specific details in node labels.
+- Show parallel branches where applicable \u2014 especially when using spawnAgents.
+- If your approach changes mid-task (source unavailable, new data discovered), output an UPDATED mermaid diagram with completed steps marked \u2713.
+</planning_policy>`);
+  appSections.push(`<workflow_examples>
+
+Simple query \u2014 "Who are the co-founders of Firecrawl?"
+1. Search for relevant results.
+2. Scrape promising results to extract the answer.
+3. Present the answer inline.
+
+Single target research \u2014 "I need the founders, funding stage, amount raised, and investors of Firecrawl."
+1. Search for relevant URLs.
+2. Scrape to extract data. Use spawnAgents if multiple independent sources are needed.
+3. Compile and present findings.
+
+Research a list of items \u2014 "I need the caloric content of all the foods on this list."
+1. Search/scrape to get the list of items.
+2. MUST use spawnAgents \u2014 one worker per item to research each in parallel.
+3. Aggregate results and present.
+
+Per-item detail extraction \u2014 "Find the 10 latest videos and get each description."
+1. Search/scrape to get the list of items with URLs.
+2. MUST use spawnAgents \u2014 one worker per item. Each worker visits its URL and extracts the detail.
+3. Aggregate all results and present.
+
+Find all items on a website \u2014 "Get all products from this shop's website."
+1. Check sitemaps (sitemap.xml, robots.txt) for an easy route to all pages.
+2. Scrape the entry page. Determine: pagination? Categories? Subcategories?
+3. For pagination, use interact to click through every page. For categories, scrape each one.
+4. If the site is JS-heavy or has infinite scroll, use interact with JavaScript interaction.
+5. MUST use spawnAgents for independent category scraping.
+6. Aggregate and present all results.
+
+Comparing multiple targets \u2014 "Compare pricing for Vercel, Netlify, and Cloudflare Pages."
+1. MUST use spawnAgents to research each target in parallel.
+2. Each agent searches for and scrapes the pricing page independently.
+3. Compile results into a comparison.
+
+</workflow_examples>`);
+  const skillCatalog = skills.length ? `
+
+Available skills (use load_skill to activate):
+${skills.map((s) => `- ${s.name}: ${s.description.slice(0, 100)}`).join("\n")}` : "";
+  appSections.push(`<skill_policy>
+Do NOT eagerly load skills. Follow this order:
+
+1. First: If the user provides URLs, call lookup_site_playbook with each URL. This returns site-specific navigation (API endpoints, pagination, gotchas). Use whatever it returns \u2014 do NOT also load the parent skill.
+2. Only if needed: If no site playbook matched, OR the task needs broader domain knowledge beyond site navigation, then load a skill:
+   - Company info, contacts, team \u2192 company-research
+   - E-commerce products, pricing, inventory \u2192 e-commerce
+   - Financial data, earnings, market metrics \u2192 financial-data
+   - Pricing comparison across products \u2192 price-tracker
+   - Single product deep detail, specs, variants \u2192 product-extraction
+   - Articles, docs, recipes, legal texts \u2192 content-extraction
+   - Complex schema with nested fields \u2192 structured-extraction
+   - Multi-source research (3+ sources) \u2192 deep-research
+
+Do NOT load a parent skill just to get site navigation \u2014 lookup_site_playbook already provides that.
+${skillCatalog}
+</skill_policy>`);
+  const hasStructuredOutput = !!(config.schema || config.columns);
+  const presentationMode = hasStructuredOutput ? buildStructuredPresentationMode(config.schema, config.columns) : buildInlinePresentationMode();
+  appSections.push(presentationMode);
+  if (config.urls && config.urls.length > 0) {
+    appSections.push(`<user_urls>
+Start with these URLs: ${config.urls.join(", ")}
+</user_urls>`);
+  }
+  const uploadedFiles = {};
+  const uploadDescriptions = [];
+  if (config.csvContext) {
+    uploadedFiles["/data/input.csv"] = config.csvContext;
+    uploadDescriptions.push("/data/input.csv (CSV)");
+  }
+  if (config.uploads?.length) {
+    for (const upload of config.uploads) {
+      const isText = upload.type.startsWith("text/") || /\.(csv|tsv|json|md|txt|xml|yaml|yml|toml|ini|log|sql|html|css|js|ts|py|rb|sh)$/i.test(
+        upload.name
+      );
+      const safeName = upload.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const filePath = `/data/${safeName}`;
+      if (isText) {
+        uploadedFiles[filePath] = upload.content;
+      } else {
+        uploadedFiles[filePath + ".b64"] = upload.content;
+      }
+      uploadDescriptions.push(
+        `${filePath} (${upload.type || upload.name.split(".").pop()})`
+      );
+    }
+  }
+  if (Object.keys(uploadedFiles).length > 0) {
+    await initBashWithFiles(uploadedFiles);
+  }
+  if (uploadDescriptions.length > 0) {
+    appSections.push(`<uploaded_files>
+The user uploaded files to the bash filesystem:
+${uploadDescriptions.map((d) => `- ${d}`).join("\n")}
+Use bashExec to explore them: 'head -5 /data/file.csv', 'cat /data/file.json | jq .', 'wc -l /data/file.txt', etc.
+</uploaded_files>`);
+  }
+  const instructions = await loadOrchestratorPrompt({
+    TODAY: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+    FIRECRAWL_SYSTEM_PROMPT: toolkit.systemPrompt ?? "",
+    RESEARCH_PLAN: researchPlan,
+    WORKFLOW_STEPS: workflowSteps,
+    APP_SECTIONS: appSections.join("\n\n")
+  });
+  const spawnAgents = createWorkerTool(model, toolkit, skills, {
+    maxWorkers,
+    workerMaxSteps
+  });
+  const resolvedCompactionModel = compactionModel ? await resolveModel(compactionModel, apiKeys) : model;
+  const compaction = createPrepareStepWithCompaction(
+    config.model.model,
+    resolvedCompactionModel
+  );
+  return new ToolLoopAgent({
+    model,
+    instructions,
+    tools: {
+      ...toolkit.tools,
+      ...skillTools,
+      ...subAgentTools,
+      spawnAgents,
+      formatOutput,
+      bashExec
+    },
+    stopWhen: stepCountIs(config.maxSteps ?? 20),
+    prepareStep: compaction.prepareStep,
+    experimental_repairToolCall: async ({ toolCall, inputSchema }) => {
+      try {
+        const schema = await inputSchema({ toolName: toolCall.toolName });
+        const allowedKeys = Object.keys(
+          schema.properties ?? {}
+        );
+        const parsed = JSON.parse(toolCall.input);
+        const cleaned = {};
+        for (const key of allowedKeys) {
+          if (key in parsed) cleaned[key] = parsed[key];
+        }
+        return { ...toolCall, input: JSON.stringify(cleaned) };
+      } catch {
+        return toolCall;
+      }
+    }
+  });
+}
+export {
+  createOrchestrator
+};

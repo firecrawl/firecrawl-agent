@@ -2,10 +2,8 @@ import { streamText } from "ai";
 import fs from "fs/promises";
 import path from "path";
 import { getTaskModel, getExperimentalFeatures } from "@agent/_config";
-import { resolveModel } from "@/agent-core";
+import { resolveModel, getDefaultSkillsDir } from "@/agent-core";
 import { getProviderApiKeys, hydrateModelConfig } from "@agent/_lib/config/keys";
-
-const SKILLS_DIR = path.join(process.cwd(), "agent-core", "src", "skills", "definitions");
 
 export async function POST(req: Request) {
   if (!getExperimentalFeatures().generateSkillMd) {
@@ -112,14 +110,14 @@ Output ONLY the SKILL.md content. No extra commentary.`,
           }
 
           // Save to disk
-          const skillDir = path.join(SKILLS_DIR, slug);
+          const skillDir = path.join(getDefaultSkillsDir(), slug);
           await fs.mkdir(skillDir, { recursive: true });
           await fs.writeFile(path.join(skillDir, "SKILL.md"), fullContent, "utf-8");
 
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({
             type: "done",
             name: slug,
-            path: `agent-core/src/skills/definitions/${slug}/SKILL.md`,
+            path: `skills/definitions/${slug}/SKILL.md`,
             content: fullContent,
           })}\n\n`));
         } catch (err) {

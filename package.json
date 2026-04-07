@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "scripts": {
+    "build": "pnpm --filter @firecrawl/agent-core build",
+    "test": "pnpm --filter @firecrawl/agent-core test",
+    "dev:next": "pnpm --filter firecrawl-agent-next dev",
+    "dev:express": "pnpm --filter firecrawl-agent-express dev",
+    "dev:hono": "pnpm --filter firecrawl-agent-hono dev"
+  }
+}

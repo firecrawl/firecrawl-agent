@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { streamSSE } from "hono/streaming";
-import { createAgentFromEnv } from "../../agent-core/src";
+import { createAgentFromEnv } from "@firecrawl/agent-core";
 
 const app = new Hono();
 

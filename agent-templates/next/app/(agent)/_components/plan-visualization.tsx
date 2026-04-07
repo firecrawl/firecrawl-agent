@@ -1396,7 +1396,7 @@ export default function PlanVisualization({
                 scrapeFormats={item.scrapeFormats}
                 pageTitle={item.pageTitle}
                 statusCode={item.statusCode}
-                isInteract={item.type === "interact"}
+                isInteract={(item.type as string) === "interact"}
                 isLatest={i === timeline.length - 1}
               />
             ) : (

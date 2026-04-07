@@ -1,3 +1,4 @@
+import type { LanguageModel } from "ai";
 import type { ModelConfig } from "./types";
 
 /**
@@ -8,7 +9,7 @@ import type { ModelConfig } from "./types";
 export async function resolveModel(
   config: ModelConfig,
   apiKeys?: Record<string, string>,
-) {
+): Promise<LanguageModel> {
   const keyFor = (provider: string) =>
     config.apiKey || apiKeys?.[provider] || undefined;
 

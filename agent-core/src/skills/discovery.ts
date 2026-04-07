@@ -7,6 +7,11 @@ import { parseSkillFrontmatter } from "./parser";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_SKILLS_DIR = path.join(__dirname, "definitions");
 
+/** Returns the path to the built-in skills directory. */
+export function getDefaultSkillsDir(): string {
+  return DEFAULT_SKILLS_DIR;
+}
+
 async function discoverSitePlaybooks(skillDir: string): Promise<SitePlaybook[]> {
   const sitesDir = path.join(skillDir, "sites");
   try {

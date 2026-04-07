@@ -1,4 +1,4 @@
-// Type-only re-export for monorepo development.
+// Type-only re-export for path alias convenience.
 export type {
   AgentConfig,
   ModelConfig,
@@ -13,4 +13,4 @@ export type {
   Toolkit,
   ExportedSkill,
   FirecrawlToolsConfig,
-} from "../../agent-core/src";
+} from "@firecrawl/agent-core";
