@@ -1,111 +1,76 @@
 # Architecture
 
-This is a web research agent framework. You scaffold a project, customize it, and deploy it. Everything is yours to modify.
+You ran `firecrawl init agent` and got a project. This is yours — everything is malleable.
+
+## What You Have
+
+```
+my-agent/
+├── agent-core/                  # the agent library (yours to modify)
+│   ├── src/
+│   │   ├── agent.ts             # createAgent() — the public API
+│   │   ├── orchestrator/
+│   │   │   ├── index.ts         # assembles: model + tools + prompts → agent loop
+│   │   │   └── prompts/         # core agent behavior
+│   │   │       ├── system.md    # role, tools, delegation, completeness
+│   │   │       ├── skills.md    # skill loading policy
+│   │   │       └── export-skill.md
+│   │   ├── worker/              # parallel sub-agents
+│   │   ├── skills/definitions/  # built-in skills (SKILL.md playbooks)
+│   │   ├── tools.ts             # formatOutput, bashExec, exportSkill
+│   │   ├── toolkit.ts           # Firecrawl API → tools
+│   │   └── resolve-model.ts     # anthropic/openai/google provider resolver
+│   └── package.json
+│
+├── prompts/                     # YOUR app-specific prompts
+│   ├── planning.md              # mermaid flowchart policy
+│   ├── presentation-inline.md   # output rules (no schema)
+│   ├── presentation-schema.md   # output rules (with schema)
+│   ├── workflow-examples.md     # task pattern examples
+│   └── loader.ts                # loads these → appSections[]
+│
+├── app/(agent)/                 # your app code
+│   ├── api/agent/route.ts       # main endpoint — uses createAgent
+│   ├── api/v1/run/route.ts      # REST API — uses createAgent
+│   └── page.tsx                 # chat UI
+│
+├── .env.local                   # your API keys
+└── package.json
+```
 
 ## The Stack
 
 ```
-Firecrawl API          hosted web scraping, search, browser automation
-      |
-firecrawl-aisdk        AI SDK tools that wrap the Firecrawl API
-      |
-agent-core             agent loop + skills + prompts (this is the library)
-      |
-your app               Next.js, Express, Hono, FastAPI — your code
+Firecrawl API             web scraping, search, browser automation
+      ↓
+Vercel AI SDK             ToolLoopAgent — the agent loop
+      ↓
+agent-core                skills, workers, prompts, tools
+      ↓
+your prompts/ + app/      your customizations on top
 ```
 
-**agent-core** is a thin wrapper around the [Vercel AI SDK](https://sdk.vercel.ai/)'s `ToolLoopAgent`. It adds:
-- Firecrawl tools (search, scrape, interact, map)
-- A skills system (reusable `.md` playbooks)
-- Parallel workers (sub-agents for independent tasks)
-- Structured output (JSON, CSV, Markdown via `formatOutput`)
-- Skill export (`exportSkill` — agent writes its own playbook)
-- Context compaction (summarizes long conversations to stay in token budget)
-
-That's it. Under the hood it's just:
+Under the hood, the entire agent is:
 
 ```ts
 new ToolLoopAgent({ model, instructions, tools, stopWhen })
 ```
 
-## File Structure
+agent-core wraps this with Firecrawl tools, a skills system, parallel workers, and structured output. Your `prompts/` folder controls how the agent behaves in your app.
 
-When you scaffold a project, you get:
+## How to Customize
 
-```
-my-agent/
-├── agent-core/                    # the library — modify freely
-│   ├── src/
-│   │   ├── agent.ts               # createAgent() → .run() / .stream() / .toResponse()
-│   │   ├── orchestrator/
-│   │   │   ├── index.ts           # model + tools + prompts → ToolLoopAgent
-│   │   │   └── prompts/           # core agent behavior (edit these!)
-│   │   │       ├── system.md      # role, mission, tool policy, delegation, completeness
-│   │   │       ├── skills.md      # when to load skills
-│   │   │       └── export-skill.md # when to export a playbook
-│   │   ├── worker/
-│   │   │   ├── index.ts           # parallel worker agents
-│   │   │   └── prompts/system.md  # worker instructions
-│   │   ├── skills/
-│   │   │   ├── definitions/       # built-in skills (SKILL.md files)
-│   │   │   ├── discovery.ts       # finds and loads skills
-│   │   │   └── tools.ts           # load_skill, lookup_site_playbook tools
-│   │   ├── tools.ts               # formatOutput, bashExec, exportSkill
-│   │   ├── toolkit.ts             # builds Firecrawl tools from API key
-│   │   ├── resolve-model.ts       # anthropic/openai/google model resolver
-│   │   └── types.ts               # all TypeScript types
-│   └── package.json
-│
-├── prompts/                       # YOUR app-specific prompts (edit these!)
-│   ├── planning.md                # mermaid flowchart policy (Next.js)
-│   ├── presentation-inline.md     # how to present results without schema
-│   ├── presentation-schema.md     # how to present results with schema
-│   ├── workflow-examples.md       # example task patterns
-│   └── loader.ts                  # loads prompts → appSections[]
-│
-├── app/                           # your Next.js app (or server.ts for Express/Hono)
-│   └── (agent)/
-│       ├── api/agent/route.ts     # main chat endpoint — uses createAgent
-│       ├── api/v1/run/route.ts    # REST API endpoint — uses createAgent
-│       └── page.tsx               # chat UI
-│
-└── .env.local                     # API keys
-```
+### Change how the agent thinks
+Edit `agent-core/src/orchestrator/prompts/system.md`. This is the core system prompt — role, tool usage, delegation rules, completeness checks.
 
-## How It Flows
-
-```
-User prompt
-    ↓
-createAgent({ firecrawlApiKey, model, appSections })
-    ↓
-orchestrator builds:
-    1. resolves model (anthropic/openai/google)
-    2. discovers skills from skills/definitions/
-    3. builds tools (firecrawl + skills + workers + formatOutput + exportSkill)
-    4. loads core prompts from agent-core/prompts/
-    5. appends YOUR app prompts (planning, presentation, etc.)
-    6. → new ToolLoopAgent({ model, instructions, tools })
-    ↓
-agent loop: think → tool call → observe → repeat
-    ↓
-formatOutput() → structured JSON/CSV/Markdown
-exportSkill()  → reusable SKILL.md playbook (optional)
-```
-
-## Where to Customize
-
-### Change agent behavior
-Edit the `.md` files in `agent-core/src/orchestrator/prompts/`. These are the core instructions. `system.md` is the big one — role, tools, delegation, completeness policies.
-
-### Change app behavior
-Edit the `.md` files in `prompts/`. These are app-specific:
-- `planning.md` — remove mermaid if you don't want flowcharts
-- `presentation-*.md` — change how results are formatted
-- `workflow-examples.md` — add your own task patterns
+### Change how your app uses the agent
+Edit `prompts/*.md`. These are app-level policies passed via `appSections`:
+- **planning.md** — remove mermaid if you don't need flowcharts
+- **presentation-*.md** — change how results are displayed
+- **workflow-examples.md** — add task patterns your users will run
 
 ### Add a skill
-Create a folder in `agent-core/src/skills/definitions/my-skill/SKILL.md`:
+Create `agent-core/src/skills/definitions/my-skill/SKILL.md`:
 
 ```markdown
 ---
@@ -114,117 +79,130 @@ description: What this skill does
 ---
 
 ## Procedure
-1. Step one...
-2. Step two...
+1. Search for "{QUERY}" to find relevant pages
+2. Scrape with query: "Extract the specific data..."
+3. Format as JSON via formatOutput
 ```
 
-Skills are auto-discovered. The agent loads them on demand.
+Auto-discovered. The agent loads it when the task matches.
 
 ### Add a site playbook
-Create `agent-core/src/skills/definitions/my-skill/sites/example-site.md`:
+Create `agent-core/src/skills/definitions/my-skill/sites/example.md`:
 
 ```markdown
 ---
-domains: ["example.com", "www.example.com"]
+domains: ["example.com"]
 platform: example
 ---
 
 ## URL Patterns
-- Product page: /products/{id}
+- Product: /products/{id}
 - Search: /search?q={query}
+
+## Extraction Tips
+- Prices are in the .price-box element
+- Pagination: ?page=N, 20 items per page
 ```
 
-When the agent scrapes a matching domain, it auto-loads these instructions.
+When the agent hits a matching domain, it gets these instructions automatically.
 
-### Swap the model
-Change the model in your `.env.local` or pass it at runtime:
-
-```ts
-const agent = createAgent({
-  model: { provider: 'anthropic', model: 'claude-sonnet-4-6' },
-  // or: { provider: 'openai', model: 'gpt-4o' }
-  // or: { provider: 'google', model: 'gemini-3-flash-preview' }
-})
-```
-
-### Add custom tools
-Add tools in `agent-core/src/tools.ts` and register them in `agent-core/src/orchestrator/index.ts`:
+### Add a custom tool
+In `agent-core/src/tools.ts`, add your tool. In `agent-core/src/orchestrator/index.ts`, register it:
 
 ```ts
 tools: {
   ...toolkit.tools,
-  ...skillTools,
-  spawnAgents,
   formatOutput,
   bashExec,
   exportSkill,
-  myCustomTool,  // ← add here
+  myTool,  // ← yours
 }
 ```
 
-### Inject app-specific prompts
-Your app loads its own `.md` prompt files and passes them to `createAgent`:
+### Swap models
+In `.env.local`:
+```
+MODEL_PROVIDER=anthropic
+MODEL_ID=claude-sonnet-4-6
+```
+
+Or at runtime:
+```ts
+const agent = createAgent({
+  model: { provider: 'openai', model: 'gpt-4o' },
+})
+```
+
+Supports: `anthropic`, `openai`, `google`, `custom-openai` (any OpenAI-compatible endpoint).
+
+### Inject app prompts
+Your `prompts/loader.ts` loads `.md` files and returns `appSections[]`. These are appended after the core system prompt:
 
 ```ts
 const appSections = await loadAppSections({ hasSchema: true });
-
-const agent = createAgent({
-  firecrawlApiKey,
-  model,
-  appSections,  // ← your prompts get appended to the core system prompt
-});
+const agent = createAgent({ firecrawlApiKey, model, appSections });
 ```
 
-## Core vs App Separation
-
-| Concern | Where | Why |
-|---------|-------|-----|
-| Agent identity, tool usage, delegation | `agent-core/prompts/system.md` | Core behavior — same regardless of UI |
-| Skill loading policy | `agent-core/prompts/skills.md` | Core — skills are framework-agnostic |
-| Mermaid planning | `prompts/planning.md` | App — only useful if you have a UI to render it |
-| Result presentation | `prompts/presentation-*.md` | App — depends on your viewer/output panel |
-| Workflow examples | `prompts/workflow-examples.md` | App — your users see different task patterns |
-
-**Rule of thumb:** If it's about how the agent thinks and acts, it's core. If it's about how results look in your UI, it's app.
+Add any `.md` file to `prompts/`, load it in the loader, and it becomes part of the agent's instructions.
 
 ## Firecrawl Tools
 
-The agent has access to these Firecrawl methods:
+| Tool | Method | What it does |
+|------|--------|-------------|
+| `search` | Web search | Returns pages with titles, URLs, snippets |
+| `scrape` | Content extraction | Use `query` for targeted extraction, `formats` for raw markdown |
+| `scrape:extract` | Schema extraction | Extract structured data matching a JSON schema |
+| `interact` | Browser automation | Click, fill forms, handle JS. Natural language or code |
+| `map` | URL discovery | Find all URLs on a site |
+| `crawl` | Full crawl | Crawl an entire site |
 
-| Tool | What it does |
-|------|-------------|
-| `search` | Web search — returns pages with titles, URLs, snippets |
-| `scrape` | Extract content from a URL. Use `query` for targeted extraction, `formats` for raw content |
-| `interact` | Browser automation — click, fill forms, handle JS-heavy pages. Code or natural language |
-| `map` | Discover all URLs on a site |
-| `crawl` | Crawl an entire site |
-| `extract` | Schema-based extraction with FIRE-1 agent |
+Built-in tools:
 
-Plus built-in tools:
 | Tool | What it does |
 |------|-------------|
 | `formatOutput` | Format results as JSON, CSV, or Markdown |
 | `bashExec` | Data processing sandbox (jq, awk, sed, grep) |
-| `exportSkill` | Save the current procedure as a reusable SKILL.md |
-| `spawnAgents` | Run parallel worker agents for independent tasks |
+| `exportSkill` | Agent saves its procedure as a reusable SKILL.md |
+| `spawnAgents` | Run parallel workers for independent tasks |
 
-## Python Core
+## Core vs App
 
-`agent-core-py/` is the same architecture in Python, built on [PydanticAI](https://ai.pydantic.dev/) + the [Firecrawl Python SDK](https://pypi.org/project/firecrawl/):
+| If you want to change... | Edit |
+|--------------------------|------|
+| How the agent reasons and acts | `agent-core/src/orchestrator/prompts/system.md` |
+| When skills load | `agent-core/src/orchestrator/prompts/skills.md` |
+| What tools are available | `agent-core/src/orchestrator/index.ts` |
+| How your app presents results | `prompts/presentation-*.md` |
+| Task planning style | `prompts/planning.md` |
+| Example task patterns | `prompts/workflow-examples.md` |
+| The chat UI | `app/(agent)/page.tsx` |
+| API endpoints | `app/(agent)/api/` |
 
-```python
-from firecrawl_agent import create_agent, CreateAgentOptions, ModelConfig, RunParams
+## Using as a Library
 
-agent = create_agent(CreateAgentOptions(
-    firecrawl_api_key="fc-...",
-    model=ModelConfig(provider="google", model="gemini-3-flash-preview"),
-))
+Skip the UI entirely:
 
-result = agent.run_sync(RunParams(prompt="Compare Vercel vs Netlify pricing"))
+```ts
+import { createAgent } from './agent-core/src'
+
+const agent = createAgent({
+  firecrawlApiKey: process.env.FIRECRAWL_API_KEY!,
+  model: { provider: 'google', model: 'gemini-3-flash-preview' },
+})
+
+// Run to completion
+const result = await agent.run({ prompt: 'Compare Vercel vs Netlify pricing' })
+console.log(result.text)
+
+// Or stream
+for await (const event of agent.stream({ prompt: '...' })) {
+  console.log(event.type, event.content)
+}
+
+// Or get a web Response with SSE
+return agent.toResponse({ prompt: '...' })
 ```
-
-Same `prompts/` folder pattern, same `appSections` for customization.
 
 ## License
 
-MIT — this is your code. Change anything.
+MIT — this is your project. Change anything.
