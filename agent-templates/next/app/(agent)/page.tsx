@@ -13,7 +13,6 @@ import SettingsPanel from "./_components/settings-panel";
 import type { UploadedFile } from "@/agent-core-types";
 
 import StreamdownBlock from "@/components/shared/streamdown-block";
-import Sidebar from "./_components/sidebar";
 import ArtifactPanel, { JsonViewer } from "./_components/artifact-panel";
 import SymbolColored from "@/components/shared/icons/symbol-colored";
 import { cn } from "@/utils/cn";
@@ -641,7 +640,6 @@ export default function AgentPage() {
   const [generatedDocPath, setGeneratedDocPath] = useState<string | null>(null);
   const [generatedDocContent, setGeneratedDocContent] = useState<string | null>(null);
   const [generatedDocLabel, setGeneratedDocLabel] = useState<string | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [artifactOpen, setArtifactOpen] = useState(false);
   const [artifactSkillMode, setArtifactSkillMode] = useState(false);
   const [acpAgents, setAcpAgents] = useState<{ name: string; bin: string; displayName: string; available: boolean }[]>([]);
@@ -756,7 +754,6 @@ export default function AgentPage() {
   const clearMessages = () => { sdkChat.setMessages([]); sdkChat.clearError?.(); };
 
   const sendMessage = useCallback((opts: { text: string }) => {
-    setSidebarCollapsed(true);
     if (isACP) {
       acpChat.sendMessage({
         text: opts.text,
@@ -1407,19 +1404,8 @@ export default function AgentPage() {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-          onNew={() => {
-            setHasSubmitted(false);
-            setConfig(defaultConfig);
-            clearMessages();
-            stop();
-          }}
-        />
-
       <div className="flex-1 overflow-y-auto no-scrollbar">
-      <div className={cn("mx-auto px-20 py-24 transition-all duration-200", sidebarCollapsed && !artifactOpen ? "max-w-900" : "max-w-700")}>
+      <div className={cn("mx-auto px-20 py-24 transition-all duration-200", !artifactOpen ? "max-w-900" : "max-w-700")}>
         {/* Query display */}
         <div className="mb-20">
           <div className="text-title-h4 text-accent-black">
