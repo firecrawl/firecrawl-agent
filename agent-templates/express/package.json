@@ -4,7 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch server.ts",
-    "start": "tsx server.ts"
+    "start": "tsx server.ts",
+    "example": "tsx examples/basic.ts",
+    "example:stream": "tsx examples/streaming.ts",
+    "example:structured": "tsx examples/structured.ts",
+    "example:custom": "tsx examples/custom-agent.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "latest",

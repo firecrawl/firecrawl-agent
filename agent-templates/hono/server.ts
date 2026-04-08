@@ -1,9 +1,12 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { streamSSE } from "hono/streaming";
-import { createAgentFromEnv } from "@firecrawl/agent-core";
+import { createAgent, createAgentFromEnv } from "@firecrawl/agent-core";
+import type { ModelConfig } from "@firecrawl/agent-core";
 
 const app = new Hono();
+
+// --- API endpoint (same interface as the Next.js template) ---
 
 app.post("/v1/run", async (c) => {
   const { prompt, stream, model, maxSteps, ...rest } = await c.req.json();
@@ -32,6 +35,8 @@ app.post("/v1/run", async (c) => {
     return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
   }
 });
+
+// --- Start ---
 
 const port = Number(process.env.PORT ?? 3000);
 console.log(`firecrawl-agent listening on http://localhost:${port}`);

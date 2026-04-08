@@ -1,8 +1,11 @@
 import express from "express";
-import { createAgentFromEnv } from "@firecrawl/agent-core";
+import { createAgent, createAgentFromEnv } from "@firecrawl/agent-core";
+import type { ModelConfig } from "@firecrawl/agent-core";
 
 const app = express();
 app.use(express.json());
+
+// --- API endpoint (same interface as the Next.js template) ---
 
 app.post("/v1/run", async (req, res) => {
   const { prompt, stream, model, maxSteps, ...rest } = req.body;
@@ -22,6 +25,8 @@ app.post("/v1/run", async (req, res) => {
     if (!res.headersSent) res.status(500).json({ error: message });
   }
 });
+
+// --- Start ---
 
 const port = Number(process.env.PORT) || 3000;
 app.listen(port, () => console.log(`firecrawl-agent listening on http://localhost:${port}`));
