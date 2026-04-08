@@ -39,7 +39,7 @@ export const config = {
 
   // ─── Parallel workers ───
   maxWorkers: 10,              // Max concurrent worker agents
-  workerMaxSteps: 30,          // Max steps per worker
+  workerMaxSteps: 50,          // Max steps per worker — let them finish complex tasks
 
   // ─── Task-specific overrides ───
   // Set a model here to override the background model for that task.
