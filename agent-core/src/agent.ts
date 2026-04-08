@@ -355,9 +355,96 @@ Do not use emojis.`,
   }
 
   /**
+   * Build a structured metadata summary of the agent run.
+   * Captures what tools were used, what worked, and the approach pattern.
+   */
+  private buildRunMetadata(steps: StepDetail[]): string {
+    const toolUsage: Record<string, { count: number; inputs: string[]; succeeded: number }> = {};
+    const urlsScraped: string[] = [];
+    const searchQueries: string[] = [];
+
+    for (const step of steps) {
+      for (const tc of step.toolCalls) {
+        if (!toolUsage[tc.name]) toolUsage[tc.name] = { count: 0, inputs: [], succeeded: 0 };
+        toolUsage[tc.name].count++;
+
+        const input = tc.input as Record<string, unknown> | undefined;
+        if (tc.name === "search" && input?.query) {
+          searchQueries.push(String(input.query));
+          toolUsage[tc.name].inputs.push(`query: "${input.query}"`);
+        } else if (tc.name === "scrape" && input?.url) {
+          const method = input.query ? `query: "${input.query}"` : input.formats ? `formats: ${JSON.stringify(input.formats)}` : "full page";
+          urlsScraped.push(String(input.url));
+          toolUsage[tc.name].inputs.push(`${input.url} (${method})`);
+        } else if (tc.name === "interact" && input?.url) {
+          const method = input.code ? "code execution" : input.prompt ? `prompt: "${String(input.prompt).slice(0, 80)}"` : "interaction";
+          urlsScraped.push(String(input.url));
+          toolUsage[tc.name].inputs.push(`${input.url} (${method})`);
+        } else if (tc.name === "formatOutput") {
+          const fmt = input?.format ?? "unknown";
+          toolUsage[tc.name].inputs.push(`format: ${fmt}`);
+        } else if (tc.name === "bashExec") {
+          toolUsage[tc.name].inputs.push(String((input as Record<string, unknown>)?.command ?? "").slice(0, 80));
+        }
+      }
+
+      // Track successes from results
+      for (const tr of step.toolResults) {
+        if (toolUsage[tr.name]) {
+          const output = tr.output;
+          const hasContent = output && typeof output === "object" && (
+            (output as Record<string, unknown>).markdown ||
+            (output as Record<string, unknown>).content ||
+            (output as Record<string, unknown>).extract ||
+            (output as Record<string, unknown>).results
+          );
+          if (hasContent || (typeof output === "string" && output.length > 10)) {
+            toolUsage[tr.name].succeeded++;
+          }
+        }
+      }
+    }
+
+    const lines = ["## Run Metadata\n"];
+
+    // Approach summary
+    const usedSearch = (toolUsage.search?.count ?? 0) > 0;
+    const usedScrape = (toolUsage.scrape?.count ?? 0) > 0;
+    const usedInteract = (toolUsage.interact?.count ?? 0) > 0;
+    const usedWorkers = (toolUsage.spawnAgents?.count ?? 0) > 0;
+    const approach = [
+      usedSearch && "search (web discovery)",
+      usedScrape && "scrape (content extraction)",
+      usedInteract && "interact (browser automation)",
+      usedWorkers && "spawnAgents (parallel workers)",
+    ].filter(Boolean).join(" → ");
+    lines.push(`**Approach pattern:** ${approach}`);
+    lines.push(`**Total steps:** ${steps.length}`);
+    lines.push("");
+
+    // Tool breakdown
+    lines.push("**Tool usage:**");
+    for (const [name, usage] of Object.entries(toolUsage)) {
+      lines.push(`- ${name}: ${usage.count} calls (${usage.succeeded} succeeded)`);
+      for (const input of usage.inputs.slice(0, 5)) {
+        lines.push(`  - ${input}`);
+      }
+    }
+    lines.push("");
+
+    if (searchQueries.length) {
+      lines.push(`**Search queries used:** ${searchQueries.map(q => `"${q}"`).join(", ")}`);
+    }
+    if (urlsScraped.length) {
+      lines.push(`**URLs accessed:** ${[...new Set(urlsScraped)].join(", ")}`);
+    }
+
+    return lines.join("\n");
+  }
+
+  /**
    * Post-process a completed run into a reusable skill package.
-   * Loads the export-workflow skill instructions and feeds the step history
-   * to the model to generate SKILL.md + workflow.mjs + schema.json.
+   * Feeds rich metadata + step history to the model for SKILL.md generation.
    */
   private async exportAsSkill(
     params: RunParams,
@@ -381,15 +468,20 @@ Do not use emojis.`,
         "Convert the tool call history into a reusable SKILL.md, workflow.mjs, and schema.json.";
     }
 
-    // Serialize the step history for the model
+    // Build rich metadata about the run
+    const metadata = this.buildRunMetadata(steps);
+
+    // Serialize full step history with more detail
     const stepHistory = steps.map((step, i) => {
-      const calls = step.toolCalls.map(
-        (tc) => `  ${tc.name}(${JSON.stringify(tc.input)})`,
-      );
-      const results = step.toolResults.map(
-        (tr) =>
-          `  ${tr.name} → ${JSON.stringify(tr.output).slice(0, 500)}`,
-      );
+      const calls = step.toolCalls.map((tc) => {
+        const input = tc.input as Record<string, unknown> | undefined;
+        return `  CALL ${tc.name}(${JSON.stringify(input, null, 2)})`;
+      });
+      const results = step.toolResults.map((tr) => {
+        const output = JSON.stringify(tr.output);
+        // Keep more of the output for the model to understand what worked
+        return `  RESULT ${tr.name} → ${output.slice(0, 1500)}`;
+      });
       return `Step ${i + 1}:\n${calls.join("\n")}\n${results.join("\n")}`;
     });
 
@@ -397,10 +489,17 @@ Do not use emojis.`,
       model,
       system: `${skillInstructions}
 
-You are post-processing a completed agent run. Generate three files based on the tool call history below.
+You are post-processing a completed agent run. Generate a REUSABLE, GENERALIZED skill package.
 
-Return your response as a single JSON object with these keys:
-- "name": a slug for the skill (e.g. "vercel-pricing")
+CRITICAL RULES:
+1. **Match the actual method used.** If the agent used scrape with a query parameter, the skill MUST say "scrape with query". If it used interact with click actions, say that. NEVER describe a method that wasn't used.
+2. **Generalize entity-specific values.** If the run was for "AAPL", the skill should work for any ticker. Use parameters like {TICKER}, {COMPANY}, {URL} in the procedure. Document what to substitute.
+3. **Document the approach pattern** (search → scrape+query → format) not just the steps. Future runs need to know WHY this approach was chosen.
+4. **Include the actual tool inputs** — exact query strings, extraction prompts, and URL patterns that worked.
+5. **Note what the data source returned** — what fields were available, what the page structure looked like.
+
+Return a single JSON object with these keys:
+- "name": a generalized slug (e.g. "yahoo-finance-financials" not "aapl-financials")
 - "skillMd": the full SKILL.md content (with frontmatter)
 - "workflow": the full workflow.mjs content
 - "schema": the full schema.json content
@@ -410,9 +509,12 @@ Return ONLY the JSON object, no markdown fences or explanation.`,
 ${params.urls?.length ? `URLs: ${params.urls.join(", ")}` : ""}
 ${params.schema ? `Schema: ${JSON.stringify(params.schema)}` : ""}
 
-Tool call history:
+${metadata}
+
+## Full Tool Call History
+
 ${stepHistory.join("\n\n")}`,
-      maxOutputTokens: 4096,
+      maxOutputTokens: 8192,
     });
 
     try {
@@ -424,7 +526,6 @@ ${stepHistory.join("\n\n")}`,
         schema: parsed.schema ?? "",
       };
     } catch {
-      // If model didn't return valid JSON, return raw text as the skill
       return {
         name: "exported-skill",
         skillMd: text,
