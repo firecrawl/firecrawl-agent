@@ -645,6 +645,7 @@ export default function AgentPage() {
   const [generatedDocLabel, setGeneratedDocLabel] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [artifactOpen, setArtifactOpen] = useState(false);
+  const [artifactSkillMode, setArtifactSkillMode] = useState(false);
   const [acpAgents, setAcpAgents] = useState<{ name: string; bin: string; displayName: string; available: boolean }[]>([]);
   const [configuredProviders, setConfiguredProviders] = useState<Set<string>>(new Set());
   const [providerConfigLoaded, setProviderConfigLoaded] = useState(false);
@@ -1705,8 +1706,8 @@ export default function AgentPage() {
                   type="button"
                   className="flex items-center gap-6 px-12 py-8 rounded-12 text-label-small border border-black-alpha-8 hover:border-black-alpha-16 hover:bg-black-alpha-4 transition-all"
                   onClick={() => {
-                    setDocGeneratorKind("skill");
-                    if (!docName) setDocName("session-skill");
+                    setArtifactSkillMode(true);
+                    setArtifactOpen(true);
                   }}
                 >
                   <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-black-alpha-32">
@@ -1714,55 +1715,6 @@ export default function AgentPage() {
                   </svg>
                   Save as Skill
                 </button>
-                <span className="text-body-small text-black-alpha-24" title="Run a task until you get the result you want, then save it as a reusable skill. The agent analyzes what worked and creates a step-by-step procedure you can run again.">
-                  <svg fill="none" height="14" viewBox="0 0 24 24" width="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-black-alpha-24 hover:text-black-alpha-48 transition-colors cursor-help">
-                    <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
-                  </svg>
-                </span>
-              </div>
-            )}
-
-            {docGeneratorKind && !isRunning && (
-              <div className="mt-12 rounded-16 border border-black-alpha-8 bg-accent-white p-16">
-                <div className="flex items-center justify-between gap-12 mb-10">
-                  <div>
-                    <div className="text-label-medium text-accent-black">Generate SKILL.md</div>
-                    <div className="text-body-small text-black-alpha-32">Creates a reusable skill from what worked in this session.</div>
-                  </div>
-                  <button type="button" className="text-label-small text-black-alpha-32 hover:text-accent-black" onClick={() => setDocGeneratorKind(null)}>Cancel</button>
-                </div>
-                <div className="flex items-center gap-10">
-                  <input
-                    className="flex-1 bg-background-base border border-black-alpha-8 rounded-12 px-16 py-12 text-body-medium placeholder:text-black-alpha-20 focus:border-heat-100 focus:outline-none"
-                    placeholder="skill name"
-                    value={docName}
-                    onChange={(e) => setDocName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleGenerateDoc(docGeneratorKind);
-                    }}
-                  />
-                  <button
-                    type="button"
-                    disabled={!docName.trim() || generatingDoc}
-                    className={cn(
-                      "px-16 py-10 rounded-12 text-label-small transition-all",
-                      docName.trim() && !generatingDoc ? "bg-accent-black text-accent-white hover:bg-black-alpha-80" : "bg-black-alpha-4 text-black-alpha-24 cursor-not-allowed"
-                    )}
-                    onClick={() => handleGenerateDoc(docGeneratorKind)}
-                  >
-                    {generatingDoc ? "Generating..." : "Generate"}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {generatedDocPath && generatedDocLabel && (
-              <div className="mt-12 rounded-16 border border-black-alpha-8 bg-black-alpha-2 p-16">
-                <div className="text-label-medium text-accent-black">Generated {generatedDocLabel}</div>
-                <div className="mt-4 text-mono-x-small text-black-alpha-32 break-all">{generatedDocPath}</div>
-                {generatedDocContent && (
-                  <pre className="mt-10 text-mono-x-small text-black-alpha-48 whitespace-pre-wrap max-h-200 overflow-auto">{generatedDocContent}</pre>
-                )}
               </div>
             )}
           </div>
@@ -1778,12 +1730,13 @@ export default function AgentPage() {
           prompt={config.prompt}
           schema={config.schema}
           urls={config.urls}
+          initialSkillMode={artifactSkillMode}
           onRequestFormat={(format) => {
             const skillMap: Record<string, string> = { JSON: "export-json", CSV: "export-csv", Markdown: "export-report" };
             const skill = skillMap[format] ?? "export-json";
             sendMessage({ text: `Load the "${skill}" skill and then format all the collected data as ${format}. Follow the skill instructions. Stream the output inline.` });
           }}
-          onClose={() => setArtifactOpen(false)}
+          onClose={() => { setArtifactOpen(false); setArtifactSkillMode(false); }}
         />
       )}
 

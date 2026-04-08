@@ -506,6 +506,8 @@ interface ArtifactPanelProps {
   prompt?: string;
   schema?: Record<string, unknown>;
   urls?: string[];
+  /** Open directly in skill generation mode */
+  initialSkillMode?: boolean;
 }
 
 function buildCodeSnippet(lang: "curl" | "fetch" | "python", prompt: string, schema?: Record<string, unknown>, urls?: string[]): string {
@@ -537,9 +539,9 @@ response = requests.post(
 print(response.json())`;
 }
 
-export default function ArtifactPanel({ messages, isRunning, onRequestFormat, onClose, prompt, schema, urls }: ArtifactPanelProps) {
+export default function ArtifactPanel({ messages, isRunning, onRequestFormat, onClose, prompt, schema, urls, initialSkillMode }: ArtifactPanelProps) {
   const formatted = extractFormattedOutput(messages);
-  const [showSkill, setShowSkill] = useState(false);
+  const [showSkill, setShowSkill] = useState(initialSkillMode ?? false);
 
   const [showCode, setShowCode] = useState(false);
   const [codeLang, setCodeLang] = useState<"curl" | "fetch" | "python">("curl");

@@ -47,51 +47,45 @@ export async function POST(req: Request) {
 
     const result = streamText({
       model,
-      system: `You generate SKILL.md files that capture procedural web knowledge — the exact steps that WORKED to accomplish a task. Skills are reusable instructions that an agent can follow to repeat the same process.
+      system: `You generate SKILL.md files that capture procedural web knowledge — reusable playbooks an agent can follow to repeat a task.
 
-Given a session transcript, analyze what the agent did that SUCCEEDED and distill it into a repeatable procedure. Focus on:
-- The exact sequence of actions that produced results
-- Which sites/pages had the data and how it was accessed
-- What interactions were needed (clicks, pagination, expanding sections)
-- What worked vs what failed (skip the failures, document the winning path)
-- How to verify completeness
+CRITICAL RULES:
+1. **Generalize.** If the session scraped "AAPL" from Yahoo Finance, the skill must work for ANY ticker. Use parameters like {TICKER}, {COMPANY}, {URL}. The skill name must be generic (e.g. "yahoo-finance-financials" not "aapl-financials").
+2. **Match the actual method.** If the agent used \`scrape\` with a \`query\` parameter, say that. If it used \`interact\` with clicks, say that. NEVER describe a method that wasn't used in the transcript.
+3. **Focus on procedure, not data.** The data is fleeting. The method is what matters. Document HOW the agent got the data, not WHAT the data was.
+4. **Be proportional.** A 3-step session gets a concise skill. Don't pad with speculation.
 
-Produce a SKILL.md with this format:
+Given a session transcript, extract the winning path — what tools were called, with what inputs, in what order.
+
+Produce a SKILL.md:
 
 ---
-name: skill-name
-description: One-line description of what this skill does
+name: generic-skill-name
+description: One-line description with {PARAMETERS} for variable parts
 ---
 
 # Skill Title
 
 ## What This Skill Does
-One paragraph explaining the procedure this skill captures.
+One paragraph. Describe the general procedure, not the specific instance.
 
-## Where to Find the Data
-- Which sites/pages contain the relevant information
-- URL patterns or search strategies that worked
-- What sections of a page to target
+## Parameters
+- {PARAM_NAME}: what to substitute (e.g. {TICKER} = stock ticker symbol)
 
 ## Procedure
-1. First step...
-2. Second step...
-(Imperative mood. Describe exactly what to do, based on what worked in the session.)
+1. Step with exact tool and method used (e.g. "scrape {URL} with query: 'Extract all pricing tiers...'")
+2. Next step...
+(Imperative mood. Include actual query strings and URL patterns from the session.)
 
 ## Data to Extract
-What fields/data points to collect and their expected format.
+Expected fields and format.
 
 ## Gotchas
-- Pages that need interaction vs static scraping
-- Rate limits or anti-bot measures observed
-- Fallback approaches when the primary method fails
-
-## Verification
-How to validate that the extracted data is correct and complete.
+- What method was used and why (scrape+query vs interact+click)
+- Rate limits or access issues observed
 
 ## Example Prompts
-- "example prompt 1"
-- "example prompt 2"
+- "example with specific values filled in"
 
 Output ONLY the SKILL.md content. No extra commentary.`,
       prompt: `Original task: ${prompt}\n\nSkill name: ${name}\n\nSession transcript:\n${transcript.slice(0, 8000)}`,
