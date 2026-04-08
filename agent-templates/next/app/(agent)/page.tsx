@@ -1606,44 +1606,25 @@ export default function AgentPage() {
                 <ProviderModelIcon icon={currentModelIcon} size={12} />
                 {currentModelName}
               </div>
-              <div className="flex items-center gap-4 text-mono-x-small text-black-alpha-32">
-                <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
-                {sessionStats.agentTurns} turn{sessionStats.agentTurns !== 1 ? "s" : ""}
-              </div>
-              <div className="flex items-center gap-4 text-mono-x-small text-black-alpha-32">
-                <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a4 4 0 014 4c0 1.95-2 4-4 6-2-2-4-4.05-4-6a4 4 0 014-4zM8 14v.5A3.5 3.5 0 004.5 18v0a1.5 1.5 0 001.5 1.5h12a1.5 1.5 0 001.5-1.5v0A3.5 3.5 0 0016 14.5V14" /></svg>
-                {sessionStats.llmCalls} LLM call{sessionStats.llmCalls !== 1 ? "s" : ""}
-              </div>
-              <div className="flex items-center gap-4 text-mono-x-small text-black-alpha-32">
-                <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16" /></svg>
-                {(() => {
-                  const fmt = (n: number) => n > 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
-                  const totalIn = sessionStats.orchestratorIn + sessionStats.workerInputTokens;
-                  const totalOut = sessionStats.orchestratorOut + sessionStats.workerOutputTokens;
-                  return `~${fmt(totalIn)} in · ${fmt(totalOut)} out`;
-                })()}
-              </div>
               {sessionStats.fc.total > 0 && (
-                <div className="flex items-center gap-4 text-mono-x-small text-black-alpha-32">
-                  <svg fill="none" height="12" viewBox="0 0 24 24" width="12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
-                  {sessionStats.fc.total} credits
-                </div>
+                <>
+                  <div className="flex items-center gap-4 text-mono-x-small text-black-alpha-32">
+                    🔥 {sessionStats.fc.total} credits
+                  </div>
+                  <div className="flex items-center gap-x-8 text-mono-x-small text-black-alpha-24">
+                    {(["search", "scrape", "map", "crawl", "interact"] as const).map((tool) => {
+                      const b = sessionStats.fc[tool];
+                      if (b.credits === 0) return null;
+                      return (
+                        <span key={tool}>
+                          {tool}: {b.credits}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
-            {sessionStats.fc.total > 0 && (
-              <div className="flex items-center justify-end gap-x-8 gap-y-4 flex-wrap mt-4">
-                {(["search", "scrape", "map", "crawl", "interact"] as const).map((tool) => {
-                  const b = sessionStats.fc[tool];
-                  if (b.count === 0) return null;
-                  return (
-                    <span key={tool} className="text-mono-x-small text-black-alpha-24">
-                      {b.count} {tool}{b.count !== 1 && tool !== "search" ? "s" : b.count !== 1 ? "es" : ""} ({b.credits}cr)
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-
           </div>
         )}
       </div>
