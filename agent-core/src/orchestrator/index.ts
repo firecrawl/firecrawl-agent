@@ -38,14 +38,22 @@ function extractFieldPaths(obj: unknown, prefix = "", depth = 0): string[] {
 
 function buildSchemaBlock(schema?: Record<string, unknown>): string {
   if (!schema) return "";
-  return `Target schema:\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\``;
+  return `<required_schema>
+CRITICAL: You MUST populate EXACTLY these fields and ONLY these fields. Do not add extra fields. Do not omit fields. Every field below must have a value scraped from a real source.
+\`\`\`json
+${JSON.stringify(schema, null, 2)}
+\`\`\`
+</required_schema>`;
 }
 
 function buildFieldChecklist(schema?: Record<string, unknown>): string {
   if (!schema) return "";
   const fields = extractFieldPaths(schema);
   if (fields.length === 0) return "";
-  return `Data collection checklist:\n${fields.map((f) => `- ${f}`).join("\n")}`;
+  return `<field_checklist>
+Before calling formatOutput, verify EVERY field below is populated. If a field is missing, go back and scrape for it. Do not submit partial data.
+${fields.map((f) => `- [ ] ${f}`).join("\n")}
+</field_checklist>`;
 }
 
 function buildColumnsBlock(columns?: string[]): string {
@@ -55,7 +63,7 @@ function buildColumnsBlock(columns?: string[]): string {
 
 function buildFormatInstructions(schema?: Record<string, unknown>, columns?: string[]): string {
   if (schema) {
-    return `When finished, call formatOutput with format "json" and the data matching this schema.`;
+    return `When finished, call formatOutput with format "json" and data that EXACTLY matches the required_schema. Every field must be present. No extra fields.`;
   }
   if (columns?.length) {
     return `When finished, call formatOutput with format "csv" and columns: ${JSON.stringify(columns)}.`;
