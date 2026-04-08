@@ -72,6 +72,8 @@ export interface AgentConfig {
   skillInstructions?: Record<string, string>;
   subAgents: SubAgentConfig[];
   maxSteps?: number;
+  /** When true, the agent is instructed to call exportSkill after completing the task */
+  exportSkill?: boolean;
 }
 
 // --- Agent Core public API types ---

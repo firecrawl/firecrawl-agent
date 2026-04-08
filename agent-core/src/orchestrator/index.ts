@@ -4,9 +4,9 @@ import { resolveModel } from "../resolve-model";
 import { createSkillTools } from "../skills/tools";
 import { createSubAgentTools } from "./sub-agents";
 import { createWorkerTool } from "../worker";
-import { formatOutput, bashExec, initBashWithFiles } from "../tools";
+import { formatOutput, bashExec, initBashWithFiles, createExportSkillTool } from "../tools";
 import { discoverSkills } from "../skills/discovery";
-import { loadOrchestratorPrompt } from "./loader";
+import { loadOrchestratorPrompt, loadPromptFile } from "./loader";
 import { createPrepareStepWithCompaction } from "./compaction";
 
 // --- Helpers ---
@@ -112,6 +112,7 @@ export async function createOrchestrator(options: OrchestratorOptions) {
     maxWorkers,
     workerMaxSteps,
   });
+  const exportSkill = createExportSkillTool(skillsDir);
 
   // 4. Pre-seed bash filesystem with uploads
   const uploadedFiles: Record<string, string> = {};
@@ -151,6 +152,12 @@ export async function createOrchestrator(options: OrchestratorOptions) {
   }
   if (uploadDescriptions.length > 0) {
     contextSections.push(`<uploaded_files>\nThe user uploaded files to the bash filesystem:\n${uploadDescriptions.map((d) => `- ${d}`).join("\n")}\nUse bashExec to explore them: 'head -5 /data/file.csv', 'cat /data/file.json | jq .', 'wc -l /data/file.txt', etc.\n</uploaded_files>`);
+  }
+
+  // Export skill prompt (loaded when agent should save its procedure)
+  if (config.exportSkill) {
+    const exportPrompt = await loadPromptFile("export-skill.md");
+    contextSections.push(exportPrompt);
   }
 
   const instructions = await loadOrchestratorPrompt(
@@ -195,6 +202,7 @@ When handling a request:
       spawnAgents,
       formatOutput,
       bashExec,
+      exportSkill,
     },
     stopWhen: stepCountIs(config.maxSteps ?? 20),
     prepareStep: compaction.prepareStep,

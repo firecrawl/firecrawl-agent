@@ -2,12 +2,8 @@ import { generateText } from "ai";
 import { createOrchestrator, type OrchestratorOptions } from "./orchestrator";
 import { resolveModel } from "./resolve-model";
 import { discoverSkills } from "./skills/discovery";
-import { parseSkillBody } from "./skills/parser";
 import { workerProgress } from "./worker";
 import { buildFirecrawlToolkit } from "./toolkit";
-import fs from "fs/promises";
-import path from "path";
-import { fileURLToPath } from "url";
 import type {
   CreateAgentOptions,
   ExportedSkill,
@@ -74,8 +70,10 @@ export class FirecrawlAgent {
       },
     };
 
-    if (params.exportSkill) {
-      runResult.exportedSkill = await this.exportAsSkill(params, steps);
+    // Extract exported skill from tool results (agent called exportSkill during the run)
+    const exported = this.extractExportedSkill(result.steps);
+    if (exported) {
+      runResult.exportedSkill = exported;
     }
 
     return runResult;
@@ -286,6 +284,7 @@ Do not use emojis.`,
         skillInstructions: params.skillInstructions,
         subAgents: params.subAgents ?? [],
         maxSteps: params.maxSteps ?? this.options.maxSteps,
+        exportSkill: params.exportSkill,
       },
       toolkit: this.getToolkit(),
       apiKeys: this.options.apiKeys,
@@ -322,65 +321,6 @@ Do not use emojis.`,
     return "";
   }
 
-  /**
-   * Summarize a tool result structurally — keys, counts, shape.
-   * The skill needs to know HOW the data came back, not the data itself.
-   */
-  private summarizeToolOutput(toolName: string, output: unknown): string {
-    if (!output) return "(empty)";
-    const o = output as Record<string, unknown>;
-
-    if (toolName === "search") {
-      if (Array.isArray(output)) return `${output.length} results [${(output as Record<string, unknown>[]).slice(0, 3).map(r => r.url ?? r.title ?? "").join(", ")}]`;
-      if (Array.isArray(o.results)) return `${o.results.length} results`;
-      return "search completed";
-    }
-
-    if (toolName === "scrape") {
-      const parts: string[] = [];
-      if (o.markdown) parts.push(`markdown: ${String(o.markdown).length} chars`);
-      if (o.extract) {
-        const extract = o.extract;
-        if (typeof extract === "object" && extract !== null) {
-          const keys = Object.keys(extract as Record<string, unknown>);
-          parts.push(`extract: {${keys.join(", ")}}`);
-        } else {
-          parts.push(`extract: ${String(extract).length} chars`);
-        }
-      }
-      if (o.json) {
-        const json = o.json;
-        if (Array.isArray(json)) {
-          const sample = json[0];
-          const keys = sample && typeof sample === "object" ? Object.keys(sample as Record<string, unknown>) : [];
-          parts.push(`json: ${json.length} items [${keys.join(", ")}]`);
-        } else if (typeof json === "object" && json !== null) {
-          parts.push(`json: {${Object.keys(json as Record<string, unknown>).join(", ")}}`);
-        }
-      }
-      return parts.length ? parts.join(", ") : `${String(JSON.stringify(output)).length} chars`;
-    }
-
-    if (toolName === "interact") {
-      if (o.success === false) return `failed: ${o.error ?? "unknown error"}`;
-      if (o.liveViewUrl) return `success, liveViewUrl available`;
-      return `success, output: ${String(o.output ?? o.result ?? "").slice(0, 100)}`;
-    }
-
-    if (toolName === "formatOutput") {
-      return `format: ${o.format}, content: ${String(o.content ?? "").length} chars`;
-    }
-
-    if (toolName === "bashExec") {
-      const exit = o.exitCode ?? "?";
-      return `exit ${exit}, stdout: ${String(o.stdout ?? "").length} chars`;
-    }
-
-    // Generic fallback
-    if (typeof output === "string") return `${output.length} chars`;
-    return JSON.stringify(output).slice(0, 150);
-  }
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private mapSteps(steps: any[]): StepDetail[] {
     return (steps ?? []).map((s) => ({
@@ -414,181 +354,28 @@ Do not use emojis.`,
   }
 
   /**
-   * Build a structured metadata summary of the agent run.
-   * Captures what tools were used, what worked, and the approach pattern.
+   * Extract an exported skill from the agent's tool results.
+   * The agent calls exportSkill as a tool during the run — we just find its output.
    */
-  private buildRunMetadata(steps: StepDetail[]): string {
-    const toolUsage: Record<string, { count: number; inputs: string[]; succeeded: number }> = {};
-    const urlsScraped: string[] = [];
-    const searchQueries: string[] = [];
-
-    for (const step of steps) {
-      for (const tc of step.toolCalls) {
-        if (!toolUsage[tc.name]) toolUsage[tc.name] = { count: 0, inputs: [], succeeded: 0 };
-        toolUsage[tc.name].count++;
-
-        const input = tc.input as Record<string, unknown> | undefined;
-        if (tc.name === "search" && input?.query) {
-          searchQueries.push(String(input.query));
-          toolUsage[tc.name].inputs.push(`query: "${input.query}"`);
-        } else if (tc.name === "scrape" && input?.url) {
-          const method = input.query ? `query: "${input.query}"` : input.formats ? `formats: ${JSON.stringify(input.formats)}` : "full page";
-          urlsScraped.push(String(input.url));
-          toolUsage[tc.name].inputs.push(`${input.url} (${method})`);
-        } else if (tc.name === "interact" && input?.url) {
-          const method = input.code ? "code execution" : input.prompt ? `prompt: "${String(input.prompt).slice(0, 80)}"` : "interaction";
-          urlsScraped.push(String(input.url));
-          toolUsage[tc.name].inputs.push(`${input.url} (${method})`);
-        } else if (tc.name === "formatOutput") {
-          const fmt = input?.format ?? "unknown";
-          toolUsage[tc.name].inputs.push(`format: ${fmt}`);
-        } else if (tc.name === "bashExec") {
-          toolUsage[tc.name].inputs.push(String((input as Record<string, unknown>)?.command ?? "").slice(0, 80));
-        }
-      }
-
-      // Track successes from results
-      for (const tr of step.toolResults) {
-        if (toolUsage[tr.name]) {
-          const output = tr.output;
-          const hasContent = output && typeof output === "object" && (
-            (output as Record<string, unknown>).markdown ||
-            (output as Record<string, unknown>).content ||
-            (output as Record<string, unknown>).extract ||
-            (output as Record<string, unknown>).results
-          );
-          if (hasContent || (typeof output === "string" && output.length > 10)) {
-            toolUsage[tr.name].succeeded++;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private extractExportedSkill(steps: any[]): ExportedSkill | null {
+    for (const step of [...steps].reverse()) {
+      for (const result of step.toolResults ?? []) {
+        const r = result as Record<string, unknown>;
+        if (r.toolName === "exportSkill") {
+          const output = (r.output ?? r.result) as { name?: string; skillMd?: string } | undefined;
+          if (output?.skillMd) {
+            return {
+              name: output.name ?? "exported-skill",
+              skillMd: output.skillMd,
+              workflow: "",
+              schema: "",
+            };
           }
         }
       }
     }
-
-    const lines = ["## Run Metadata\n"];
-
-    // Approach summary
-    const usedSearch = (toolUsage.search?.count ?? 0) > 0;
-    const usedScrape = (toolUsage.scrape?.count ?? 0) > 0;
-    const usedInteract = (toolUsage.interact?.count ?? 0) > 0;
-    const usedWorkers = (toolUsage.spawnAgents?.count ?? 0) > 0;
-    const approach = [
-      usedSearch && "search (web discovery)",
-      usedScrape && "scrape (content extraction)",
-      usedInteract && "interact (browser automation)",
-      usedWorkers && "spawnAgents (parallel workers)",
-    ].filter(Boolean).join(" → ");
-    lines.push(`**Approach pattern:** ${approach}`);
-    lines.push(`**Total steps:** ${steps.length}`);
-    lines.push("");
-
-    // Tool breakdown
-    lines.push("**Tool usage:**");
-    for (const [name, usage] of Object.entries(toolUsage)) {
-      lines.push(`- ${name}: ${usage.count} calls (${usage.succeeded} succeeded)`);
-      for (const input of usage.inputs.slice(0, 5)) {
-        lines.push(`  - ${input}`);
-      }
-    }
-    lines.push("");
-
-    if (searchQueries.length) {
-      lines.push(`**Search queries used:** ${searchQueries.map(q => `"${q}"`).join(", ")}`);
-    }
-    if (urlsScraped.length) {
-      lines.push(`**URLs accessed:** ${[...new Set(urlsScraped)].join(", ")}`);
-    }
-
-    return lines.join("\n");
-  }
-
-  /**
-   * Post-process a completed run into a reusable skill package.
-   * Feeds rich metadata + step history to the model for SKILL.md generation.
-   */
-  private async exportAsSkill(
-    params: RunParams,
-    steps: StepDetail[],
-  ): Promise<ExportedSkill> {
-    const model = await resolveModel(this.options.model, this.options.apiKeys);
-
-    // Load the export-workflow skill instructions
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const skillPath = path.join(
-      this.options.skillsDir ?? path.join(__dirname, "skills", "definitions"),
-      "export-workflow",
-      "SKILL.md",
-    );
-    let skillInstructions: string;
-    try {
-      const raw = await fs.readFile(skillPath, "utf-8");
-      skillInstructions = parseSkillBody(raw);
-    } catch {
-      skillInstructions =
-        "Convert the tool call history into a reusable SKILL.md, workflow.mjs, and schema.json.";
-    }
-
-    // Build rich metadata about the run
-    const metadata = this.buildRunMetadata(steps);
-
-    // Serialize step history: full inputs, structural summary of outputs
-    const stepHistory = steps.map((step, i) => {
-      const calls = step.toolCalls.map((tc) => {
-        const input = tc.input as Record<string, unknown> | undefined;
-        return `  CALL ${tc.name}(${JSON.stringify(input)})`;
-      });
-      const results = step.toolResults.map((tr) => {
-        return `  RESULT ${tr.name} → ${this.summarizeToolOutput(tr.name, tr.output)}`;
-      });
-      return `Step ${i + 1}:\n${calls.join("\n")}\n${results.join("\n")}`;
-    });
-
-    const { text } = await generateText({
-      model,
-      system: `${skillInstructions}
-
-You are post-processing a completed agent run. Generate a REUSABLE, GENERALIZED skill package.
-
-CRITICAL RULES:
-1. **Match the actual method.** If the agent used scrape with a query parameter, say that. If it used interact with clicks, say that. NEVER describe a method that wasn't used in the run.
-2. **Generalize.** If the run targeted "AAPL", the skill must work for any ticker. Use {TICKER}, {COMPANY}, {URL} as parameters. The skill name should be generic (e.g. "yahoo-finance-financials" not "aapl-financials").
-3. **Focus on the procedure.** Document the approach pattern (search → scrape+query → format) and the exact tool inputs that worked (queries, prompts, URL patterns). The data is fleeting — the method is what matters.
-4. **Be proportional.** A 3-step run gets a concise skill. A 15-step run with pagination and workers gets a detailed one. Don't pad short procedures with speculation.
-
-Return a single JSON object with these keys:
-- "name": a generalized slug (e.g. "yahoo-finance-financials" not "aapl-financials")
-- "skillMd": the full SKILL.md content (with frontmatter)
-- "workflow": the full workflow.mjs content
-- "schema": the full schema.json content
-
-Return ONLY the JSON object, no markdown fences or explanation.`,
-      prompt: `Original prompt: ${params.prompt}
-${params.urls?.length ? `URLs: ${params.urls.join(", ")}` : ""}
-${params.schema ? `Schema: ${JSON.stringify(params.schema)}` : ""}
-
-${metadata}
-
-## Full Tool Call History
-
-${stepHistory.join("\n\n")}`,
-      maxOutputTokens: 8192,
-    });
-
-    try {
-      const parsed = JSON.parse(text);
-      return {
-        name: parsed.name ?? "exported-skill",
-        skillMd: parsed.skillMd ?? "",
-        workflow: parsed.workflow ?? "",
-        schema: parsed.schema ?? "",
-      };
-    } catch {
-      return {
-        name: "exported-skill",
-        skillMd: text,
-        workflow: "",
-        schema: "",
-      };
-    }
+    return null;
   }
 }
 

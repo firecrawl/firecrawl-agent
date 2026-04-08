@@ -7,7 +7,7 @@ const PROMPTS_DIR = path.join(__dirname, "prompts");
 
 const cache: Map<string, string> = new Map();
 
-async function loadPromptFile(name: string): Promise<string> {
+export async function loadPromptFile(name: string): Promise<string> {
   if (cache.has(name)) return cache.get(name)!;
   const content = await fs.readFile(path.join(PROMPTS_DIR, name), "utf-8");
   cache.set(name, content.trim());

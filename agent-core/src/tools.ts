@@ -1,5 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
+import fs from "fs/promises";
+import path from "path";
 
 // --- formatOutput ---
 
@@ -136,3 +138,151 @@ export const bashExec = tool({
     };
   },
 });
+
+// --- exportSkill ---
+
+const firecrawlMethodEnum = z.enum([
+  "search",
+  "scrape",
+  "scrape:query",
+  "scrape:extract",
+  "scrape:markdown",
+  "interact",
+  "interact:code",
+  "map",
+  "crawl",
+  "extract",
+  "agent",
+  "bashExec",
+  "formatOutput",
+]).describe("The Firecrawl method or tool used in this step");
+
+const exportSkillInputSchema = z.object({
+  name: z.string().describe("Kebab-case skill slug, e.g. 'yahoo-finance-financials'. Must be generic, not entity-specific."),
+  description: z.string().describe("One-line description with {PARAM} placeholders for variable parts"),
+  parameters: z.array(z.object({
+    name: z.string().describe("Parameter name, e.g. TICKER, URL, QUERY"),
+    description: z.string().describe("What this parameter represents"),
+    example: z.string().describe("Example value, e.g. 'AAPL', 'https://example.com'"),
+  })).describe("Variable parts of the procedure that change per run"),
+  procedure: z.array(z.object({
+    method: firecrawlMethodEnum,
+    description: z.string().describe("What this step does, using {PARAM} placeholders"),
+    input: z.string().optional().describe("The key input: URL pattern, query string, extraction prompt, or code snippet"),
+  })).describe("Ordered steps — each references a specific Firecrawl method"),
+  dataFields: z.array(z.string()).optional().describe("Field names the procedure extracts"),
+  examplePrompts: z.array(z.string()).optional().describe("Example user prompts with specific values filled in"),
+  targets: z.array(z.object({
+    urlPattern: z.string().describe("URL pattern with {PARAM} placeholders"),
+    fallbackQuery: z.string().optional().describe("Search query to rediscover this URL if stale"),
+  })).optional().describe("Key URL patterns used"),
+});
+
+type ExportSkillInput = z.infer<typeof exportSkillInputSchema>;
+
+function renderSkillMd(input: ExportSkillInput): string {
+  const lines: string[] = [];
+
+  lines.push("---");
+  lines.push(`name: ${input.name}`);
+  lines.push(`description: ${input.description}`);
+  lines.push("category: Generated");
+  lines.push("---");
+  lines.push("");
+  lines.push(`# ${input.name.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}`);
+  lines.push("");
+
+  // Parameters
+  if (input.parameters.length > 0) {
+    lines.push("## Parameters");
+    lines.push("");
+    for (const p of input.parameters) {
+      lines.push(`- **{${p.name}}**: ${p.description} (e.g. \`${p.example}\`)`);
+    }
+    lines.push("");
+  }
+
+  // Procedure
+  lines.push("## Procedure");
+  lines.push("");
+  for (let i = 0; i < input.procedure.length; i++) {
+    const step = input.procedure[i];
+    const methodLabel = step.method.includes(":") ? step.method : step.method;
+    lines.push(`${i + 1}. **${methodLabel}** — ${step.description}`);
+    if (step.input) {
+      lines.push(`   \`\`\``);
+      lines.push(`   ${step.input}`);
+      lines.push(`   \`\`\``);
+    }
+  }
+  lines.push("");
+
+  // Targets
+  if (input.targets?.length) {
+    lines.push("## Targets");
+    lines.push("");
+    lines.push("| URL Pattern | Fallback Query |");
+    lines.push("|---|---|");
+    for (const t of input.targets) {
+      lines.push(`| ${t.urlPattern} | ${t.fallbackQuery ?? "—"} |`);
+    }
+    lines.push("");
+  }
+
+  // Data fields
+  if (input.dataFields?.length) {
+    lines.push("## Data Fields");
+    lines.push("");
+    for (const f of input.dataFields) {
+      lines.push(`- ${f}`);
+    }
+    lines.push("");
+  }
+
+  // Example prompts
+  if (input.examplePrompts?.length) {
+    lines.push("## Example Prompts");
+    lines.push("");
+    for (const p of input.examplePrompts) {
+      lines.push(`- "${p}"`);
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Create an exportSkill tool that writes SKILL.md to the given directory.
+ * The agent calls this after completing a task to save its procedure as a reusable skill.
+ */
+export function createExportSkillTool(skillsDir?: string) {
+  return tool({
+    description:
+      "Export the current task as a reusable skill. Call this after completing a task and calling formatOutput. " +
+      "Describe what you did in generalized terms — use {PARAM} placeholders instead of specific values. " +
+      "Each procedure step must reference the specific Firecrawl method used: search, scrape (with query, extract, or markdown), interact (with code or prompt), map, crawl, extract, agent, bashExec, or formatOutput.",
+    inputSchema: exportSkillInputSchema,
+    execute: async (input) => {
+      const skillMd = renderSkillMd(input);
+
+      if (skillsDir) {
+        try {
+          const dir = path.join(skillsDir, input.name);
+          await fs.mkdir(dir, { recursive: true });
+          await fs.writeFile(path.join(dir, "SKILL.md"), skillMd, "utf-8");
+          return {
+            name: input.name,
+            skillMd,
+            savedPath: `skills/definitions/${input.name}/SKILL.md`,
+            saved: true,
+          };
+        } catch {
+          // Disk write failed (serverless, permissions) — return content anyway
+        }
+      }
+
+      return { name: input.name, skillMd, saved: false };
+    },
+  });
+}
