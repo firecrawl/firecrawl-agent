@@ -1510,7 +1510,11 @@ export default function PlanVisualization({
             const label = fmtLabel[item.formatType ?? "text"] ?? "Output";
             return (
               <div key={i} className="flex items-center gap-6 my-8">
-                <span className="text-mono-x-small text-black-alpha-32 bg-black-alpha-4 px-8 py-2 rounded-4">{label}</span>
+                <button
+                  type="button"
+                  className="text-mono-x-small text-black-alpha-32 bg-black-alpha-4 px-8 py-2 rounded-4 cursor-pointer hover:bg-black-alpha-8 hover:text-accent-black transition-all"
+                  onClick={() => onArtifactClick?.()}
+                >{label}</button>
                 {item.status === "running" && (
                   <span className="inline-block w-4 h-4 rounded-full bg-heat-100 animate-pulse" />
                 )}
