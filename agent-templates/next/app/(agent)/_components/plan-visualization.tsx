@@ -147,23 +147,15 @@ function SearchResultItem({ result }: { result: SearchResult }) {
   );
 }
 
-function SearchResults({ query, results, creditsUsed, isLatest }: { query: string; results: SearchResult[]; creditsUsed?: number; isLatest?: boolean }) {
-  const [userToggled, setUserToggled] = useState<boolean | null>(null);
-  const autoCollapsed = useRef(false);
-
-  // Auto-collapse when no longer the latest item
-  if (!isLatest && !autoCollapsed.current && userToggled === null) {
-    autoCollapsed.current = true;
-  }
-
-  const collapsed = userToggled !== null ? !userToggled : autoCollapsed.current;
+function SearchResults({ query, results, creditsUsed }: { query: string; results: SearchResult[]; creditsUsed?: number; isLatest?: boolean }) {
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
     <div className="my-12 rounded-10 border border-border-faint overflow-hidden">
       <button
         type="button"
         className="flex items-center gap-8 px-14 py-10 w-full text-left hover:bg-black-alpha-2 transition-colors"
-        onClick={() => setUserToggled(collapsed)}
+        onClick={() => setCollapsed(!collapsed)}
       >
         <EndpointBadge type="search" />
         <div className="flex-1 min-w-0">
@@ -219,17 +211,10 @@ function ScrapeResult({
   isInteract?: boolean;
   isLatest?: boolean;
 }) {
-  const [userToggled, setUserToggled] = useState<boolean | null>(null);
-  const autoCollapsed = useRef(false);
+  const [expanded, setExpanded] = useState(true);
   const [showLiveView, setShowLiveView] = useState(false);
   const domain = getDomain(url);
   const hasContent = !!(content || answer || interactOutput);
-
-  if (!isLatest && !autoCollapsed.current && userToggled === null) {
-    autoCollapsed.current = true;
-  }
-
-  const expanded = userToggled !== null ? userToggled : !autoCollapsed.current;
 
   return (
     <div className={cn("my-12 rounded-10 border overflow-hidden transition-all", expanded ? "border-heat-40 shadow-sm" : "border-border-faint hover:border-black-alpha-16")}>
@@ -237,7 +222,7 @@ function ScrapeResult({
       <button
         type="button"
         className="w-full flex items-center gap-8 px-14 py-10 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
-        onClick={() => { autoCollapsed.current = expanded; setUserToggled(expanded ? false : true); }}
+        onClick={() => setExpanded(!expanded)}
       >
         <EndpointBadge type={isInteract ? "interact" : "scrape"} />
         <div className="flex-1 min-w-0">
