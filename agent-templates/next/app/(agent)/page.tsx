@@ -11,7 +11,7 @@ import AgentInput from "./_components/agent-input";
 import PlanVisualization from "./_components/plan-visualization";
 import SettingsPanel from "./_components/settings-panel";
 import type { UploadedFile } from "@/agent-core-types";
-import HistoryPanel from "./_components/history-panel";
+
 import StreamdownBlock from "@/components/shared/streamdown-block";
 import Sidebar from "./_components/sidebar";
 import ArtifactPanel, { JsonViewer } from "./_components/artifact-panel";
@@ -41,11 +41,10 @@ function HeaderLinks() {
   );
 }
 
-import { getOrchestratorModel, getExperimentalFeatures, getHistoryConfig } from "@agent/_config";
+import { getOrchestratorModel, getExperimentalFeatures } from "@agent/_config";
 
 const defaultModel: ModelConfig = getOrchestratorModel();
 const experimentalFeatures = getExperimentalFeatures();
-const historyConfig = getHistoryConfig();
 const MODEL_PREFERENCE_STORAGE_KEY = "firecrawl-agent:last-model";
 
 type CachedModelPreference = Pick<ModelConfig, "provider" | "model" | "baseURL" | "bin">;
@@ -627,7 +626,6 @@ export default function AgentPage() {
   const typingPlaceholder = useTypewriter(PLACEHOLDER_PHRASES);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [followUp, setFollowUp] = useState("");
-  const [conversationId, setConversationId] = useState<string | null>(null);
   const [showPlus, setShowPlus] = useState(false);
   const [showModel, setShowModel] = useState(false);
   const [skills, setSkills] = useState<SkillInfo[] | null>(null);
@@ -999,20 +997,7 @@ export default function AgentPage() {
       : config.prompt;
     setPlanText(null);
     setPlanEditText("");
-    const id = `conv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    setConversationId(historyConfig.enabled ? id : null);
     setHasSubmitted(true);
-    if (historyConfig.enabled) {
-      fetch("/api/conversations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id,
-          title: config.prompt.slice(0, 100),
-          config,
-        }),
-      });
-    }
     sendMessage({ text: promptWithPlan });
   };
 
@@ -1369,17 +1354,7 @@ export default function AgentPage() {
                 onClick={() => {
                   const updated = { ...config, prompt };
                   setConfig(updated);
-                  // Run directly with the updated config to avoid stale state
-                  const id = `conv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-                  setConversationId(historyConfig.enabled ? id : null);
                   setHasSubmitted(true);
-                  if (historyConfig.enabled) {
-                    fetch("/api/conversations", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ id, title: prompt.slice(0, 100), config: updated }),
-                    });
-                  }
                   sendMessage({ text: prompt });
                 }}
               >
@@ -1391,14 +1366,6 @@ export default function AgentPage() {
           </div>
         </div>
 
-        {/* Recent conversations */}
-        <div className="w-full max-w-640 pb-60">
-          <HistoryPanel
-            enabled={historyConfig.enabled}
-            onSelect={(id, title) => setConfig({ ...config, prompt: title })}
-            currentId={conversationId ?? undefined}
-          />
-        </div>
       </div>
     );
   }
@@ -1413,7 +1380,6 @@ export default function AgentPage() {
           onClick={() => {
             setHasSubmitted(false);
             setConfig(defaultConfig);
-            setConversationId(null);
             setSuggestions([]);
             setSparkMode(false);
             setSparkResult(null);
@@ -1442,19 +1408,11 @@ export default function AgentPage() {
 
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
-          currentId={conversationId ?? undefined}
-          historyEnabled={historyConfig.enabled}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-          onSelect={(id, title) => {
-            setConfig({ ...config, prompt: title });
-            setConversationId(id);
-            setHasSubmitted(true);
-          }}
           onNew={() => {
             setHasSubmitted(false);
             setConfig(defaultConfig);
-            setConversationId(null);
             clearMessages();
             stop();
           }}

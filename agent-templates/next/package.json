@@ -41,7 +41,7 @@
     "@streamdown/mermaid": "^1.0.2",
     "@tailwindcss/typography": "^0.5.13",
     "ai": "^6.0.0",
-    "better-sqlite3": "^12.8.0",
+
     "class-variance-authority": "^0.7.0",
     "classnames": "^2.5.1",
     "clsx": "^2.1.0",
@@ -66,7 +66,7 @@
     "vega-lite": "^6.4.2"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
+
     "@types/node": "^20.10.4",
     "@types/papaparse": "^5.3.15",
     "@types/react": "^19.0.0",
