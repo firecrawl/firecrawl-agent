@@ -1,13 +1,9 @@
-/**
- * Basic library usage — no server, just import and run.
- *
- *   npx tsx examples/basic.ts
- */
-import { createAgent } from "./agent-core/src";
+import "dotenv/config";
+import { createAgent } from "../agent-core/src";
 
 const agent = createAgent({
   firecrawlApiKey: process.env.FIRECRAWL_API_KEY!,
-  model: { provider: "google", model: "gemini-3-flash-preview" },
+  model: { provider: "anthropic", model: "claude-sonnet-4-6" },
 });
 
 const result = await agent.run({

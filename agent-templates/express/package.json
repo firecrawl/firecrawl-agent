@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch server.ts",
-    "start": "tsx server.ts",
-    "example": "tsx examples/basic.ts",
-    "example:stream": "tsx examples/streaming.ts",
-    "example:structured": "tsx examples/structured.ts",
-    "example:custom": "tsx examples/custom-agent.ts"
+    "dev": "node --import tsx/esm --watch server.ts",
+    "start": "node --import tsx/esm server.ts",
+    "example:basic": "node --import tsx/esm examples/1-basic.ts",
+    "example:structured": "node --import tsx/esm examples/2-structured-output.ts",
+    "example:parallel": "node --import tsx/esm examples/3-parallel-subagents.ts",
+    "example:skills": "node --import tsx/esm examples/4-with-skills.ts",
+    "example:stream": "node --import tsx/esm examples/5-streaming.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "latest",
