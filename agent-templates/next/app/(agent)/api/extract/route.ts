@@ -6,8 +6,8 @@ import type { ModelConfig } from "@/agent-core";
 
 export const maxDuration = 800;
 
-const DEFAULT_MAX_STEPS = 15;
-const MAX_STEPS_LIMIT = 50;
+const DEFAULT_MAX_STEPS = 50;
+const MAX_STEPS_LIMIT = 200;
 
 /**
  * POST /api/extract
