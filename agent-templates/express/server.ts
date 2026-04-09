@@ -30,4 +30,11 @@ app.post("/v1/run", async (req, res) => {
 // --- Start ---
 
 const port = Number(process.env.PORT) || 3000;
-app.listen(port, () => console.log(`firecrawl-agent listening on http://localhost:${port}`));
+app.listen(port, () => {
+  const provider = process.env.MODEL_PROVIDER ?? "google";
+  const model = process.env.MODEL_ID ?? "gemini-3-flash-preview";
+  const keys = ["FIRECRAWL_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"]
+    .filter((k) => process.env[k])
+    .map((k) => k.replace(/_API_KEY|_GENERATIVE_AI_API_KEY/, "").toLowerCase());
+  console.log(`\n  firecrawl-agent  http://localhost:${port}  ${provider}/${model}  keys: ${keys.join(", ")}\n`);
+});

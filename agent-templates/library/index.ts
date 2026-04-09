@@ -17,19 +17,25 @@ if (!firecrawlApiKey) {
   process.exit(1);
 }
 
+const provider = (process.env.MODEL_PROVIDER ?? "google") as "google" | "anthropic" | "openai";
+const modelId = process.env.MODEL_ID ?? "gemini-3-flash-preview";
+
+const keys = ["FIRECRAWL_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"]
+  .filter((k) => process.env[k])
+  .map((k) => k.replace(/_API_KEY|_GENERATIVE_AI_API_KEY/, "").toLowerCase());
+
+console.log(`\n  firecrawl-agent  ${provider}/${modelId}  keys: ${keys.join(", ")}\n`);
+
 const agent = createAgent({
   firecrawlApiKey,
-  model: {
-    provider: (process.env.MODEL_PROVIDER ?? "google") as "google" | "anthropic" | "openai",
-    model: process.env.MODEL_ID ?? "gemini-3-flash-preview",
-  },
+  model: { provider, model: modelId },
 });
 
 // --- Run a task ---
 
 const prompt = process.argv[2] ?? "What are the top 3 stories on Hacker News right now?";
 
-console.log(`\n→ ${prompt}\n`);
+console.log(`→ ${prompt}\n`);
 
 const result = await agent.run({ prompt });
 
