@@ -10,7 +10,7 @@ AI-powered web research agent built on [Firecrawl](https://firecrawl.dev). Give 
 
 ## Open Source
 
-Each layer builds on the one below it.
+Each layer builds on the one below it. Start at the top for a ready-to-use app, or go lower in the stack for finer control over the primitives.
 
 | Layer | Description | Get started |
 |:---:|---|---|
@@ -20,20 +20,26 @@ Each layer builds on the one below it.
 | ↑ | | |
 | [**Agent Core**](./agent-core/) | Orchestrator, skills, sub-agents, structured output | `firecrawl-agent init -t library` |
 | ↑ | | |
-| [**Firecrawl AI SDK**](https://npmjs.com/package/firecrawl-aisdk) | search, scrape, interact as Vercel AI SDK tools | `firecrawl-agent init -t aisdk` |
+| [**Firecrawl AI SDK**](https://npmjs.com/package/firecrawl-aisdk) | search, scrape, interact as Vercel AI SDK tools | `npm i firecrawl-aisdk` |
 | ↑ | | |
 | [**Firecrawl SDK**](https://npmjs.com/package/firecrawl) | Core API client for scrape, search, crawl, extract | `npm i firecrawl` |
 | ↑ | | |
-| [**API Reference**](https://docs.firecrawl.dev/api-reference) | REST API, use from any language | [docs.firecrawl.dev](https://docs.firecrawl.dev) |
+| [**API Reference**](https://docs.firecrawl.dev/api-reference/v2-introduction) | REST API, use from any language | [docs.firecrawl.dev](https://docs.firecrawl.dev) |
 
 ### Examples
 
-| Level | Example |
-|---|---|
-| Firecrawl AI SDK | [Basic usage](./agent-templates/library/examples/basic.ts) · [Streaming](./agent-templates/library/examples/streaming.ts) · [Structured output](./agent-templates/library/examples/structured.ts) |
-| Agent Core | [Library usage](./agent-templates/library/) · [Custom agent](./agent-templates/library/examples/custom-agent.ts) |
-| Next.js | [Full template](./agent-templates/next/) |
-| Express | [API server](./agent-templates/express/) |
+**Agent Core** ([all examples](./agent-core/examples/))
+
+1. [Basic usage](./agent-core/examples/1-basic.ts) - single prompt, text response
+2. [Structured output](./agent-core/examples/2-structured-output.ts) - enforce a JSON schema
+3. [Parallel sub-agents](./agent-core/examples/3-parallel-subagents.ts) - multiple sites concurrently
+4. [With skills](./agent-core/examples/4-with-skills.ts) - load a reusable skill
+5. [Streaming](./agent-core/examples/5-streaming.ts) - get results as they arrive
+
+**Templates**
+
+- [Next.js](./agent-templates/next/) - full web app with chat UI
+- [Express](./agent-templates/express/) - API server with `POST /v1/run`
 
 ## How it works
 
