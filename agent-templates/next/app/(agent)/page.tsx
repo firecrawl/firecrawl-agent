@@ -801,7 +801,7 @@ export default function AgentPage() {
       // Agent just finished -- fetch contextual suggestions
       const lastTexts = messages
         .filter((m) => m.role === "assistant")
-        .flatMap((m) => m.parts.filter((p) => p.type === "text").map((p) => p.text))
+        .flatMap((m) => m.parts.filter((p) => p.type === "text").map((p) => (p as { text: string }).text))
         .slice(-3)
         .join("\n");
       const summary = lastTexts.slice(0, 1000);
