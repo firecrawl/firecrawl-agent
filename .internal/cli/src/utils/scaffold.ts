@@ -169,8 +169,12 @@ export async function scaffoldProject(opts: ScaffoldOptions): Promise<void> {
     try {
       execSync('npm install', { cwd: projectDir, stdio: 'pipe' });
       success('Dependencies installed');
-    } catch {
+    } catch (err) {
+      const stderr = err instanceof Error && 'stderr' in err
+        ? (err as { stderr: Buffer }).stderr?.toString().trim()
+        : '';
       warn('npm install failed — run it manually in the project directory');
+      if (stderr) console.error(`\n${stderr}\n`);
     }
   }
 }
