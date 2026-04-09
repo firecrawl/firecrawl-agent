@@ -9,11 +9,16 @@ app.use(express.json());
 // --- API endpoint (same interface as the Next.js template) ---
 
 app.post("/v1/run", async (req, res) => {
-  const { prompt, stream, model, maxSteps, ...rest } = req.body;
+  const { prompt, stream, model, subAgentModel, maxSteps, ...rest } = req.body;
   if (!prompt) return res.status(400).json({ error: "prompt is required" });
 
-  const agent = createAgentFromEnv(model ? { model } : undefined);
-  const params = { prompt, maxSteps, ...rest };
+  const overrides: Record<string, unknown> = {};
+  if (model) overrides.model = model;
+  if (subAgentModel) overrides.subAgentModel = subAgentModel;
+
+  const agent = createAgentFromEnv(Object.keys(overrides).length ? overrides : undefined);
+  const clampedMaxSteps = maxSteps ? Math.min(Math.max(1, maxSteps), 200) : undefined;
+  const params = { prompt, maxSteps: clampedMaxSteps, ...rest };
 
   try {
     if (stream) {

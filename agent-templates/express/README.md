@@ -39,9 +39,19 @@ curl -X POST http://localhost:3000/v1/run \
   -d '{"prompt": "Get pricing for Vercel", "format": "json"}'
 ```
 
-**Parameters:** `prompt` (required), `stream`, `format` (`json` | `csv` | `markdown`), `schema`, `urls`, `skills`, `maxSteps`.
+**Parameters:** `prompt` (required), `stream`, `model`, `subAgentModel`, `format` (`json` | `csv` | `markdown`), `schema`, `urls`, `skills`, `maxSteps`.
 
-**Streaming:** set `"stream": true` for Server-Sent Events with tool calls and results as they happen.
+### Streaming
+
+Set `"stream": true` for Server-Sent Events. Use `curl -N` for real-time output:
+
+```bash
+curl -N -X POST http://localhost:3000/v1/run \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Get pricing for Vercel", "stream": true}'
+```
+
+Each event is a JSON line: `data: {"type":"text","content":"..."}\n\n`
 
 ## Examples
 
