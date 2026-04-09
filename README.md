@@ -15,94 +15,14 @@ AI-powered web research agent built on [Firecrawl](https://firecrawl.dev). Give 
 
 ---
 
-### 1. Firecrawl AI SDK
+### Examples
 
-The lightest option. Add Firecrawl's web tools to any Vercel AI SDK agent:
-
-```typescript
-import { generateText, stepCountIs } from 'ai'
-import { FirecrawlTools } from 'firecrawl-aisdk'
-
-const { text } = await generateText({
-  model: anthropic('claude-sonnet-4-6'),
-  tools: FirecrawlTools(),
-  stopWhen: stepCountIs(30),
-  prompt: `
-    1. Use interact on Hacker News to identify the top story
-    2. Search for other perspectives on the same topic
-    3. Scrape the most relevant pages you found
-    4. Summarize everything you found
-  `,
-})
-
-console.log(text)
-```
-
-You control the model, the loop, everything. `FirecrawlTools()` gives you `search`, `scrape`, and `interact` as standard AI SDK tools.
-
-[npm](https://npmjs.com/package/firecrawl-aisdk)
-
----
-
-### 2. Agent Core
-
-Adds an opinionated orchestrator on top: plans work, parallelizes with sub-agents, loads reusable skills, and outputs structured data.
-
-```typescript
-import { createAgent } from '@firecrawl/agent-core'
-
-const agent = createAgent({
-  firecrawlApiKey: process.env.FIRECRAWL_API_KEY!,
-  model: { provider: 'anthropic', model: 'claude-sonnet-4-6' },
-})
-
-const result = await agent.run({
-  prompt: 'Get the P/E ratio and stock price for NVIDIA, Google, and Microsoft',
-  schema: {
-    type: 'array',
-    items: {
-      type: 'object',
-      properties: {
-        company: { type: 'string' },
-        ticker: { type: 'string' },
-        price: { type: 'number' },
-        peRatio: { type: 'number' },
-      },
-    },
-  },
-})
-
-console.log(result.output) // structured JSON matching your schema
-```
-
-What you get on top of the AI SDK:
-- **Parallel sub-agents** - NVIDIA, Google, Microsoft scraped concurrently
-- **Skills** - reusable SKILL.md playbooks loaded on demand
-- **Schema enforcement** - output matches your schema exactly
-- **Context compaction** - long sessions stay within the context window
-
----
-
-### 3. Templates
-
-Scaffold a complete project with UI, streaming, and configuration:
-
-```bash
-firecrawl-agent init my-agent
-```
-
-```
-? Template
-> Next.js (Full UI)      Complete web app with chat UI, streaming, skills
-  Express (API only)     Lightweight Node.js API server with /v1/run endpoint
-```
-
-| Template | Install | What you get |
-|----------|---------|-------------|
-| [**Next.js**](./agent-templates/next/) | `firecrawl-agent init my-agent -t next` | Full web app with chat UI, streaming, skills |
-| [**Express**](./agent-templates/express/) | `firecrawl-agent init my-agent -t express` | Lightweight API server with `POST /v1/run` |
-
-Both templates build on agent-core and include all its features out of the box.
+| Level | Example |
+|---|---|
+| Firecrawl AI SDK | [Basic usage](./agent-templates/library/examples/basic.ts) · [Streaming](./agent-templates/library/examples/streaming.ts) · [Structured output](./agent-templates/library/examples/structured.ts) |
+| Agent Core | [Library usage](./agent-templates/library/) · [Custom agent](./agent-templates/library/examples/custom-agent.ts) |
+| Next.js | [Full template](./agent-templates/next/) |
+| Express | [API server](./agent-templates/express/) |
 
 ---
 
