@@ -52,9 +52,9 @@ export async function POST(req: Request) {
 
     return createAgentUIStreamResponse({
       agent: orchestrator,
-      uiMessages: messages as Parameters<
-        typeof createAgentUIStreamResponse
-      >[0]["uiMessages"],
+      // Pass empty messages — each agent run is a fresh conversation.
+      // Sending prior messages causes ZDR org errors (expired message IDs).
+      uiMessages: [],
     });
   } catch (error) {
     const message =

@@ -132,10 +132,15 @@
   min-height: 500px;
 }
 /* Don't blow up action button SVGs */
-[data-streamdown="mermaid-block-actions"] svg {
+[data-streamdown="mermaid-block-actions"] svg,
+[data-streamdown="mermaid-block"] [data-streamdown="code-block-copy-button"] svg {
   min-height: unset !important;
   width: unset !important;
   height: unset !important;
+}
+/* Hide the code copy button inside mermaid blocks — it breaks layout */
+[data-streamdown="mermaid-block"] [data-streamdown="code-block-copy-button"] {
+  display: none !important;
 }
 [data-streamdown="mermaid-block"] > div:last-of-type:not([data-streamdown]) {
   max-height: none !important;
