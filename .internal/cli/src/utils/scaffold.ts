@@ -112,14 +112,6 @@ export async function scaffoldProject(opts: ScaffoldOptions): Promise<void> {
     });
   }
 
-  // Copy project docs (CLAUDE.md, ARCHITECTURE.md)
-  for (const doc of ['CLAUDE.md', 'ARCHITECTURE.md']) {
-    const docSrc = path.join(sourceRoot, doc);
-    if (fs.existsSync(docSrc)) {
-      fs.copyFileSync(docSrc, path.join(projectDir, doc));
-    }
-  }
-
   // Copy template files
   const templateSrc = path.join(sourceRoot, template.path);
   for (const entry of fs.readdirSync(templateSrc, { withFileTypes: true })) {

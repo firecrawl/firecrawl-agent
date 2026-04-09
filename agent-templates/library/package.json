@@ -6,10 +6,11 @@
   "scripts": {
     "start": "tsx index.ts",
     "dev": "tsx watch index.ts",
-    "example": "tsx examples/basic.ts",
-    "example:stream": "tsx examples/streaming.ts",
-    "example:structured": "tsx examples/structured.ts",
-    "example:custom": "tsx examples/custom-agent.ts"
+    "example:basic": "tsx examples/1-basic.ts",
+    "example:structured": "tsx examples/2-structured-output.ts",
+    "example:parallel": "tsx examples/3-parallel-subagents.ts",
+    "example:skills": "tsx examples/4-with-skills.ts",
+    "example:stream": "tsx examples/5-streaming.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "latest",
