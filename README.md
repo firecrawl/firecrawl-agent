@@ -2,7 +2,11 @@
 
 <img src=".internal/agent.jpg" alt="Firecrawl Agent" />
 
-AI-powered web research agent built on [Firecrawl](https://firecrawl.dev). Give it a prompt - it searches, scrapes, and extracts data from any website.
+When we built [Firecrawl's /agent endpoint](https://docs.firecrawl.dev/features/agent), the most common request was more control. People wanted to customize the agent, swap models, add their own skills, and build on top of the core primitives.
+
+So we're open-sourcing the entire stack. One command scaffolds an agent at whatever level of abstraction you want to work with. Everything in this repo is yours to fork, extend, and deploy however you want.
+
+Firecrawl's hosted [/agent](https://firecrawl.dev/app/agent) and [Spark 1](https://docs.firecrawl.dev/features/models) models are optimized for structured web research out of the box. This repo gives you the same capabilities with full control over every layer.
 
 ## Hosted
 
