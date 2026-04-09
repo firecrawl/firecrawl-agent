@@ -34,10 +34,10 @@ graph LR
 
 Agent-core combines [firecrawl-aisdk](https://www.npmjs.com/package/firecrawl-aisdk) (web tools) with the [Vercel AI SDK](https://sdk.vercel.ai/) (agent loop) and adds:
 
-- **Skills** — SKILL.md files that teach the agent how to navigate specific sites, what to extract, and how to paginate. Auto-matched by URL via site playbooks. See `src/skills/definitions/` for built-in examples.
-- **Sub-agents** — parallel agents spawned dynamically (`spawnAgents`) or pre-configured with their own model, instructions, and scoped tools/skills.
-- **Output** — `formatOutput` for structured JSON/CSV/markdown, `bashExec` for data processing with jq/awk/sed.
-- **Context compaction** — automatic summarization when approaching token limits.
+- **Skills** - SKILL.md files that teach the agent how to navigate specific sites, what to extract, and how to paginate. Auto-matched by URL via site playbooks. See `src/skills/definitions/` for built-in examples.
+- **Sub-agents** - parallel agents spawned dynamically (`spawnAgents`) or pre-configured with their own model, instructions, and scoped tools/skills.
+- **Output** - `formatOutput` for structured JSON/CSV/markdown, `bashExec` for data processing with jq/awk/sed.
+- **Context compaction** - automatic summarization when approaching token limits.
 
 ## Quick start
 
@@ -268,7 +268,7 @@ if (result.exportedSkill) {
 ```
 
 ```typescript
-// Monitor a page on a schedule — export once, run the script directly after
+// Monitor a page on a schedule - export once, run the script directly after
 const result = await agent.run({
   prompt: 'Track the price of RTX 5090 on Newegg, Best Buy, and Amazon',
   exportSkill: true,

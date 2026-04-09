@@ -18,14 +18,14 @@ Each layer builds on the one below it. Start at the top for a ready-to-use app, 
 
 | Layer | Description | Get started |
 |:---:|---|---|
-| [**Next.js Template**](./agent-templates/next/) | Chat UI, streaming, skills, sub-agents, structured output | `firecrawl-agent init -t next` |
-| [**Express Template**](./agent-templates/express/) | API server with skills, sub-agents, structured output | `firecrawl-agent init -t express` |
+| [**Next.js Template**](./agent-templates/next/) | Chat UI, streaming, Skills, Subagents, structured output | `firecrawl-agent init -t next` |
+| [**Express Template**](./agent-templates/express/) | API server with Skills, Subagents, structured output | `firecrawl-agent init -t express` |
 | ↑ | | |
-| [**Agent Core**](./agent-core/) | Orchestrator, skills, sub-agents, structured output | `firecrawl-agent init -t library` |
+| [**Agent Core**](./agent-core/) | Orchestrator, Skills, Subagents, structured output | `firecrawl-agent init -t library` |
 | ↑ | | |
-| [**Firecrawl AI SDK**](https://npmjs.com/package/firecrawl-aisdk) | search, scrape, interact as Vercel AI SDK tools | `npm i firecrawl-aisdk` |
+| [**Firecrawl AI SDK**](https://npmjs.com/package/firecrawl-aisdk) | Search, Scrape, Interact as Vercel AI SDK tools | `npm i firecrawl-aisdk` |
 | ↑ | | |
-| [**Firecrawl SDK**](https://npmjs.com/package/firecrawl) | Core API client for scrape, search, crawl, extract | `npm i firecrawl` |
+| [**Firecrawl SDK**](https://npmjs.com/package/firecrawl) | Core API client for Scrape, Search, Crawl, Extract | `npm i firecrawl` |
 | ↑ | | |
 | [**API Reference**](https://docs.firecrawl.dev/api-reference/v2-introduction) | REST API, use from any language | [docs.firecrawl.dev](https://docs.firecrawl.dev) |
 
@@ -35,7 +35,7 @@ Each layer builds on the one below it. Start at the top for a ready-to-use app, 
 |---|---|
 | Next.js | [Full template](./agent-templates/next/) |
 | Express | [API server](./agent-templates/express/) |
-| Agent Core | [Basic](./agent-core/examples/1-basic.ts) · [Structured output](./agent-core/examples/2-structured-output.ts) · [Parallel sub-agents](./agent-core/examples/3-parallel-subagents.ts) · [With skills](./agent-core/examples/4-with-skills.ts) · [Streaming](./agent-core/examples/5-streaming.ts) |
+| Agent Core | [Basic](./agent-core/examples/1-basic.ts) · [Structured output](./agent-core/examples/2-structured-output.ts) · [Parallel Subagents](./agent-core/examples/3-parallel-subagents.ts) · [With Skills](./agent-core/examples/4-with-skills.ts) · [Streaming](./agent-core/examples/5-streaming.ts) |
 | Firecrawl AI SDK | [npmjs.com/package/firecrawl-aisdk](https://npmjs.com/package/firecrawl-aisdk) |
 
 ## Skills
@@ -45,7 +45,7 @@ Skills are reusable SKILL.md files that teach the agent domain-specific procedur
 ```
 agent-core/src/skills/definitions/
   e-commerce/
-    SKILL.md          # procedure: how to extract products, handle pagination
+    SKILL.md          # procedure: how to Extract products, handle pagination
   deep-research/
     SKILL.md          # procedure: multi-source research with fact-checking
   structured-extraction/
@@ -73,22 +73,22 @@ category: E-commerce
 - Keep going until you have all the data
 ```
 
-The agent loads skills on demand via the `load_skill` tool. You can also pass `skills: ["e-commerce"]` in the run params to pre-load specific skills.
+The agent loads Skills on demand via the `load_skill` tool. You can also pass `skills: ["e-commerce"]` in the run params to pre-load specific Skills.
 
 ## How it works
 
 The agent combines web tools with an AI model in a loop - it plans, acts, observes, and repeats until the task is done.
 
-- **Tools** - search, scrape, interact (browser automation). Powered by [firecrawl-aisdk](https://www.npmjs.com/package/firecrawl-aisdk).
+- **Tools** - Search, Scrape, Interact (browser automation). Powered by [firecrawl-aisdk](https://www.npmjs.com/package/firecrawl-aisdk).
 - **Skills** - reusable SKILL.md playbooks. Auto-discovered from `agent-core/src/skills/definitions/`.
-- **Sub-agents** - parallel workers for independent tasks. The orchestrator spawns them dynamically.
+- **Subagents** - parallel workers for independent tasks. The orchestrator spawns them dynamically.
 - **Output** - structured results via `formatOutput` (JSON, CSV, Markdown) and data processing via `bashExec`.
 
 ## Project structure
 
 | Directory | What's inside |
 |-----------|--------------|
-| [`agent-core/`](./agent-core/) | Core agent logic, orchestrator, skills, tools |
+| [`agent-core/`](./agent-core/) | Core agent logic, orchestrator, Skills, tools |
 | [`agent-templates/`](./agent-templates/) | Server templates - [Next.js](./agent-templates/next/), [Express](./agent-templates/express/) |
 
 ## License
