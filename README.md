@@ -8,19 +8,19 @@ AI-powered web research agent built on [Firecrawl](https://firecrawl.dev). Give 
 
 Each layer builds on the one below it.
 
-```
-Hosted /agent endpoint          firecrawl.dev/app/agent
-        |
-Next.js / Express templates     Full apps with UI, streaming, config
-        |
-Agent Core                      Orchestrator, skills, sub-agents, structured output
-        |
-Firecrawl AI SDK                search, scrape, interact as Vercel AI SDK tools
-        |
-Firecrawl SDK                   Core API client (scrape, search, crawl, extract)
-        |
-Firecrawl API                   docs.firecrawl.dev/api-reference
-```
+| Layer | Description |
+|:---:|---|
+| [**Hosted Agent**](https://firecrawl.dev/app/agent) | Use directly on firecrawl.dev, no setup |
+| ↑ | |
+| [**Next.js**](./agent-templates/next/) / [**Express**](./agent-templates/express/) | Full apps with UI, streaming, config |
+| ↑ | |
+| [**Agent Core**](./agent-core/) | Orchestrator, skills, sub-agents, structured output |
+| ↑ | |
+| [**Firecrawl AI SDK**](https://npmjs.com/package/firecrawl-aisdk) | search, scrape, interact as Vercel AI SDK tools |
+| ↑ | |
+| [**Firecrawl SDK**](https://npmjs.com/package/firecrawl) | Core API client for scrape, search, crawl, extract |
+| ↑ | |
+| [**API Reference**](https://docs.firecrawl.dev/api-reference) | REST API, use from any language |
 
 | | |
 |---|---|
