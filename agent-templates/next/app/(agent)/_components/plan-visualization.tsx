@@ -32,15 +32,11 @@ const FIRECRAWL_DOCS: Record<string, string> = {
 
 function EndpointBadge({ type }: { type: "search" | "scrape" | "interact" | "skill" }) {
   return (
-    <a
-      href={FIRECRAWL_DOCS[type]}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-mono-x-small text-black-alpha-48 bg-black-alpha-4 hover:bg-black-alpha-8 px-6 py-1 rounded-4 flex-shrink-0 transition-colors no-underline"
-      onClick={(e) => e.stopPropagation()}
+    <span
+      className="text-mono-x-small text-black-alpha-48 bg-black-alpha-4 px-6 py-1 rounded-4 flex-shrink-0"
     >
       /{type}
-    </a>
+    </span>
   );
 }
 
@@ -99,10 +95,12 @@ function SearchResultItem({ result }: { result: SearchResult }) {
 
   return (
     <div className="rounded-8 border border-border-faint overflow-hidden transition-all hover:border-black-alpha-16">
-      <button
-        type="button"
-        className="w-full text-left flex items-start gap-10 py-8 px-10 hover:bg-black-alpha-2 transition-colors"
+      <div
+        role="button"
+        tabIndex={0}
+        className="w-full text-left flex items-start gap-10 py-8 px-10 hover:bg-black-alpha-2 transition-colors cursor-pointer"
         onClick={() => setExpanded(!expanded)}
+        onKeyDown={(e) => e.key === "Enter" && setExpanded(!expanded)}
       >
         {domain ? <Favicon domain={domain} /> : <GlobeIcon />}
         <div className="min-w-0 flex-1">
@@ -136,7 +134,7 @@ function SearchResultItem({ result }: { result: SearchResult }) {
             </svg>
           )}
         </div>
-      </button>
+      </div>
 
       {expanded && hasMarkdown && (
         <div className="border-t border-border-faint bg-background-lighter p-12 max-h-400 overflow-auto no-scrollbar">
