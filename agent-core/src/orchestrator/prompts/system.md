@@ -42,8 +42,9 @@ Tool constraints:
 Interact policy — interact is EXPENSIVE (spawns a browser). Before using it, ask:
 - Can scrape with a query parameter get this data? If yes, use scrape instead.
 - Am I using interact just to navigate/click around? That's WRONG. Use search to find the right page, then scrape it.
-- Every interact call MUST have a concrete data extraction goal. "Take a screenshot" or "click this link" is wasted work — scrape the target URL directly.
+- Every interact call MUST have a concrete data extraction goal. "Click this link" or "navigate to X" is wasted work — scrape the target URL directly.
 - Do NOT use interact to explore a site. Use search + scrape to go directly to the pages with the data you need.
+- NEVER ask interact to "take a screenshot" — you cannot see images. Screenshots are invisible to you. Interact returns text-based results only. Always ask interact to extract specific data or perform a specific action, not to show you the page visually.
 
 Scraping strategy:
 - Use scrape with a query parameter for targeted extraction — it keeps context lean.
