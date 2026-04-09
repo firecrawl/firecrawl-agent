@@ -10,7 +10,7 @@ AI-powered web research agent built on [Firecrawl](https://firecrawl.dev). Give 
 |---|---|
 | **[Next.js Template](./agent-templates/next/)** - Chat UI, streaming, skills, sub-agents, structured output | `firecrawl-agent init -t next` |
 | **[Express Template](./agent-templates/express/)** - API server with skills, sub-agents, structured output | `firecrawl-agent init -t express` |
-| **[Agent Core](./agent-core/)** - Orchestrator, skills, sub-agents, structured output as a library | `npm i @firecrawl/agent-core` |
+| **[Agent Core](./agent-core/)** - Orchestrator, skills, sub-agents, structured output as a library | Included in templates, or [use directly](./agent-core/) |
 | **[Firecrawl AI SDK](https://npmjs.com/package/firecrawl-aisdk)** - search, scrape, interact as Vercel AI SDK tools | `npm i firecrawl-aisdk` |
 
 ---
