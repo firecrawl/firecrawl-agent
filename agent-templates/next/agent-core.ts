@@ -1,4 +1,3 @@
-// Re-export from the local agent-core folder.
-// In the repo this is a symlink to ../../agent-core.
-// In scaffolded projects it's a copied folder.
+// Re-export from the vendored agent-core folder (copy of ../../agent-core).
+// Refresh: from repo root, `node .internal/scripts/sync-agent-core.mjs`
 export * from "./agent-core/src";

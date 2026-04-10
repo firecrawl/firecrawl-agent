@@ -123,7 +123,21 @@
 [data-streamdown="mermaid-block"] > div:first-child {
   padding: 0.25rem 0.5rem !important;
   height: auto !important;
-  min-height: 0 !important;
+  /* Streamdown uses h-8 (=32px in default Tailwind); this theme maps h-8 to 8px, so force readable header height */
+  min-height: 2rem !important;
+}
+/*
+ * Mermaid actions reuse the code-block pattern: sticky + negative margin pulls the toolbar over the block.
+ * With this project's px-based spacing scale, that overlaps the diagram; keep toolbar in normal flow.
+ */
+[data-streamdown="mermaid-block"] > div.pointer-events-none.sticky {
+  position: relative !important;
+  top: auto !important;
+  margin-top: 0 !important;
+  margin-bottom: 0.125rem !important;
+  min-height: 2.25rem !important;
+  height: auto !important;
+  align-items: center !important;
 }
 /* Let mermaid SVGs grow to fit their content */
 [data-streamdown="mermaid-block"] > div:not([data-streamdown]) svg {

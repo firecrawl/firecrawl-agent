@@ -4,7 +4,7 @@ import { discoverSkills, resolveModel } from "@/agent-core";
 import { getTaskModel } from "@agent/_config";
 import { getProviderApiKeys, hydrateModelConfig } from "@agent/_lib/config/keys";
 
-export const maxDuration = 800;
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
   const { prompt, config } = (await req.json()) as {
