@@ -1,10 +1,10 @@
-import { generateText, stepCountIs, ToolLoopAgent } from "ai";
+import { generateText, stepCountIs, ToolLoopAgent, type ToolSet } from "ai";
 import { resolveModel, formatOutput, bashExec, createSkillTools, discoverSkills, buildFirecrawlToolkit } from "@/agent-core";
 import { getTaskModel } from "@agent/_config";
 import { getFirecrawlKey, getProviderApiKeys, hydrateModelConfig } from "@agent/_lib/config/keys";
 import type { ModelConfig } from "@/agent-core";
 
-export const maxDuration = 800;
+export const maxDuration = 300;
 
 const DEFAULT_MAX_STEPS = 50;
 const MAX_STEPS_LIMIT = 200;
@@ -108,7 +108,7 @@ export async function POST(req: Request) {
       ...skillTools,
       formatOutput,
       bashExec,
-    };
+    } as ToolSet;
 
     const agent = new ToolLoopAgent({
       model,

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "next build --webpack",
+    "build": "node scripts/verify-agent-core.mjs && next build --webpack",
     "start": "next start",
     "lint": "next lint"
   },
@@ -44,8 +44,11 @@
     "class-variance-authority": "^0.7.0",
     "classnames": "^2.5.1",
     "clsx": "^2.1.0",
+    "firecrawl-aisdk": "^0.12.0",
     "framer-motion": "^11.1.7",
     "geist": "^1.4.2",
+    "gray-matter": "^4.0.3",
+    "just-bash": "^2.14.0",
     "lucide-react": "^0.539.0",
     "motion": "^12.20.2",
     "next": "^16.2.1",
@@ -62,7 +65,8 @@
     "undici": "^7.24.6",
     "vega": "^6.2.0",
     "vega-embed": "^7.1.0",
-    "vega-lite": "^6.4.2"
+    "vega-lite": "^6.4.2",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.4",

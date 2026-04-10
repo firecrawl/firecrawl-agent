@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback } from "react";
+import {
+  use,
+  useState,
+  useMemo,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+} from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import type { AgentConfig, ModelConfig } from "@/agent-core-types";
@@ -614,7 +622,16 @@ function ModelDropdown({
   );
 }
 
-export default function AgentPage() {
+/** Next.js 16 passes `params` / `searchParams` as Promises; unwrap so DevTools / runtime don't enumerate Promises (sync-dynamic-apis). */
+type AgentPageProps = {
+  params: Promise<Record<string, string | string[]>>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default function AgentPage(props: AgentPageProps) {
+  use(props.params);
+  use(props.searchParams);
+
   const [config, setConfig] = useState<AgentConfig>(defaultConfig);
   const modelPreferenceLoaded = true; // Model always comes from _config.ts, no localStorage
   const typingPlaceholder = useTypewriter(PLACEHOLDER_PHRASES);

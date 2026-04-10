@@ -120,3 +120,20 @@ firecrawl-agent deploy -p vercel    # generates vercel.json
 firecrawl-agent deploy -p railway   # generates railway.toml
 firecrawl-agent deploy -p docker    # generates Dockerfile
 ```
+
+### Vercel / `agent-core`
+
+This app vendors **`agent-core/`** (a copy of the shared package). Imports go through `agent-core.ts` → `./agent-core/src`.
+
+**Refresh the copy** after upstream `agent-core` changes (from monorepo root):
+
+```bash
+# from firecrawl-agent repo root
+node .internal/scripts/sync-agent-core.mjs
+# optional: preview under /tmp only
+node .internal/scripts/sync-agent-core.mjs --tmp
+```
+
+**Standalone Git repo:** commit the `agent-core/` directory as part of your project (run the sync script once against upstream, or copy the folder).
+
+The build runs `node scripts/verify-agent-core.mjs` first so a missing `agent-core` fails with a clear message.

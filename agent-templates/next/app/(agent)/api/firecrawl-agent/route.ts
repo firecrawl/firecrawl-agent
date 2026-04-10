@@ -1,6 +1,6 @@
 import { getFirecrawlKey } from "@agent/_lib/config/keys";
 
-export const maxDuration = 800;
+export const maxDuration = 300;
 
 const FIRECRAWL_API_BASE = "https://api.firecrawl.dev/v2";
 

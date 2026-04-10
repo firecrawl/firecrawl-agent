@@ -39,6 +39,9 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "agent-core/tsup.config.ts",
+    "agent-core/**/*.test.ts",
+    "agent-core/examples"
   ]
 }
