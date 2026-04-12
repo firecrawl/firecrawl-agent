@@ -6,6 +6,13 @@ const nextConfig: NextConfig = {
     "just-bash",
     "@mongodb-js/zstd",
     "@agentclientprotocol/sdk",
+    "deepagents",
+    "langchain",
+    "@langchain/core",
+    "@langchain/anthropic",
+    "@langchain/openai",
+    "@langchain/google-genai",
+    "@langchain/langgraph",
   ],
   webpack: (config, { isServer }) => {
     if (isServer) {

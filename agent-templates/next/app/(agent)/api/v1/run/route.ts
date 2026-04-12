@@ -1,36 +1,23 @@
-import { createAgent } from "@/agent-core";
-import { getFirecrawlKey, getProviderApiKeys, hydrateModelConfig } from "@agent/_lib/config/keys";
-import { config as globalConfig, getTaskModel } from "@agent/_config";
-import type { RunParams, ModelConfig } from "@/agent-core";
-import { loadAppSections } from "@/prompts/loader";
+import { createFirecrawlAgent, toResponse } from "@/agent-core";
+import { getFirecrawlKey, getProviderApiKeys } from "@agent/_lib/config/keys";
 
 export const maxDuration = 300;
-
-const DEFAULT_MAX_STEPS = 50;
-const MAX_STEPS_LIMIT = 200;
 
 /**
  * POST /api/v1/run
  *
- * Consolidated endpoint for all agent operations.
- * Replaces /api/query and /api/extract with a single interface.
+ * Consolidated agent endpoint. Body shape:
+ *   { prompt: string, stream?: boolean, model?: string | ModelConfig }
  *
- * See agent-core/openapi.yaml for the full spec.
+ * Streaming returns SSE `data: {...AgentEvent}\n\n` events.
+ * Non-streaming returns `{ text, messages }`.
  */
 export async function POST(req: Request) {
   const body = await req.json();
-  const {
-    prompt,
-    stream = false,
-    model: modelOverride,
-    subAgentModel: subAgentModelOverride,
-    maxSteps: rawMaxSteps,
-    ...rest
-  } = body as RunParams & {
+  const { prompt, stream = false, model, ...rest } = body as {
+    prompt: string;
     stream?: boolean;
-    model?: ModelConfig;
-    subAgentModel?: ModelConfig;
-    maxSteps?: number;
+    model?: string | { provider: string; model: string };
   };
 
   if (!prompt) {
@@ -40,83 +27,30 @@ export async function POST(req: Request) {
   const firecrawlApiKey = getFirecrawlKey();
   if (!firecrawlApiKey) {
     return Response.json(
-      { error: "FIRECRAWL_API_KEY is not configured." },
+      { error: "FIRECRAWL_API_KEY is missing. Set it in .env.local or Settings." },
       { status: 500 },
     );
   }
 
-  const maxSteps = Math.min(
-    Math.max(1, rawMaxSteps ?? DEFAULT_MAX_STEPS),
-    MAX_STEPS_LIMIT,
-  );
-
-  const queryDefault = getTaskModel("query");
-  const model = hydrateModelConfig(modelOverride ?? {
-    provider: queryDefault.provider,
-    model: queryDefault.model,
-  });
-
-  const apiKeys = getProviderApiKeys();
-
-  const appSections = await loadAppSections({
-    hasSchema: !!(rest.schema || rest.columns),
-    schema: rest.schema as Record<string, unknown> | undefined,
-    columns: rest.columns,
-  });
-
-  const agent = createAgent({
-    firecrawlApiKey,
-    model: model as ModelConfig,
-    subAgentModel: subAgentModelOverride ? hydrateModelConfig(subAgentModelOverride as ModelConfig) : undefined,
-    apiKeys,
-    maxSteps,
-    maxWorkers: globalConfig.maxWorkers,
-    workerMaxSteps: globalConfig.workerMaxSteps,
-    appSections,
-  });
-
-  const runParams: RunParams = {
-    prompt,
-    ...rest,
-  };
-
   try {
-    if (stream) {
-      const encoder = new TextEncoder();
-      const readable = new ReadableStream({
-        async start(controller) {
-          const send = (data: Record<string, unknown>) => {
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify(data)}\n\n`),
-            );
-          };
-          try {
-            for await (const event of agent.stream(runParams)) {
-              send(event as unknown as Record<string, unknown>);
-            }
-          } catch (err) {
-            send({
-              type: "error",
-              error: err instanceof Error ? err.message : String(err),
-            });
-          } finally {
-            controller.close();
-          }
-        },
-      });
+    const agent = await createFirecrawlAgent({
+      firecrawlApiKey,
+      model: model ?? "anthropic:claude-sonnet-4-6",
+      apiKeys: getProviderApiKeys(),
+    });
 
-      return new Response(readable, {
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        },
-      });
+    const input = { messages: [{ role: "user" as const, content: prompt }] };
+
+    if (stream) {
+      return toResponse(agent, input);
     }
 
-    // Non-streaming
-    const result = await agent.run(runParams);
-    return Response.json(result);
+    const result = await agent.invoke(input, rest as any);
+    const last = result.messages[result.messages.length - 1];
+    return Response.json({
+      text: typeof last.content === "string" ? last.content : JSON.stringify(last.content),
+      messages: result.messages,
+    });
   } catch (err) {
     return Response.json(
       { error: err instanceof Error ? err.message : String(err) },
