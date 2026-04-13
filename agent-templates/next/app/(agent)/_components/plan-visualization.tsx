@@ -1670,7 +1670,11 @@ interface SubagentStep {
   toolResults: { toolName: string; output: Record<string, unknown> }[];
 }
 
-function extractTimeline(messages: UIMessage[]): { items: TimelineItem[]; subagentText: Record<string, string> } {
+function extractTimeline(messages: UIMessage[]): {
+  items: TimelineItem[];
+  subagentText: Record<string, string>;
+  interactLiveView: Record<string, { liveViewUrl: string; interactiveLiveViewUrl: string | null; url: string }>;
+} {
   const items: TimelineItem[] = [];
   // `itemByToolCallId` and `toolCallParent` are populated as we walk the
   // messages: the server emits `data-subagent-map` parts that tell us which
@@ -1682,6 +1686,10 @@ function extractTimeline(messages: UIMessage[]): { items: TimelineItem[]; subage
   // parts emitted by the server. This is the authoritative sub-agent narration
   // — bridge-side text deltas for sub-agent messages are stripped server-side.
   const subagentText: Record<string, string> = {};
+  // scrapeId → latest live-view URL, emitted from the server via
+  // `data-interact-liveview` parts as soon as Firecrawl's `onSessionStart`
+  // callback fires. Used to pin iframes inside interact tiles early.
+  const interactLiveView: Record<string, { liveViewUrl: string; interactiveLiveViewUrl: string | null; url: string }> = {};
 
   for (const msg of messages) {
     if (msg.role !== "assistant") continue;
@@ -1700,6 +1708,18 @@ function extractTimeline(messages: UIMessage[]): { items: TimelineItem[]; subage
         const d = (part as { data?: { parentId?: string; text?: string } }).data;
         if (d?.parentId && typeof d.text === "string") {
           subagentText[d.parentId] = d.text;
+        }
+        continue;
+      }
+      // Server-side live-view URL for an interact session, keyed by scrapeId.
+      if ((part as { type?: string }).type === "data-interact-liveview") {
+        const d = (part as { data?: { scrapeId?: string; liveViewUrl?: string; interactiveLiveViewUrl?: string | null; url?: string } }).data;
+        if (d?.scrapeId && d.liveViewUrl) {
+          interactLiveView[d.scrapeId] = {
+            liveViewUrl: d.liveViewUrl,
+            interactiveLiveViewUrl: d.interactiveLiveViewUrl ?? null,
+            url: d.url ?? "",
+          };
         }
         continue;
       }
@@ -2169,7 +2189,20 @@ function extractTimeline(messages: UIMessage[]): { items: TimelineItem[]; subage
     }
   }
 
-  return { items: grouped, subagentText };
+  // Early-bind live-view URLs onto interact tiles by scrapeId. The server
+  // emits these via the Firecrawl SDK's `onSessionStart` callback AS SOON AS
+  // the browser session attaches — well before the tool's execute() resolves.
+  // Walk BOTH top-level items and nested subagentChildren.
+  const bindLiveView = (item: TimelineItem) => {
+    if (item.type === "interact" && item.scrapeId && interactLiveView[item.scrapeId]) {
+      const v = interactLiveView[item.scrapeId];
+      if (!item.liveViewUrl) item.liveViewUrl = v.liveViewUrl;
+    }
+    if (item.subagentChildren) for (const c of item.subagentChildren) bindLiveView(c);
+  };
+  for (const g of grouped) bindLiveView(g);
+
+  return { items: grouped, subagentText, interactLiveView };
 }
 
 // --- Main ---

@@ -50,7 +50,7 @@
     "classnames": "^2.5.1",
     "clsx": "^2.1.0",
     "deepagents": "^1.9.0",
-    "firecrawl-aisdk": "0.12.0-beta.0",
+    "firecrawl-aisdk": "0.12.0-beta.2",
     "framer-motion": "^11.1.7",
     "geist": "^1.4.2",
     "gray-matter": "^4.0.3",
