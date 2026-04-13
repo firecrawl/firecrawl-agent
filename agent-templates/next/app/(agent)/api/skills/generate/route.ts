@@ -10,14 +10,14 @@ export async function POST(req: Request) {
     return Response.json({ error: "SKILL.md generation is disabled in app/(agent)/_config.ts" }, { status: 404 });
   }
 
-  let body: { name: string; messages: unknown[]; prompt: string };
+  let body: { name: string; messages: unknown[]; prompt: string; schema?: Record<string, unknown> };
   try {
     body = await req.json();
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { name, messages, prompt } = body;
+  const { name, messages, prompt, schema } = body;
 
   const slug = (name ?? "")
     .toLowerCase()
@@ -80,7 +80,9 @@ One paragraph. Describe the general procedure, not the specific instance.
 (Imperative mood. Include actual query strings and URL patterns from the session.)
 
 ## Data to Extract
-Expected fields and format.
+Expected fields and format. If a schema is provided below, include it verbatim
+in a fenced \`\`\`json code block under this section so the skill can be replayed
+with the same structure.
 
 ## Gotchas
 - What method was used and why (scrape+query vs interact+click)
@@ -90,7 +92,12 @@ Expected fields and format.
 - "example with specific values filled in"
 
 Output ONLY the SKILL.md content. No extra commentary.`,
-      prompt: `Original task: ${prompt}\n\nSkill name: ${name}\n\nSession transcript:\n${transcript.slice(0, 8000)}`,
+      prompt: [
+        `Original task: ${prompt}`,
+        `Skill name: ${name}`,
+        schema ? `Schema used (include this JSON verbatim in ## Data to Extract):\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\`` : null,
+        `Session transcript:\n${transcript.slice(0, 8000)}`,
+      ].filter(Boolean).join("\n\n"),
       maxOutputTokens: 2000,
     });
 

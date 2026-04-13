@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import type { UIMessage } from "ai";
 import { cn } from "@/utils/cn";
-import StreamdownBlock from "@/components/shared/streamdown-block";
 import { codeToHtml } from "shiki/bundle/web";
 
 const shikiLangMap: Record<string, string> = {
@@ -50,6 +49,16 @@ function HighlightedCode({ code, lang }: { code: string; lang: string }) {
 
 function isToolPart(part: { type: string }): boolean {
   return part.type.startsWith("tool-") || part.type === "dynamic-tool";
+}
+
+// Same as plan-visualization: LangChain ToolMessage content is a string of
+// JSON-stringified tool output (from our adapter). Parse when possible.
+function normalizeToolOutput(raw: unknown): unknown {
+  if (typeof raw !== "string") return raw;
+  const trimmed = raw.trim();
+  if (!trimmed) return raw;
+  if (trimmed[0] !== "{" && trimmed[0] !== "[") return raw;
+  try { return JSON.parse(trimmed); } catch { return raw; }
 }
 
 interface FormattedOutput {
@@ -131,27 +140,26 @@ function extractFormattedOutput(messages: UIMessage[]): FormattedOutput & { stre
         if (toolName !== "formatOutput") continue;
 
         const state = (p.state ?? "") as string;
-        const isComplete = state === "output-available" || state === "result";
+        const rawOutput = normalizeToolOutput(p.output ?? p.result);
+        const output = (rawOutput && typeof rawOutput === "object")
+          ? rawOutput as { format?: string; content?: string }
+          : undefined;
+        // Treat a parseable, non-empty output object as complete — the bridge may
+        // not set state="output-available" for every run but the output is there.
+        const isComplete = state === "output-available" || state === "result" || !!(output?.format && output?.content);
 
-        // Complete: use the final output
-        if (isComplete && p.output) {
-          const output = p.output as { format: string; content: string };
-          if (output.format && output.content) {
-            return { format: output.format as FormattedOutput["format"], content: output.content, streaming: false };
-          }
+        if (isComplete && output?.format && output?.content) {
+          return { format: output.format as FormattedOutput["format"], content: output.content, streaming: false };
         }
 
-        // Still streaming: use the tool input data as a preview
-        if (!isComplete) {
-          const input = (p.input ?? p.args ?? {}) as Record<string, unknown>;
-          const format = (input.format as string) ?? "json";
-          let content = "";
-          if (input.data !== undefined) {
-            content = typeof input.data === "string" ? input.data : JSON.stringify(input.data, null, 2);
-          }
-          // Show streaming state even before data arrives
-          return { format: format as FormattedOutput["format"], content: content || "...", streaming: true };
+        // Still streaming: use the tool input as preview
+        const input = (p.input ?? p.args ?? {}) as Record<string, unknown>;
+        const format = (input.format as string) ?? output?.format ?? "json";
+        let content = output?.content ?? "";
+        if (!content && input.data !== undefined) {
+          content = typeof input.data === "string" ? input.data : JSON.stringify(input.data, null, 2);
         }
+        return { format: format as FormattedOutput["format"], content: content || "...", streaming: true };
       }
     }
   }
@@ -290,10 +298,11 @@ function CsvTable({ data }: { data: string }) {
 interface SkillPanelProps {
   messages: UIMessage[];
   prompt?: string;
+  schema?: Record<string, unknown>;
   onClose: () => void;
 }
 
-function SkillPanel({ messages, prompt, onClose }: SkillPanelProps) {
+function SkillPanel({ messages, prompt, schema, onClose }: SkillPanelProps) {
   const [skillName, setSkillName] = useState(() => {
     const slug = (prompt ?? "skill")
       .toLowerCase()
@@ -336,7 +345,7 @@ function SkillPanel({ messages, prompt, onClose }: SkillPanelProps) {
       const res = await fetch("/api/skills/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: skillName, messages: transcript, prompt: prompt ?? "" }),
+        body: JSON.stringify({ name: skillName, messages: transcript, prompt: prompt ?? "", schema }),
       });
 
       if (!res.ok) {
@@ -383,7 +392,7 @@ function SkillPanel({ messages, prompt, onClose }: SkillPanelProps) {
     } finally {
       setGenerating(false);
     }
-  }, [messages, prompt, skillName]);
+  }, [messages, prompt, skillName, schema]);
 
   const downloadSkill = useCallback(() => {
     if (!content) return;
@@ -570,7 +579,7 @@ export default function ArtifactPanel({ messages, isRunning, onRequestFormat, on
 
 
 
-  if (showSkill) return <SkillPanel messages={messages} prompt={prompt} onClose={() => setShowSkill(false)} />;
+  if (showSkill) return <SkillPanel messages={messages} prompt={prompt} schema={codeSchema} onClose={() => setShowSkill(false)} />;
 
   if (!formatted) return null;
 
@@ -579,11 +588,7 @@ export default function ArtifactPanel({ messages, isRunning, onRequestFormat, on
 
   const isJson = fmt === "json";
   const isCsv = fmt === "csv";
-  const ext = isJson ? "json" : isCsv ? "csv" : "md";
-  const label = isJson ? "JSON" : isCsv ? "CSV" : "Markdown";
-  const sizeStr = formatted.content.length > 1024
-    ? `${(formatted.content.length / 1024).toFixed(1)} KB`
-    : `${formatted.content.length} B`;
+  const ext = isJson ? "json" : "csv";
 
   return (
     <div className="h-full border-l border-border-faint bg-background-base flex flex-col flex-shrink-0 w-full md:w-[50%] transition-all duration-200 overflow-hidden">
@@ -599,7 +604,6 @@ export default function ArtifactPanel({ messages, isRunning, onRequestFormat, on
             {([
               { id: "JSON", active: isJson },
               { id: "CSV", active: isCsv },
-              { id: "Markdown", active: !isJson && !isCsv },
             ] as const).map((f) => (
               <button
                 key={f.id}
@@ -715,9 +719,10 @@ export default function ArtifactPanel({ messages, isRunning, onRequestFormat, on
         )}
         {isCsv && <CsvTable data={formatted.content} />}
         {!isJson && !isCsv && (
-          <div className="p-14">
-            <StreamdownBlock>{formatted.content}</StreamdownBlock>
-          </div>
+          // Agent returned format "text" or markdown despite the prompt — show
+          // as raw preformatted text so the user at least sees it, but style it
+          // as an edge case rather than a blessed format.
+          <pre className="text-[13px] text-accent-black whitespace-pre-wrap p-14">{formatted.content}</pre>
         )}
       </div>
 

@@ -1,15 +1,80 @@
-import { createAgentUIStreamResponse, type UIMessage } from "ai";
+import { toBaseMessages, toUIMessageStream } from "@ai-sdk/langchain";
+import { AIMessage, ToolMessage, type BaseMessage, isAIMessage } from "@langchain/core/messages";
+import { createUIMessageStream, createUIMessageStreamResponse, type UIMessage } from "ai";
 import { createAgent } from "@/agent-core";
 import type { AgentConfig } from "@/agent-core";
 import { getFirecrawlKey, getProviderApiKeys, hydrateModelConfig } from "@agent/_lib/config/keys";
 import { config as globalConfig } from "@agent/_config";
 import { loadAppSections } from "@/prompts/loader";
 
+/**
+ * Anthropic rejects tool_use blocks whose `input` is missing (required field).
+ * On turn 2+ the UIMessage → LangChain conversion can yield AIMessage.tool_calls
+ * with undefined args (happens when a prior stream was interrupted mid-tool-call
+ * or when the bridge can't reconstruct args from persisted UI state). Backfill
+ * args to {} and drop any tool_calls / ToolMessages that are orphaned.
+ *
+ * See: https://docs.langchain.com/oss/javascript/langchain/errors/INVALID_TOOL_RESULTS/
+ */
+function sanitizeToolCallHistory(messages: BaseMessage[]): BaseMessage[] {
+  const repaired = messages.map((m) => {
+    if (isAIMessage(m) && Array.isArray(m.tool_calls) && m.tool_calls.length > 0) {
+      const fixed = m.tool_calls.map((tc) => ({
+        id: tc.id,
+        name: tc.name,
+        type: "tool_call" as const,
+        args: tc.args ?? {},
+      }));
+      return new AIMessage({
+        content: m.content ?? "",
+        tool_calls: fixed,
+        additional_kwargs: m.additional_kwargs,
+        response_metadata: m.response_metadata,
+        id: m.id,
+      });
+    }
+    return m;
+  });
+
+  // Drop orphan ToolMessages (no matching tool_call) and AIMessages whose
+  // tool_calls have no paired ToolMessage — Anthropic validates 1:1 pairing.
+  const aiCallIds = new Set<string>();
+  for (const m of repaired) {
+    if (isAIMessage(m) && Array.isArray(m.tool_calls)) {
+      for (const tc of m.tool_calls) if (tc.id) aiCallIds.add(tc.id);
+    }
+  }
+  const toolMsgIds = new Set<string>();
+  for (const m of repaired) {
+    if (m instanceof ToolMessage && m.tool_call_id) toolMsgIds.add(m.tool_call_id);
+  }
+
+  return repaired.filter((m) => {
+    if (m instanceof ToolMessage) return !m.tool_call_id || aiCallIds.has(m.tool_call_id);
+    if (isAIMessage(m) && Array.isArray(m.tool_calls) && m.tool_calls.length > 0) {
+      return m.tool_calls.every((tc) => !tc.id || toolMsgIds.has(tc.id));
+    }
+    return true;
+  });
+}
+
 export const maxDuration = 300;
+
+// FirecrawlAgent caches toolkit internally; reuse the instance across requests
+// with the same model/provider config so that toolkit build + model resolution
+// aren't paid on every POST. Key is a stable hash of the fingerprint fields.
+const agentCache = new Map<string, ReturnType<typeof createAgent>>();
+function getCachedAgent(fingerprint: string, factory: () => ReturnType<typeof createAgent>) {
+  const existing = agentCache.get(fingerprint);
+  if (existing) return existing;
+  const fresh = factory();
+  agentCache.set(fingerprint, fresh);
+  return fresh;
+}
 
 export async function POST(req: Request) {
   const { messages, config } = (await req.json()) as {
-    messages: unknown[];
+    messages: UIMessage[];
     config: AgentConfig;
   };
 
@@ -18,31 +83,49 @@ export async function POST(req: Request) {
     return new Response(
       JSON.stringify({
         error:
-          "FIRECRAWL_API_KEY is missing. Set it in .env.local (or your host’s env), or paste it in Settings — then restart dev if you edited the file.",
+          "FIRECRAWL_API_KEY is missing. Set it in .env.local (or your host's env), or paste it in Settings — then restart dev if you edited the file.",
       }),
       { status: 500, headers: { "Content-Type": "application/json" } },
     );
   }
 
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return new Response(
+      JSON.stringify({ error: "No messages in request." }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  const t0 = performance.now();
+  const timings: Record<string, number> = {};
+
   try {
+    const tPromptStart = performance.now();
     const appSections = await loadAppSections({
       hasSchema: !!(config.schema || config.columns),
       schema: config.schema,
       columns: config.columns,
     });
+    timings.loadPrompts = performance.now() - tPromptStart;
 
-    const agent = createAgent({
+    const tAgentStart = performance.now();
+    const modelConf = hydrateModelConfig(config.model);
+    const subAgentConf = config.subAgentModel ? hydrateModelConfig(config.subAgentModel) : undefined;
+    const fingerprint = JSON.stringify({ m: modelConf, s: subAgentConf, a: appSections.length, k: config.maxSteps ?? 0 });
+    const agent = getCachedAgent(fingerprint, () => createAgent({
       firecrawlApiKey,
-      model: hydrateModelConfig(config.model),
-      subAgentModel: config.subAgentModel ? hydrateModelConfig(config.subAgentModel) : undefined,
+      firecrawlOptions: { bash: true },
+      model: modelConf,
+      subAgentModel: subAgentConf,
       apiKeys: getProviderApiKeys(),
       maxSteps: config.maxSteps,
       maxWorkers: globalConfig.maxWorkers,
       workerMaxSteps: globalConfig.workerMaxSteps,
       appSections,
-    });
+    }));
 
-    const orchestrator = await agent.createRawAgent({
+    // Deep Agent = LangGraph runnable with .stream(input, { streamMode }).
+    const rawAgent = await agent.createRawAgent({
       prompt: config.prompt,
       urls: config.urls,
       schema: config.schema,
@@ -52,28 +135,208 @@ export async function POST(req: Request) {
       skillInstructions: config.skillInstructions,
       subAgents: config.subAgents,
     });
+    timings.buildAgent = performance.now() - tAgentStart;
 
-    const uiMessages = messages as UIMessage[];
-    if (!Array.isArray(uiMessages) || uiMessages.length === 0) {
-      return new Response(
-        JSON.stringify({
-          error:
-            "No messages in request. The chat UI must send at least one user message.",
-        }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
-      );
+    // AI SDK UIMessages → LangChain BaseMessages → sanitize → feed into graph.
+    const tMsgStart = performance.now();
+    const langchainMessages = sanitizeToolCallHistory(await toBaseMessages(messages));
+    timings.convertMessages = performance.now() - tMsgStart;
+
+    const tStreamStart = performance.now();
+    // Need BOTH "values" and "messages":
+    // - "messages" streams AIMessageChunk token deltas (live typing effect)
+    // - "values" is what causes the bridge (@ai-sdk/langchain) to emit
+    //   `tool-output-available` / `tool-input-available` events at the end of
+    //   each graph step — without it, tool calls never transition to the
+    //   "complete" state in the UI, so no tiles render at all.
+    //
+    // The duplicate-text stutter we saw with `["values", "messages"]` earlier
+    // is now dampened by our frontend dedupe on `parts` (the AI SDK useChat
+    // merges chunks by toolCallId, and text duplication from values ends up
+    // appending to the same text part, not creating a new one).
+    //
+    // `runState` is a per-request object the agent-core tool shim reads off
+    // `config.configurable`. Initially `dataCollected: false`; flips to true
+    // when a data-gathering tool returns non-empty output. formatOutput refuses
+    // to run while false — prevents the "format called prematurely with stub
+    // data" failure mode at the tool boundary rather than via prompt rules.
+    const runState = { dataCollected: false };
+    // `subgraphs: true` makes sub-agent (task tool) inner events stream through
+    // the parent stream. Without it, only the task tool's final string result
+    // bubbles up — and the UI has no way to show what the sub-agent did. The
+    // tradeoff: the stream now yields `[namespace, mode, data]` 3-tuples
+    // instead of `[mode, data]`, which the @ai-sdk/langchain bridge can't
+    // parse, so we unwrap them below before handing off to the bridge.
+    const rawLangGraphStream = await rawAgent.stream(
+      { messages: langchainMessages },
+      { streamMode: ["values", "messages"], subgraphs: true, configurable: { runState } },
+    );
+
+    // Namespace-aware stream processing.
+    //
+    // LangGraph's `subgraphs: true` gives us 3-tuples `[namespace, mode, data]`
+    // where `namespace[0]` is a graph-internal UUID like `"tools:<uuid>"` —
+    // this is NOT the LLM's tool_call_id (`toolu_*`). The task tool_call_id
+    // that the frontend tracks only lives in ROOT-namespace AIMessageChunks.
+    //
+    // So we build the map in two steps:
+    //  1. Watch root-namespace messages (2-tuples) for `name === "task"` tool
+    //     calls and queue their real `toolu_*` IDs in arrival order.
+    //  2. When a sub-namespace appears for the first time, pop the next
+    //     unclaimed task from the queue and remember `nsKey → parentToolCallId`.
+    //     Every subsequent tool call seen in that sub-namespace gets mapped
+    //     to that parent.
+
+    function collectToolCalls(data: unknown): Array<{ id: string; name: string }> {
+      const out: Array<{ id: string; name: string }> = [];
+      if (!data) return out;
+      const msg = Array.isArray(data) ? data[0] : data;
+      const anyMsg = msg as { tool_calls?: Array<{ id?: string; name?: string }>; tool_call_chunks?: Array<{ id?: string; name?: string }> };
+      for (const tc of anyMsg?.tool_calls ?? []) if (tc.id && tc.name) out.push({ id: tc.id, name: tc.name });
+      for (const tc of anyMsg?.tool_call_chunks ?? []) if (tc.id && tc.name) out.push({ id: tc.id, name: tc.name });
+      const state = data as { messages?: Array<{ tool_calls?: Array<{ id?: string; name?: string }> }> };
+      for (const m of state?.messages ?? []) {
+        for (const tc of m.tool_calls ?? []) if (tc.id && tc.name) out.push({ id: tc.id, name: tc.name });
+      }
+      return out;
     }
 
-    // Must forward client messages: AI SDK validateUIMessages requires a non-empty array.
-    // Omitting them caused AI_TypeValidationError and an empty 500 body (generic client error).
-    return await createAgentUIStreamResponse({
-      // ToolLoopAgent concrete tool map is incompatible with Agent's default generics in strict mode
-      agent: orchestrator as Parameters<typeof createAgentUIStreamResponse>[0]["agent"],
-      uiMessages,
+    const toolCallParent: Record<string, string> = {};
+    const seenNamespaces = new Set<string>();
+    const nsToParent = new Map<string, string>();          // sub-ns → claimed parent toolu_*
+    const nsChildren = new Map<string, Set<string>>();     // sub-ns → child tool_call_ids seen so far
+    const pendingNamespaces: string[] = [];                // FIFO of sub-ns keys awaiting a parent
+    const pendingTasks: string[] = [];                     // FIFO of root task tool_call_ids awaiting a sub-ns
+    const knownTasks = new Set<string>();                  // dedupe root task ids across repeated emissions
+
+    // Match pending namespaces with pending tasks FIFO-style. Retroactively
+    // maps all children that were seen in that namespace BEFORE the parent
+    // was known.
+    function tryAssign() {
+      while (pendingNamespaces.length > 0 && pendingTasks.length > 0) {
+        const nsKey = pendingNamespaces.shift()!;
+        const parentId = pendingTasks.shift()!;
+        nsToParent.set(nsKey, parentId);
+        console.log(`[agent] ns-claim ${nsKey} → parent=${parentId}`);
+        const kids = nsChildren.get(nsKey);
+        if (kids) {
+          for (const childId of kids) {
+            if (!toolCallParent[childId]) {
+              toolCallParent[childId] = parentId;
+              console.log(`[agent] map (retro) child=${childId} parent=${parentId}`);
+            }
+          }
+        }
+      }
+    }
+
+    // A namespace represents a sub-agent run iff any element starts with
+    // "tools:" — that's how Deep Agents/LangGraph tag a spawned subgraph.
+    // Other prefixes like "model_request:" are internal nodes that still
+    // belong to whichever graph they're in.
+    function subAgentNsKey(ns: unknown): string {
+      if (!Array.isArray(ns)) return "";
+      for (const seg of ns) {
+        if (typeof seg === "string" && seg.startsWith("tools:")) return seg;
+      }
+      return "";
+    }
+
+    async function* stripNamespaceAndMap(src: AsyncIterable<unknown>) {
+      for await (const chunk of src) {
+        // With subgraphs: true, every event is `[namespace, mode, data]` —
+        // root events have namespace `[]` (length 0) or only internal nodes
+        // like `["model_request:…"]`.
+        if (Array.isArray(chunk) && chunk.length === 3) {
+          const [ns, mode, data] = chunk;
+          if (!seenNamespaces.has(JSON.stringify(ns))) {
+            seenNamespaces.add(JSON.stringify(ns));
+            console.log(`[agent] ns=${JSON.stringify(ns)} mode=${String(mode)}`);
+          }
+          const nsKey = subAgentNsKey(ns);
+
+          if (nsKey) {
+            // We're inside a sub-agent graph.
+            if (!nsChildren.has(nsKey)) {
+              nsChildren.set(nsKey, new Set());
+              if (!nsToParent.has(nsKey)) pendingNamespaces.push(nsKey);
+              tryAssign();
+            }
+            const kids = nsChildren.get(nsKey)!;
+            for (const tc of collectToolCalls(data)) kids.add(tc.id);
+
+            const parentId = nsToParent.get(nsKey);
+            if (parentId) {
+              for (const tc of collectToolCalls(data)) {
+                if (!toolCallParent[tc.id]) {
+                  toolCallParent[tc.id] = parentId;
+                  console.log(`[agent] map child=${tc.id} (${tc.name}) parent=${parentId}`);
+                }
+              }
+            }
+          } else {
+            // Root-graph event — this is where orchestrator task tool_calls
+            // actually live. Queue them for sub-ns matching.
+            for (const tc of collectToolCalls(data)) {
+              if (tc.name !== "task") continue;
+              if (knownTasks.has(tc.id)) continue;
+              let alreadyAssigned = false;
+              for (const v of nsToParent.values()) { if (v === tc.id) { alreadyAssigned = true; break; } }
+              if (alreadyAssigned) continue;
+              knownTasks.add(tc.id);
+              pendingTasks.push(tc.id);
+              console.log(`[agent] queued task id=${tc.id}`);
+            }
+            tryAssign();
+          }
+
+          yield [mode, data];
+        } else {
+          yield chunk;
+        }
+      }
+    }
+    const stream = stripNamespaceAndMap(rawLangGraphStream as AsyncIterable<unknown>) as unknown as ReadableStream;
+    timings.graphStreamInit = performance.now() - tStreamStart;
+
+    console.log(`[agent] boot ${(performance.now() - t0).toFixed(0)}ms  prompts=${timings.loadPrompts.toFixed(0)}  buildAgent=${timings.buildAgent.toFixed(0)}  convertMsgs=${timings.convertMessages.toFixed(0)}  graphInit=${timings.graphStreamInit.toFixed(0)}  msgsIn=${langchainMessages.length}`);
+
+    // Merge the standard UIMessage stream (text, tool parts) with our own
+    // `data-subagent-map` parts so the UI can nest tool calls under their
+    // parent task even during streaming.
+    return createUIMessageStreamResponse({
+      stream: createUIMessageStream({
+        execute: async ({ writer }) => {
+          const mainStream = toUIMessageStream(stream);
+          // Consume and forward main stream chunks; periodically flush mapping.
+          const reader = mainStream.getReader();
+          let lastMapSize = 0;
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              writer.write(value);
+              // If the wrapped stream recorded new mappings since last flush,
+              // push an updated data-subagent-map part so the client sees them.
+              const size = Object.keys(toolCallParent).length;
+              if (size > lastMapSize) {
+                writer.write({ type: "data-subagent-map", id: "subagent-map", data: { ...toolCallParent } } as never);
+                lastMapSize = size;
+              }
+            }
+            // Final flush in case mappings arrived after the last read.
+            if (Object.keys(toolCallParent).length > lastMapSize) {
+              writer.write({ type: "data-subagent-map", id: "subagent-map", data: { ...toolCallParent } } as never);
+            }
+            console.log(`[agent] stream done. subagent-map size=${Object.keys(toolCallParent).length}`);
+          } finally {
+            reader.releaseLock();
+          }
+        },
+      }),
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unknown error";
+    const message = error instanceof Error ? error.message : "Unknown error";
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

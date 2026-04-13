@@ -224,8 +224,6 @@ function PlusMenu({
   uploads,
   onRemoveUpload,
   onClose,
-  planMode,
-  onTogglePlan,
   schema,
   onSchemaChange,
 }: {
@@ -236,13 +234,11 @@ function PlusMenu({
   uploads: UploadedFile[];
   onRemoveUpload: (i: number) => void;
   onClose: () => void;
-  planMode: boolean;
-  onTogglePlan: () => void;
   schema: Record<string, unknown> | undefined;
   onSchemaChange: (schema: Record<string, unknown> | undefined) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [activePanel, setActivePanel] = useState<"plan" | "upload" | "schema" | "skills" | null>(null);
+  const [activePanel, setActivePanel] = useState<"upload" | "schema" | "skills" | null>(null);
   const [schemaMode, setSchemaMode] = useState<"describe" | "paste">("describe");
   const [schemaDesc, setSchemaDesc] = useState("");
   const [schemaPaste, setSchemaPaste] = useState("");
@@ -278,11 +274,7 @@ function PlusMenu({
 
   const visibleSkills = (skills ?? []).filter((s) => s.category !== "Export");
 
-  const menuItems: { id: "plan" | "schema" | "skills"; label: string; icon: React.ReactNode; badge?: string }[] = [
-    {
-      id: "plan", label: "Plan", badge: planMode ? "on" : undefined,
-      icon: <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" /><rect x="9" y="3" width="6" height="4" rx="1" /><path d="M9 12h6M9 16h4" /></svg>,
-    },
+  const menuItems: { id: "schema" | "skills"; label: string; icon: React.ReactNode; badge?: string }[] = [
     {
       id: "schema", label: "Schema", badge: schema ? "set" : undefined,
       icon: <svg fill="none" height="16" viewBox="0 0 24 24" width="16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H7a2 2 0 00-2 2v5a2 2 0 01-2 2 2 2 0 012 2v5a2 2 0 002 2h1M16 3h1a2 2 0 012 2v5a2 2 0 002 2 2 2 0 00-2 2v5a2 2 0 01-2 2h-1" /></svg>,
@@ -328,24 +320,6 @@ function PlusMenu({
       {/* Right panel */}
       {activePanel && (
         <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
-          {/* Plan */}
-          {activePanel === "plan" && (
-            <div className="p-14 flex flex-col gap-8">
-              <div className="text-label-medium text-accent-black">Plan before running</div>
-              <div className="text-body-small text-black-alpha-48">Generate an execution plan before the agent starts working. Review and approve before any tools are called.</div>
-              <button
-                type="button"
-                className={cn(
-                  "w-full py-8 rounded-8 text-label-small transition-all",
-                  planMode ? "bg-heat-100 text-white" : "bg-black-alpha-4 text-accent-black hover:bg-black-alpha-8",
-                )}
-                onClick={() => { onTogglePlan(); }}
-              >
-                {planMode ? "Enabled" : "Enable"}
-              </button>
-            </div>
-          )}
-
           {/* Upload */}
           {activePanel === "upload" && (
             <div className="p-14 flex flex-col gap-8">
@@ -661,11 +635,6 @@ export default function AgentPage(props: AgentPageProps) {
   const [acpAvailabilityLoaded, setAcpAvailabilityLoaded] = useState(false);
 
   // Model defaults from _config.ts, no localStorage persistence to avoid hydration mismatches
-  const [planMode, setPlanMode] = useState(false);
-  const [planText, setPlanText] = useState<string | null>(null);
-  const [planLoading, setPlanLoading] = useState(false);
-  const [planEditing, setPlanEditing] = useState(false);
-  const [planEditText, setPlanEditText] = useState("");
   const [sparkMode, setSparkMode] = useState(false);
   const [sparkResult, setSparkResult] = useState<{ data: unknown; status: string; creditsUsed?: number } | null>(null);
   const [sparkLoading, setSparkLoading] = useState(false);
@@ -928,26 +897,6 @@ export default function AgentPage(props: AgentPageProps) {
 
   const onRun = () => {
     if (!config.prompt.trim()) return;
-    if (planMode && !planText) {
-      // Generate plan first
-      setPlanLoading(true);
-      fetch("/api/plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: config.prompt, config }),
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          setPlanText(data.plan);
-          setPlanEditText(data.plan);
-          setPlanLoading(false);
-        })
-        .catch(() => {
-          setPlanLoading(false);
-          alert("Failed to generate plan");
-        });
-      return;
-    }
     // Firecrawl Spark models: use /agent API directly
     if (config.model.provider === "firecrawl") {
       setSparkMode(true);
@@ -981,14 +930,8 @@ export default function AgentPage(props: AgentPageProps) {
       return;
     }
 
-    // Execute (with or without plan context)
-    const promptWithPlan = planText
-      ? `Execute this plan:\n\n${planText}\n\nOriginal request: ${config.prompt}`
-      : config.prompt;
-    setPlanText(null);
-    setPlanEditText("");
     setHasSubmitted(true);
-    sendMessage({ text: promptWithPlan });
+    sendMessage({ text: config.prompt });
   };
 
   const mentionSkills = useMemo(() => {
@@ -1143,8 +1086,6 @@ export default function AgentPage(props: AgentPageProps) {
                       setConfig({ ...config, uploads: (config.uploads ?? []).filter((_, idx) => idx !== i) })
                     }
                     onClose={() => setShowPlus(false)}
-                    planMode={planMode}
-                    onTogglePlan={() => { setPlanMode(!planMode); setPlanText(null); setPlanEditText(""); }}
                     schema={config.schema}
                     onSchemaChange={(s) => setConfig({ ...config, schema: s })}
                   />
@@ -1215,117 +1156,26 @@ export default function AgentPage(props: AgentPageProps) {
                 type="button"
                 className={cn(
                   "rounded-8 p-8 transition-all",
-                  config.prompt.trim() && !planLoading
+                  config.prompt.trim()
                     ? "bg-heat-100 hover:bg-[color:var(--heat-90)] text-accent-white active:scale-95"
                     : "bg-black-alpha-8 text-black-alpha-24 cursor-not-allowed",
                 )}
-                disabled={!config.prompt.trim() || planLoading}
+                disabled={!config.prompt.trim()}
                 onClick={onRun}
               >
-                {planLoading ? (
-                  <div className="w-18 h-18 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                ) : (
-                  <svg fill="none" height="18" viewBox="0 0 20 20" width="18">
-                    <path
-                      d="M10 16.875V3.125M4.79163 8.33333L9.99994 3.125L15.2083 8.33333"
-                      stroke="currentColor"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="1.5"
-                    />
-                  </svg>
-                )}
+                <svg fill="none" height="18" viewBox="0 0 20 20" width="18">
+                  <path
+                    d="M10 16.875V3.125M4.79163 8.33333L9.99994 3.125L15.2083 8.33333"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.5"
+                  />
+                </svg>
               </button>
             </div>
           </div>
         </div>
-
-        {/* Plan review */}
-        {planText && (
-          <div
-            className="w-full max-w-640 mt-16 bg-accent-white rounded-12 overflow-hidden"
-            style={{
-              boxShadow:
-                "0px 2px 12px -2px rgba(0,0,0,0.06), 0px 0px 0px 1px rgba(0,0,0,0.06)",
-            }}
-          >
-            <div className="flex items-center justify-between px-16 py-10 border-b border-border-faint">
-              <div className="flex items-center gap-6">
-                <svg fill="none" height="14" viewBox="0 0 24 24" width="14" className="text-heat-100" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
-                  <rect x="9" y="3" width="6" height="4" rx="1" />
-                  <path d="M9 12h6M9 16h4" />
-                </svg>
-                <span className="text-label-medium text-accent-black">Execution Plan</span>
-              </div>
-              <button
-                type="button"
-                className="text-label-small text-black-alpha-40 hover:text-accent-black transition-colors"
-                onClick={() => setPlanEditing(!planEditing)}
-              >
-                {planEditing ? "Preview" : "Edit"}
-              </button>
-            </div>
-
-            <div className="px-16 py-12">
-              {planEditing ? (
-                <textarea
-                  className="w-full bg-transparent text-body-small text-accent-black font-mono focus:outline-none resize-none min-h-[120px]"
-                  value={planEditText}
-                  onChange={(e) => setPlanEditText(e.target.value)}
-                  rows={Math.max(6, planEditText.split("\n").length)}
-                />
-              ) : (
-                <StreamdownBlock>{planEditText || planText}</StreamdownBlock>
-              )}
-            </div>
-
-            <div className="flex items-center gap-6 px-16 py-10 border-t border-border-faint">
-              <button
-                type="button"
-                className="px-14 py-6 rounded-8 text-label-small bg-heat-100 text-white hover:bg-[color:var(--heat-90)] transition-all active:scale-95"
-                onClick={() => {
-                  if (planEditText !== planText) setPlanText(planEditText);
-                  onRun();
-                }}
-              >
-                Run plan
-              </button>
-              <button
-                type="button"
-                className="px-14 py-6 rounded-8 text-label-small text-black-alpha-48 hover:bg-black-alpha-4 transition-all"
-                onClick={() => {
-                  setPlanLoading(true);
-                  fetch("/api/plan", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      prompt: `${config.prompt}\n\nPrevious plan (revise and improve):\n${planEditText}`,
-                      config,
-                    }),
-                  })
-                    .then((r) => r.json())
-                    .then((data) => {
-                      setPlanText(data.plan);
-                      setPlanEditText(data.plan);
-                      setPlanLoading(false);
-                    })
-                    .catch(() => setPlanLoading(false));
-                }}
-                disabled={planLoading}
-              >
-                {planLoading ? "Regenerating..." : "Regenerate"}
-              </button>
-              <button
-                type="button"
-                className="px-14 py-6 rounded-8 text-label-small text-black-alpha-32 hover:text-accent-crimson hover:bg-accent-crimson/5 transition-all ml-auto"
-                onClick={() => { setPlanText(null); setPlanEditText(""); }}
-              >
-                Discard
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Example prompts */}
         <div className="w-full max-w-640 mt-20">
@@ -1504,7 +1354,7 @@ export default function AgentPage(props: AgentPageProps) {
 
         {/* Bottom section */}
         {messages.length > 0 && (
-          <div className="mt-20 pt-16 border-t border-border-faint">
+          <div className="mt-20 pt-16">
             {/* Error display */}
             {chatError && (
               <div className="mb-10 px-14 py-10 rounded-10 border border-accent-crimson/20 bg-accent-crimson/5 text-body-small text-accent-black">
@@ -1632,7 +1482,7 @@ export default function AgentPage(props: AgentPageProps) {
           urls={config.urls}
           initialSkillMode={artifactSkillMode}
           onRequestFormat={(format) => {
-            const skillMap: Record<string, string> = { JSON: "export-json", CSV: "export-csv", Markdown: "export-report" };
+            const skillMap: Record<string, string> = { JSON: "export-json", CSV: "export-csv" };
             const skill = skillMap[format] ?? "export-json";
             sendMessage({ text: `Load the "${skill}" skill and then format all the collected data as ${format}. Follow the skill instructions. Stream the output inline.` });
           }}

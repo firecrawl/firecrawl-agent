@@ -21,10 +21,65 @@ import type {
 // --- AI SDK tool → LangChain tool shim ---
 // `tool({...})` from "ai" is an identity helper at runtime. Extract the three
 // fields Deep Agents needs and wrap with langchain's `tool()`.
+//
+// This wrapper also **gates `formatOutput`**: it reads a per-run `runState`
+// object off `config.configurable` (injected from the request handler) and
+// refuses to run formatOutput until at least one data-collection tool has
+// returned non-empty output. Prompts tell the model this too, but that's
+// advice — this is enforcement. Stops the "formatOutput called prematurely
+// with stub data" failure mode at the source.
+const DATA_TOOLS = new Set([
+  "scrape", "scrapeBash", "search", "interact",
+  "extract", "crawl", "map", "batchScrape",
+]);
+
+function resultHasData(result: unknown): boolean {
+  if (result == null) return false;
+  if (typeof result === "string") return result.trim().length > 0;
+  if (typeof result === "object") {
+    const o = result as Record<string, unknown>;
+    // Explicit error envelope → not data
+    if (typeof o.error === "string" && o.error) return false;
+    // Search/scrape-style shapes — consider data present if any of these
+    // resolve to non-empty.
+    const candidates = [
+      o.markdown, o.content, o.html, o.stdout, o.text, o.data,
+      o.web, o.news, o.images, o.results, o.pages, o.links,
+      o.json, o.extract, o.preview,
+    ];
+    for (const c of candidates) {
+      if (typeof c === "string" && c.trim().length > 0) return true;
+      if (Array.isArray(c) && c.length > 0) return true;
+      if (c && typeof c === "object" && Object.keys(c as object).length > 0) return true;
+    }
+    // Fallback: any non-metadata key means something came back
+    const META = new Set(["creditsUsed", "status", "statusCode", "scrapeId", "cacheState", "cachedAt", "proxyUsed", "url"]);
+    return Object.keys(o).some((k) => !META.has(k));
+  }
+  return true;
+}
+
 function aiToolToLc(name: string, t: any) {
   return lcTool(
-    async (input: unknown) => {
+    async (input: unknown, config?: { configurable?: { runState?: { dataCollected?: boolean } } }) => {
+      const runState = config?.configurable?.runState;
+
+      if (name === "formatOutput" && runState && !runState.dataCollected) {
+        return JSON.stringify({
+          error:
+            "No data collected yet. You must call a data-gathering tool " +
+            "(search, scrape, scrapeBash, interact, extract, map, or crawl) " +
+            "and receive a non-empty result before calling formatOutput. " +
+            "Gather the data first, then call formatOutput with the results.",
+        });
+      }
+
       const result = await t.execute!(input as never);
+
+      if (runState && DATA_TOOLS.has(name) && resultHasData(result)) {
+        runState.dataCollected = true;
+      }
+
       return typeof result === "string" ? result : JSON.stringify(result);
     },
     { name, description: t.description ?? "", schema: t.inputSchema as never },
@@ -273,14 +328,36 @@ Do not use emojis.`,
     if (Object.keys(uploadedFiles).length > 0) await initBashWithFiles(uploadedFiles);
 
     const exportSkillTool = createExportSkillTool(skillsDir);
-    const tools = [
+
+    // Tools the sub-agents get: data-gathering only. `formatOutput` and
+    // `exportSkill` are ORCHESTRATOR-ONLY — a sub-agent calling formatOutput
+    // would open the artifact panel mid-run with partial data. `bashExec`
+    // stays available because sub-agents may need to reshape data.
+    const subAgentTools = [
       ...aiToolkitToLc(toolkit.tools as Record<string, any>),
-      aiToolToLc("formatOutput", formatOutput),
       aiToolToLc("bashExec", bashExec),
+    ];
+
+    // Orchestrator tool set includes the terminal formatOutput + exportSkill.
+    const tools = [
+      ...subAgentTools,
+      aiToolToLc("formatOutput", formatOutput),
       aiToolToLc("exportSkill", exportSkillTool),
     ];
 
-    const subagents: SubAgent[] = await Promise.all(
+    // Override Deep Agents' default "general-purpose" sub-agent so it inherits
+    // the RESTRICTED tool set. Otherwise it clones the parent's tools and can
+    // fire formatOutput prematurely from inside a task run.
+    const generalPurposeSubAgent: SubAgent = {
+      name: "general-purpose",
+      description: "General-purpose data-gathering sub-agent. Use for multi-step research requiring search/scrape/scrapeBash. Returns raw findings; DOES NOT format final output — that's the orchestrator's job.",
+      systemPrompt: "You are a data-gathering sub-agent. Use search/scrape/scrapeBash/interact/extract/map/crawl to collect what was requested. Return ONLY a terse JSON-shaped block of raw facts (fields, URLs, numbers). No prose. No 'summary'. No narration. No markdown headings or bullet commentary. No reflection on what you did. Just the data. Example good output: `{ \"ticker\": \"NVDA\", \"price\": 142.15, \"pe_ratio\": 68.3, \"sources\": [\"https://…\"] }`. The orchestrator will aggregate your raw data with others and produce the final artifact — you don't need to summarize, explain, or format.",
+      model: subAgentModel,
+      tools: subAgentTools,
+      skills: [skillsDir],
+    };
+
+    const userSubagents: SubAgent[] = await Promise.all(
       (params.subAgents ?? []).map(async (cfg) => {
         const filtered = toolkit.createFiltered ? toolkit.createFiltered(cfg.tools) : toolkit.tools;
         return {
@@ -294,11 +371,17 @@ Do not use emojis.`,
       }),
     );
 
+    const subagents: SubAgent[] = [generalPurposeSubAgent, ...userSubagents];
+
     const appSystemPrompt = (this.options.appSections ?? []).join("\n\n");
     const systemPrompt = [toolkit.systemPrompt, appSystemPrompt].filter(Boolean).join("\n\n");
 
     const skills = [skillsDir, ...(params.skills ?? [])];
 
+    // NB: Deep Agents already includes SummarizationMiddleware in its default
+    // stack — passing another instance throws "Middleware ... defined multiple
+    // times". We trust the default thresholds for now; if history bloat recurs,
+    // we'll need to override via a custom graph or monkey-patch the default.
     return createDeepAgent({
       model: model as any,
       tools,

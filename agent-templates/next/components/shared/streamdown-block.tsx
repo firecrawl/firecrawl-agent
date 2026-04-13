@@ -33,7 +33,7 @@ export default function StreamdownBlock({
   isStreaming?: boolean;
 }) {
   return (
-    <div className="max-w-none">
+    <div className="max-w-none [&_pre]:!rounded-0 [&_code]:!rounded-0 [&_div[class*='rounded']]:!rounded-0 [&_div[class*='border']]:!rounded-0 [&_figure]:!rounded-0 [&_.streamdown-code]:!rounded-0">
       <Streamdown
         plugins={plugins}
         controls={controls}

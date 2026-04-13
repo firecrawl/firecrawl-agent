@@ -91,6 +91,13 @@ export interface FirecrawlToolsConfig {
   crawl?: boolean;
   /** Max approximate tokens for tool responses */
   maxResponseTokens?: number;
+  /**
+   * When true, replace `scrape` with `scrapeBash` — a single tool that loads
+   * pages into a WASM sandbox and queries them with rg/grep/sed. Full page
+   * markdown never enters the LLM context, cutting tokens and preventing the
+   * "enrichment" failure mode where the model invents extra scrapes.
+   */
+  bash?: boolean;
 }
 
 export interface CreateAgentOptions {

@@ -79,6 +79,95 @@ function getDomain(url: string): string | null {
   catch { return null; }
 }
 
+// Firecrawl and other tool backends return wordy multi-paragraph error strings
+// (DNS failures, proxy tunnels, 404 walls, etc.). Condense to a single-line
+// summary for the tile; the full text stays in the Raw I/O toggle.
+function summarizeError(err: string | undefined): string | undefined {
+  if (!err) return err;
+  const trimmed = err.trim();
+  if (trimmed.length <= 100) return trimmed;
+  const dns = trimmed.match(/DNS resolution failed for hostname "([^"]+)"/i);
+  if (dns) return `DNS failed: ${dns[1]}`;
+  const tunnel = trimmed.match(/ERR_TUNNEL_CONNECTION_FAILED/i);
+  if (tunnel) return "Proxy tunnel failed";
+  const notFound = trimmed.match(/404|not found/i);
+  if (notFound) return "Page not found (404)";
+  const connRefused = trimmed.match(/ECONNREFUSED|connection refused/i);
+  if (connRefused) return "Connection refused";
+  const timeout = trimmed.match(/ETIMEDOUT|timed? out/i);
+  if (timeout) return "Request timed out";
+  // Fallback: first sentence or 100 chars.
+  const firstSentence = trimmed.split(/[.!?]\s/)[0];
+  return (firstSentence.length > 100 ? firstSentence.slice(0, 97) + "…" : firstSentence);
+}
+
+// @ai-sdk/langchain bridge sets UIMessage tool part `output` to the LangChain
+// ToolMessage content string. Our adapter JSON-stringifies non-string results,
+// so parse it back to an object here before extractors read fields like
+// `markdown`, `web`, `metadata` etc. Keeps the raw string as a fallback.
+function normalizeToolOutput(raw: unknown): unknown {
+  if (typeof raw !== "string") return raw;
+  const trimmed = raw.trim();
+  if (!trimmed) return raw;
+  if (trimmed[0] !== "{" && trimmed[0] !== "[") return raw;
+  try { return JSON.parse(trimmed); } catch { return raw; }
+}
+
+// Shared chip for metadata key/value pairs on tile headers.
+function MetaChip({ label, value, tone = "neutral" }: { label?: string; value: string | number; tone?: "neutral" | "success" | "warn" | "info" }) {
+  const toneClass =
+    tone === "success" ? "bg-accent-forest/8 text-accent-forest"
+    : tone === "warn" ? "bg-accent-crimson/8 text-accent-crimson"
+    : tone === "info" ? "bg-accent-bluetron/8 text-accent-bluetron"
+    : "bg-black-alpha-4 text-black-alpha-56";
+  return (
+    <span className={cn("inline-flex items-center gap-3 px-6 py-1 rounded-4 text-mono-x-small flex-shrink-0", toneClass)}>
+      {label && <span className="opacity-60">{label}</span>}
+      <span>{String(value)}</span>
+    </span>
+  );
+}
+
+// Collapsible "Raw" panel showing the literal tool input + output JSON the
+// agent sent/received. Keeps the tile compact by default.
+function RawIOToggle({ input, output, toolName }: { input?: string; output?: string; toolName?: string }) {
+  const [open, setOpen] = useState(false);
+  if (!input && !output) return null;
+  return (
+    <div className="mx-14 mb-10 rounded-6 border border-border-faint bg-black-alpha-2">
+      <button
+        type="button"
+        className="w-full flex items-center gap-6 px-10 py-6 text-left hover:bg-black-alpha-4 transition-colors"
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+      >
+        <span className="text-mono-x-small text-black-alpha-56">
+          Raw {toolName ? `/${toolName}` : "tool"} I/O
+        </span>
+        <span className="flex-1" />
+        <svg fill="none" height="10" viewBox="0 0 24 24" width="10" className={cn("transition-transform text-black-alpha-24", open && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
+        <div className="border-t border-border-faint px-10 py-8 flex flex-col gap-8 max-h-[420px] overflow-auto no-scrollbar">
+          {input && (
+            <div>
+              <div className="text-mono-x-small text-black-alpha-32 mb-3">input</div>
+              <pre className="text-mono-small text-accent-black whitespace-pre-wrap break-all">{input}</pre>
+            </div>
+          )}
+          {output && (
+            <div>
+              <div className="text-mono-x-small text-black-alpha-32 mb-3">output</div>
+              <pre className="text-mono-small text-accent-black whitespace-pre-wrap break-all">{output}</pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // --- Search results rendering ---
 
 interface SearchResult {
@@ -145,24 +234,30 @@ function SearchResultItem({ result }: { result: SearchResult }) {
   );
 }
 
-function SearchResults({ query, results, creditsUsed, isLatest }: { query: string; results: SearchResult[]; creditsUsed?: number; isLatest?: boolean }) {
+function SearchResults({ query, results, creditsUsed, sources, rawInput, rawOutput, toolName, isLatest }: { query: string; results: SearchResult[]; creditsUsed?: number; sources?: string[]; rawInput?: string; rawOutput?: string; toolName?: string; isLatest?: boolean }) {
   const [userExpanded, setUserExpanded] = useState<boolean | null>(null);
   const collapsed = userExpanded !== null ? !userExpanded : !isLatest;
 
   return (
-    <div className="my-12 rounded-10 border border-border-faint overflow-hidden">
+    <div className="my-12 border border-border-faint overflow-hidden">
       <button
         type="button"
-        className="flex items-center gap-8 px-14 py-10 w-full text-left hover:bg-black-alpha-2 transition-colors"
+        className="flex items-center gap-10 px-14 py-10 w-full text-left hover:bg-black-alpha-2 transition-colors"
         onClick={() => setUserExpanded(collapsed ? true : false)}
       >
-        <EndpointBadge type="search" />
+        {results.length > 0
+          ? <FaviconStack urls={results.slice(0, 5).map((r) => r.url).filter((u): u is string => !!u)} />
+          : <EndpointBadge type="search" />}
         <div className="flex-1 min-w-0">
           <div className="text-label-medium text-accent-black truncate">{query}</div>
-          <div className="text-body-small text-black-alpha-40">
-            {results.length} result{results.length !== 1 ? "s" : ""}
+          <div className="text-body-small text-black-alpha-40 flex items-center gap-4 flex-wrap">
+            <span>{results.length} result{results.length !== 1 ? "s" : ""}</span>
+            {sources && sources.length > 0 && (
+              <span className="text-black-alpha-32">· {sources.join(", ")}</span>
+            )}
           </div>
         </div>
+        {typeof creditsUsed === "number" && <MetaChip label="credits" value={creditsUsed} />}
         <svg className="w-14 h-14 text-accent-forest flex-shrink-0" fill="none" viewBox="0 0 16 16">
           <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -171,11 +266,14 @@ function SearchResults({ query, results, creditsUsed, isLatest }: { query: strin
         </svg>
       </button>
       {!collapsed && (
-        <div className="border-t border-border-faint px-14 py-8 flex flex-col gap-4">
-          {results.map((r, i) => (
-            <SearchResultItem key={i} result={r} />
-          ))}
-        </div>
+        <>
+          <div className="border-t border-border-faint px-14 py-8 flex flex-col gap-4">
+            {results.map((r, i) => (
+              <SearchResultItem key={i} result={r} />
+            ))}
+          </div>
+          <RawIOToggle input={rawInput} output={rawOutput} toolName={toolName} />
+        </>
       )}
     </div>
   );
@@ -191,9 +289,19 @@ function ScrapeResult({
   scrapeQuery,
   scrapeFormats,
   pageTitle,
+  pageDescription,
+  pageLanguage,
   statusCode,
+  contentType,
+  cacheState,
+  cachedAt,
+  proxyUsed,
+  scrapeId,
   liveViewUrl,
   interactOutput,
+  rawInput,
+  rawOutput,
+  toolName,
   isInteract,
   isLatest,
 }: {
@@ -204,9 +312,19 @@ function ScrapeResult({
   scrapeQuery?: string;
   scrapeFormats?: string[];
   pageTitle?: string;
+  pageDescription?: string;
+  pageLanguage?: string;
   statusCode?: number;
+  contentType?: string;
+  cacheState?: string;
+  cachedAt?: string;
+  proxyUsed?: string;
+  scrapeId?: string;
   liveViewUrl?: string;
   interactOutput?: string;
+  rawInput?: string;
+  rawOutput?: string;
+  toolName?: string;
   isInteract?: boolean;
   isLatest?: boolean;
 }) {
@@ -217,7 +335,7 @@ function ScrapeResult({
   const hasContent = !!(content || answer || interactOutput);
 
   return (
-    <div className={cn("my-12 rounded-10 border overflow-hidden transition-all", expanded ? "border-heat-40 shadow-sm" : "border-border-faint hover:border-black-alpha-16")}>
+    <div className={cn("my-12 border overflow-hidden transition-all border-border-faint", !expanded && "hover:border-black-alpha-16")}>
       {/* Header - clickable */}
       <button
         type="button"
@@ -253,6 +371,32 @@ function ScrapeResult({
         "transition-all duration-300 overflow-hidden",
         expanded ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0",
       )}>
+        {/* Metadata chips — only the non-obvious ones. Success status/default
+            formats already communicated by the green check and the QUERY pill. */}
+        {(() => {
+          const showStatus = typeof statusCode === "number" && statusCode !== 200;
+          // Drop "query" — already signaled by the QUERY pill next to the title.
+          const extraFormats = (scrapeFormats ?? []).filter((f) => f !== "query");
+          const hasAny = showStatus || typeof creditsUsed === "number" || cacheState || proxyUsed || pageLanguage || extraFormats.length > 0;
+          if (!hasAny) return null;
+          return (
+            <div className="mx-14 mt-10 mb-4 flex flex-wrap gap-4">
+              {showStatus && (
+                <MetaChip label="status" value={statusCode!} tone={statusCode! >= 400 ? "warn" : "info"} />
+              )}
+              {typeof creditsUsed === "number" && <MetaChip label="credits" value={creditsUsed} />}
+              {cacheState && <MetaChip label="cache" value={cacheState} tone={cacheState === "HIT" || cacheState === "hit" ? "success" : "neutral"} />}
+              {proxyUsed && <MetaChip label="proxy" value={proxyUsed} />}
+              {pageLanguage && <MetaChip label="lang" value={pageLanguage} />}
+              {extraFormats.map((f) => <MetaChip key={f} value={f} />)}
+            </div>
+          );
+        })()}
+
+        {pageDescription && (
+          <div className="mx-14 mb-10 text-body-small text-black-alpha-48 italic">{pageDescription}</div>
+        )}
+
         {interactOutput && (
           <div className="mx-14 mb-10 bg-accent-bluetron/[0.04] rounded-8 border border-accent-bluetron/15 p-12">
             <StreamdownBlock>{interactOutput}</StreamdownBlock>
@@ -301,6 +445,8 @@ function ScrapeResult({
             <div className="text-body-small text-black-alpha-24 italic">No content returned</div>
           </div>
         )}
+
+        <RawIOToggle input={rawInput} output={rawOutput} toolName={toolName} />
       </div>
     </div>
   );
@@ -332,10 +478,7 @@ function InteractCard({ item }: { item: TimelineItem }) {
 
   return (
     <>
-      <div className={cn(
-        "my-12 rounded-10 border overflow-hidden transition-all",
-        isRunning ? "border-heat-40 shadow-sm" : "border-border-faint",
-      )}>
+      <div className="my-12 border overflow-hidden transition-all border-border-faint">
         {/* Header -- clickable to toggle */}
         <button
           type="button"
@@ -385,7 +528,7 @@ function InteractCard({ item }: { item: TimelineItem }) {
           )}
 
           {isRunning && (
-            <div className="mx-14 my-10 rounded-10 border border-accent-iris/20 bg-accent-iris/6 px-12 py-10">
+            <div className="mx-14 my-10 border border-accent-iris/20 bg-accent-iris/6 px-12 py-10">
               <div className="flex items-center gap-8">
                 <div className="min-w-0 flex-1">
                   <div className="text-label-medium text-accent-black">Browser automation in progress</div>
@@ -453,8 +596,16 @@ function InteractCard({ item }: { item: TimelineItem }) {
 // --- Sub-agent card ---
 
 function SubAgentCard({ item }: { item: TimelineItem }) {
-  const [expanded, setExpanded] = useState(false);
   const isRunning = item.status !== "complete";
+  // Auto-expand while running (so inner calls stream visibly) and
+  // auto-collapse once done (keeps the final timeline tidy).
+  const [userToggled, setUserToggled] = useState(false);
+  const [expanded, setExpanded] = useState(true);
+  useEffect(() => {
+    if (userToggled) return;
+    setExpanded(isRunning);
+  }, [isRunning, userToggled]);
+  const onToggle = () => { setUserToggled(true); setExpanded((v) => !v); };
   const steps = item.subagentSteps ?? [];
 
   // Parse sub-agent steps into mini timeline items
@@ -519,18 +670,15 @@ function SubAgentCard({ item }: { item: TimelineItem }) {
   }, [steps]);
 
   return (
-    <div className={cn(
-      "my-12 rounded-10 border overflow-hidden transition-all",
-      isRunning ? "border-accent-amethyst/30 shadow-sm" : "border-accent-amethyst/15",
-    )}>
+    <div className="my-12 border border-border-faint overflow-hidden transition-all">
       {/* Header - clickable to expand */}
       <button
         type="button"
-        className="w-full flex items-center gap-8 px-14 py-10 hover:bg-accent-amethyst/[0.02] transition-colors text-left cursor-pointer"
-        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-8 px-14 py-10 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
+        onClick={onToggle}
       >
-        <div className="w-28 h-28 rounded-8 bg-accent-amethyst/10 flex-center flex-shrink-0">
-          <svg fill="none" height="16" viewBox="0 0 24 24" width="16" className="text-accent-amethyst">
+        <div className="w-28 h-28 rounded-8 bg-black-alpha-4 flex-center flex-shrink-0">
+          <svg fill="none" height="16" viewBox="0 0 24 24" width="16" className="text-black-alpha-56">
             <path d="M16 18l6-6-6-6M8 6l-6 6 6 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
           </svg>
         </div>
@@ -540,7 +688,7 @@ function SubAgentCard({ item }: { item: TimelineItem }) {
               {item.skillName ?? "Sub-agent"}
             </span>
             {isRunning && (
-              <div className="w-5 h-5 rounded-full bg-accent-amethyst animate-pulse flex-shrink-0" />
+              <div className="w-5 h-5 rounded-full bg-heat-100 animate-pulse flex-shrink-0" />
             )}
           </div>
           {item.subagentTask && (
@@ -571,13 +719,25 @@ function SubAgentCard({ item }: { item: TimelineItem }) {
         </div>
       </button>
 
-      {/* Expanded: show internal tool calls timeline */}
+      {/* Expanded: full nested tiles for sub-agent's own tool calls */}
+      {expanded && (item.subagentChildren?.length ?? 0) > 0 && (
+        <div className="border-t border-border-faint bg-black-alpha-2 px-14 py-8">
+          <div className="text-label-x-small text-black-alpha-24 mb-2">Sub-agent activity</div>
+          <div className="flex flex-col">
+            {item.subagentChildren!.map((child, j) => (
+              <ChildTile key={j} item={child} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Expanded: legacy subagent_* steps summary (kept for back-compat) */}
       {expanded && subItems.length > 0 && (
-        <div className="border-t border-accent-amethyst/10 bg-accent-amethyst/[0.02] px-14 py-10">
+        <div className="border-t border-border-faint bg-black-alpha-2 px-14 py-10">
           <div className="flex flex-col gap-1">
             {subItems.map((si, j) => (
               <div key={j} className="flex items-start gap-8 py-3">
-                <div className="w-4 h-4 rounded-full bg-accent-amethyst/30 mt-6 flex-shrink-0" />
+                <div className="w-4 h-4 rounded-full bg-black-alpha-16 mt-6 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className={cn(
                     "text-body-small truncate",
@@ -585,15 +745,7 @@ function SubAgentCard({ item }: { item: TimelineItem }) {
                   )}>
                     {si.type === "text" ? si.label : (
                       <>
-                        <span className={cn(
-                          "text-mono-x-small px-6 py-1 rounded-4 mr-4",
-                          si.type === "search" ? "text-heat-100 bg-heat-4" :
-                          si.type === "scrape" ? "text-accent-forest bg-accent-forest/8" :
-                          si.type === "interact" ? "text-accent-amethyst bg-accent-amethyst/8" :
-                          si.type === "workers" ? "text-accent-iris bg-accent-iris/8" :
-                          si.type === "bash" ? "text-black-alpha-48 bg-black-alpha-4" :
-                          "text-black-alpha-40 bg-black-alpha-4"
-                        )}>
+                        <span className="text-mono-x-small text-black-alpha-40 bg-black-alpha-4 px-6 py-1 rounded-4 mr-4">
                           {si.type}
                         </span>
                         <span className="text-body-small text-black-alpha-56">{si.label.replace(/^(Search|Scrape|Interact|bash|Parallel workers):\s*/i, "")}</span>
@@ -611,14 +763,21 @@ function SubAgentCard({ item }: { item: TimelineItem }) {
         </div>
       )}
 
-      {/* Collapsed preview of what it did */}
-      {!expanded && subItems.length > 0 && (
+      {/* Collapsed preview of what it did (prefers new subagentChildren, falls back to legacy subItems) */}
+      {!expanded && ((item.subagentChildren?.length ?? 0) > 0 || subItems.length > 0) && (
         <div className="px-14 pb-8">
           <div className="flex flex-wrap gap-4">
             {(() => {
               const counts: Record<string, number> = {};
-              for (const si of subItems) {
-                if (si.type !== "text") counts[si.type] = (counts[si.type] || 0) + 1;
+              if (item.subagentChildren?.length) {
+                for (const child of item.subagentChildren) {
+                  const k = child.type === "scrapeBashLoad" ? "scrape" : child.type;
+                  counts[k] = (counts[k] || 0) + 1;
+                }
+              } else {
+                for (const si of subItems) {
+                  if (si.type !== "text") counts[si.type] = (counts[si.type] || 0) + 1;
+                }
               }
               return Object.entries(counts).map(([type, count]) => (
                 <span key={type} className="text-mono-x-small text-black-alpha-24 bg-black-alpha-4 px-6 py-1 rounded-4">
@@ -632,7 +791,7 @@ function SubAgentCard({ item }: { item: TimelineItem }) {
 
       {/* Final result text */}
       {expanded && item.status === "complete" && item.text && (
-        <div className="border-t border-accent-amethyst/10 px-14 py-10">
+        <div className="border-t border-border-faint px-14 py-10">
           <div className="text-label-x-small text-black-alpha-24 mb-4">Result</div>
           <StreamdownBlock>{item.text}</StreamdownBlock>
         </div>
@@ -672,41 +831,344 @@ function describeBashAction(command: string): { label: string; detail?: string; 
   return { label: "Running command", isFileOp: false };
 }
 
-function BashResult({ command, stdout, stderr, exitCode }: { command: string; stdout: string; stderr: string; exitCode: number }) {
+function BashResult({ command, stdout, stderr, exitCode, rawInput, rawOutput, toolName }: { command: string; stdout: string; stderr: string; exitCode: number; rawInput?: string; rawOutput?: string; toolName?: string }) {
   const [expanded, setExpanded] = useState(false);
   const hasOutput = !!(stdout || stderr);
-  const { label, detail, isFileOp } = describeBashAction(command);
+  const { label, detail } = describeBashAction(command);
+  const singleLine = command.split("\n")[0];
+  const cmdPreview = singleLine.length > 120 ? singleLine.slice(0, 117) + "…" : singleLine;
+  const domains = useMemo(() => extractDomainsFromCommand(command), [command]);
 
   return (
-      <div className="my-12 rounded-10 border border-border-faint overflow-hidden">
+      <div className="my-12 border border-border-faint overflow-hidden">
         <button
           type="button"
-          className="w-full flex items-center gap-8 px-14 py-10 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
+          className="w-full flex items-start gap-10 px-14 py-10 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
           onClick={() => setExpanded(!expanded)}
         >
+          {domains.length > 0
+            ? <div className="mt-1"><FaviconStack urls={domains.map((d) => `https://${d}`)} /></div>
+            : <span className="mt-1 text-mono-x-small text-black-alpha-32 bg-black-alpha-4 px-6 py-1 rounded-4 flex-shrink-0">$</span>}
           <div className="flex-1 min-w-0">
             <div className="text-label-medium text-accent-black">{label}</div>
-            {detail && <div className="text-body-small text-black-alpha-40 truncate">{detail}</div>}
+            <div className="text-mono-x-small text-black-alpha-40 truncate font-mono">{cmdPreview}</div>
+            {detail && <div className="text-body-small text-black-alpha-32 truncate">{detail}</div>}
           </div>
           {exitCode === 0 ? (
-            <svg className="w-14 h-14 text-accent-forest flex-shrink-0" fill="none" viewBox="0 0 16 16">
+            <svg className="w-14 h-14 text-accent-forest flex-shrink-0 mt-2" fill="none" viewBox="0 0 16 16">
               <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           ) : (
-            <span className="text-mono-x-small text-accent-crimson flex-shrink-0">exit {exitCode}</span>
+            <span className="text-mono-x-small text-accent-crimson flex-shrink-0 mt-2">exit {exitCode}</span>
           )}
-          <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24 flex-shrink-0", expanded && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24 flex-shrink-0 mt-2", expanded && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M6 9l6 6 6-6" />
           </svg>
         </button>
-        {expanded && hasOutput && (
-          <div className="border-t border-border-faint bg-black-alpha-2 px-14 py-10 max-h-300 overflow-auto no-scrollbar">
-            <pre className="text-mono-small text-accent-black whitespace-pre-wrap">{stdout}</pre>
-            {stderr && <pre className="text-mono-small text-accent-crimson whitespace-pre-wrap mt-6">{stderr}</pre>}
-          </div>
+        {expanded && (
+          <>
+            {/* Full command (multi-line, monospace, copyable selection) */}
+            <div className="border-t border-border-faint bg-black-alpha-2 px-14 py-8">
+              <div className="text-mono-x-small text-black-alpha-32 mb-3">command</div>
+              <pre className="text-mono-small text-accent-black whitespace-pre-wrap break-all">{command}</pre>
+            </div>
+            {hasOutput && (
+              <div className="border-t border-border-faint bg-black-alpha-2 px-14 py-8 max-h-[400px] overflow-auto no-scrollbar">
+                {stdout && (
+                  <>
+                    <div className="text-mono-x-small text-black-alpha-32 mb-3">stdout</div>
+                    <pre className="text-mono-small text-accent-black whitespace-pre-wrap">{stdout}</pre>
+                  </>
+                )}
+                {stderr && (
+                  <>
+                    <div className="text-mono-x-small text-accent-crimson/60 mt-8 mb-3">stderr</div>
+                    <pre className="text-mono-small text-accent-crimson whitespace-pre-wrap">{stderr}</pre>
+                  </>
+                )}
+              </div>
+            )}
+            <RawIOToggle input={rawInput} output={rawOutput} toolName={toolName} />
+          </>
         )}
       </div>
     );
+}
+
+// Thin dispatcher used to render a nested TimelineItem (a sub-agent's tool
+// call) inside a SubAgentCard. Delegates to the same tile components used at
+// the top level so nothing looks different — just nested.
+function ChildTile({ item }: { item: TimelineItem }) {
+  switch (item.type) {
+    case "search":
+      return (
+        <SearchResults
+          query={item.query ?? ""}
+          sources={item.searchSources}
+          rawInput={item.rawInput}
+          rawOutput={item.rawOutput}
+          toolName={item.toolName}
+          results={item.status === "complete" && item.searchResults?.length ? item.searchResults : []}
+          creditsUsed={item.creditsUsed}
+          isLatest={false}
+        />
+      );
+    case "scrape":
+      return (
+        <ScrapeResult
+          url={item.url ?? ""}
+          content={item.content ?? ""}
+          answer={item.answer}
+          creditsUsed={item.creditsUsed}
+          scrapeQuery={item.scrapeQuery}
+          scrapeFormats={item.scrapeFormats}
+          pageTitle={item.pageTitle}
+          pageDescription={item.pageDescription}
+          pageLanguage={item.pageLanguage}
+          statusCode={item.statusCode}
+          contentType={item.contentType}
+          cacheState={item.cacheState}
+          cachedAt={item.cachedAt}
+          proxyUsed={item.proxyUsed}
+          scrapeId={item.scrapeId}
+          rawInput={item.rawInput}
+          rawOutput={item.rawOutput}
+          toolName={item.toolName}
+          isInteract={false}
+        />
+      );
+    case "scrapeBashLoad":
+      return <ScrapeBashLoadCard item={item} />;
+    case "bash":
+      return (
+        <BashResult
+          command={item.command ?? ""}
+          stdout={item.stdout ?? ""}
+          stderr={item.stderr ?? ""}
+          exitCode={item.exitCode ?? 0}
+          rawInput={item.rawInput}
+          rawOutput={item.rawOutput}
+          toolName={item.toolName}
+        />
+      );
+    case "skill":
+      return <SkillLoad name={item.skillName ?? ""} description={item.text} instructions={item.skillInstructions} status={item.status} />;
+    case "other":
+      return <GenericToolTile item={item} />;
+    default:
+      return <GenericToolTile item={item} />;
+  }
+}
+
+// --- Reusable stacked-favicon row (up to N slightly overlapping domain icons). ---
+
+function FaviconStack({ urls, max = 5, dimErrored }: { urls: Array<string | { url: string; errored?: boolean }>; max?: number; dimErrored?: boolean }) {
+  const domains = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { url: string; domain: string; errored: boolean }[] = [];
+    for (const u of urls) {
+      const url = typeof u === "string" ? u : u.url;
+      const errored = typeof u === "string" ? false : (u.errored ?? false);
+      if (!url) continue;
+      const d = getDomain(url);
+      if (!d || seen.has(d)) continue;
+      seen.add(d);
+      out.push({ url, domain: d, errored });
+      if (out.length >= max) break;
+    }
+    return out;
+  }, [urls, max]);
+
+  if (domains.length === 0) return null;
+  const stackCount = domains.length;
+  return (
+    <div
+      className="flex-shrink-0 flex items-center"
+      style={{ minWidth: `${12 + (stackCount - 1) * 12}px` }}
+    >
+      {domains.map((d, idx) => (
+        <span
+          key={d.domain}
+          className="relative inline-flex items-center justify-center rounded-full border border-accent-white bg-accent-white"
+          style={{
+            width: 20,
+            height: 20,
+            marginLeft: idx === 0 ? 0 : -8,
+            zIndex: 5 - idx,
+            opacity: dimErrored && d.errored ? 0.4 : 1,
+          }}
+          title={d.url}
+        >
+          <Favicon domain={d.domain} />
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// Pull domain references out of a bash command string so we can show favicons
+// for commands like `cat -n cursor.com/pricing.md` or `rg -n x cursor.com/`.
+function extractDomainsFromCommand(cmd: string): string[] {
+  if (!cmd) return [];
+  const matches = cmd.match(/\b(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}(?=\/|\b)/gi) ?? [];
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  for (const m of matches) {
+    const lower = m.toLowerCase();
+    if (seen.has(lower)) continue;
+    // Skip obvious false positives (e.g. "file.md" shouldn't look like a domain, but the
+    // regex requires 2+ char TLD — exclude common file extensions as safety net).
+    if (/\.(md|txt|json|csv|html|htm|js|ts|py|sh|yaml|yml|toml|log|xml|pdf)$/i.test(lower)) continue;
+    seen.add(lower);
+    unique.push(lower);
+    if (unique.length >= 5) break;
+  }
+  return unique;
+}
+
+// --- scrapeBash load-mode tile: stacked favicons + domain list ---
+
+function ScrapeBashLoadCard({ item }: { item: TimelineItem }) {
+  const [expanded, setExpanded] = useState(false);
+  const pages = item.scrapePages ?? [];
+  const isRunning = item.status === "running";
+  const error = item.scrapeError;
+
+  const domains = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { url: string; domain: string; status: ScrapeBashPage["status"]; lineCount?: number }[] = [];
+    for (const p of pages) {
+      const d = getDomain(p.url);
+      if (!d || seen.has(d)) continue;
+      seen.add(d);
+      out.push({ url: p.url, domain: d, status: p.status, lineCount: p.lineCount });
+    }
+    return out;
+  }, [pages]);
+
+  const stackCount = Math.min(domains.length, 5);
+  const headerDomains = domains.slice(0, 3).map((d) => d.domain);
+  const remaining = domains.length - headerDomains.length;
+  const title = isRunning ? "Scraping" : error ? "Scrape failed" : "Loaded";
+  const subtitle = headerDomains.length > 0
+    ? headerDomains.join(", ") + (remaining > 0 ? `, +${remaining} more` : "")
+    : (error ?? "no pages");
+
+  return (
+    <div className="my-12 border border-border-faint overflow-hidden">
+      <button
+        type="button"
+        className="w-full flex items-center gap-10 px-14 py-10 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
+        onClick={() => setExpanded(!expanded)}
+      >
+        {/* Stacked favicons */}
+        <div className="flex-shrink-0 flex items-center" style={{ minWidth: stackCount > 0 ? `${12 + (stackCount - 1) * 12}px` : 0 }}>
+          {domains.slice(0, 5).map((d, idx) => (
+            <span
+              key={d.domain}
+              className="relative inline-flex items-center justify-center rounded-full border border-accent-white bg-accent-white"
+              style={{
+                width: 20,
+                height: 20,
+                marginLeft: idx === 0 ? 0 : -8,
+                zIndex: 5 - idx,
+                opacity: d.status === "error" ? 0.4 : 1,
+              }}
+              title={d.url}
+            >
+              <Favicon domain={d.domain} />
+            </span>
+          ))}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="text-label-medium text-accent-black">
+            {title}
+            {!isRunning && !error && pages.length > 0 && (
+              <span className="text-black-alpha-32 font-normal"> · {pages.length} page{pages.length === 1 ? "" : "s"}</span>
+            )}
+          </div>
+          <div className={cn("text-body-small truncate", error ? "text-accent-crimson" : "text-black-alpha-40")}>
+            {subtitle}
+          </div>
+        </div>
+
+        {isRunning ? (
+          <div className="w-5 h-5 rounded-full bg-heat-100 animate-pulse flex-shrink-0" />
+        ) : error ? (
+          <span className="text-mono-x-small text-accent-crimson flex-shrink-0">failed</span>
+        ) : (
+          <svg className="w-14 h-14 text-accent-forest flex-shrink-0" fill="none" viewBox="0 0 16 16">
+            <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+        <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className={cn("transition-transform text-black-alpha-24 flex-shrink-0", expanded && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+
+      {expanded && (
+        <>
+          <div className="border-t border-border-faint px-14 py-8 flex flex-col gap-4">
+            {pages.map((p, i) => {
+              const d = getDomain(p.url);
+              return (
+                <div key={i} className="flex items-center gap-8 text-body-small">
+                  {d ? <Favicon domain={d} /> : <GlobeIcon />}
+                  <span className={cn("truncate flex-1", p.status === "error" ? "text-accent-crimson" : "text-accent-black")}>{p.url}</span>
+                  {p.lineCount !== undefined && (
+                    <span className="text-mono-x-small text-black-alpha-40 flex-shrink-0">{p.lineCount} lines</span>
+                  )}
+                  {p.status === "error" && (
+                    <span className="text-mono-x-small text-accent-crimson flex-shrink-0">error</span>
+                  )}
+                  {p.status === "empty" && (
+                    <span className="text-mono-x-small text-black-alpha-32 flex-shrink-0">empty</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <RawIOToggle input={item.rawInput} output={item.rawOutput} toolName={item.toolName} />
+        </>
+      )}
+    </div>
+  );
+}
+
+// --- Generic tool tile (catch-all: any tool we don't have a custom card for) ---
+
+function GenericToolTile({ item }: { item: TimelineItem }) {
+  const [expanded, setExpanded] = useState(false);
+  const toolName = item.toolName ?? item.text ?? "tool";
+  const hasRaw = !!(item.rawInput || item.rawOutput);
+  return (
+    <div className="my-12 border border-border-faint overflow-hidden">
+      <button
+        type="button"
+        className="w-full flex items-center gap-8 px-14 py-8 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <span className="text-mono-x-small text-black-alpha-40 bg-black-alpha-4 px-6 py-1 rounded-4 flex-shrink-0">/{toolName}</span>
+        <div className="flex-1 min-w-0 text-label-small text-accent-black truncate">
+          {toolName}
+        </div>
+        {item.status === "running" ? (
+          <div className="w-5 h-5 rounded-full bg-heat-100 animate-pulse flex-shrink-0" />
+        ) : (
+          <svg className="w-12 h-12 text-accent-forest flex-shrink-0" fill="none" viewBox="0 0 16 16">
+            <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        )}
+        {hasRaw && (
+          <svg fill="none" height="10" viewBox="0 0 24 24" width="10" className={cn("transition-transform text-black-alpha-24 flex-shrink-0", expanded && "rotate-180")} stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        )}
+      </button>
+      {expanded && <RawIOToggle input={item.rawInput} output={item.rawOutput} toolName={toolName} />}
+    </div>
+  );
 }
 
 // --- Skill load rendering ---
@@ -798,10 +1260,10 @@ function describeWorkerStep(step: { tool: string; detail: string; input: Record<
     case "search":
       return { label: `Searched: "${step.input.query ?? step.detail}"`, url: null, icon: "search" };
     case "scrape":
-      return { label: url ? new URL(url).hostname : step.detail, url, icon: "scrape" };
+      return { label: url ? (getDomain(url) ?? step.detail) : step.detail, url, icon: "scrape" };
     case "interact": {
       const prompt = String(step.input.prompt ?? step.input.instruction ?? step.input.code ?? "").slice(0, 80);
-      const hostname = url ? (() => { try { return new URL(url).hostname; } catch { return url; } })() : null;
+      const hostname = url ? (getDomain(url) ?? url) : null;
       const label = prompt
         ? (hostname ? `${hostname} — ${prompt}` : prompt)
         : (hostname ? `Interacting with ${hostname}` : "Interacting");
@@ -865,7 +1327,7 @@ function WorkerCard({ id, prompt, result, workerStatus, liveProgress, stepDetail
 
   return (
     <div className={cn(
-      "rounded-10 border overflow-hidden transition-all",
+      "border overflow-hidden transition-all",
       isInteracting ? "border-accent-iris/30" :
       workerStatus === "error" ? "border-accent-crimson/20" : "border-border-faint hover:border-black-alpha-16",
     )}>
@@ -991,7 +1453,7 @@ function WorkersPanel({ item, apiBase = "" }: { item: TimelineItem; apiBase?: st
   }, [isRunning]);
 
   return (
-    <div className="my-12 rounded-10 border border-border-faint overflow-hidden">
+    <div className="my-12 border border-border-faint overflow-hidden">
       {/* Card header */}
       <button
         type="button"
@@ -1051,7 +1513,7 @@ function SkillLoad({ name, description, instructions, status }: { name: string; 
   const clickable = status === "complete" && !!instructions;
 
   return (
-    <div className="my-12 rounded-10 border border-border-faint overflow-hidden">
+    <div className="my-12 border border-border-faint overflow-hidden">
       <button
         type="button"
         className={cn(
@@ -1097,13 +1559,27 @@ function isToolPart(part: { type: string }): boolean {
   return part.type.startsWith("tool-") || part.type === "dynamic-tool";
 }
 
+interface ScrapeBashPage {
+  url: string;
+  status: "loaded" | "empty" | "error";
+  lineCount?: number;
+  sandboxPath?: string;
+}
+
 interface TimelineItem {
-  type: "text" | "search" | "scrape" | "interact" | "bash" | "skill" | "subagent" | "format" | "workers" | "other";
+  type: "text" | "search" | "scrape" | "interact" | "bash" | "scrapeBashLoad" | "skill" | "subagent" | "format" | "workers" | "other";
+  // Sub-agent nested children (populated by post-process when this item is a
+  // task-tool invocation and subsequent tool calls should be grouped under it).
+  subagentChildren?: TimelineItem[];
+  // scrapeBash load-mode
+  scrapePages?: ScrapeBashPage[];
+  scrapeError?: string;
   // text
   text?: string;
   // search
   query?: string;
   searchResults?: SearchResult[];
+  searchSources?: string[];
   // scrape/interact
   url?: string;
   content?: string;
@@ -1112,7 +1588,14 @@ interface TimelineItem {
   scrapeQuery?: string;
   scrapeFormats?: string[];
   pageTitle?: string;
+  pageDescription?: string;
+  pageLanguage?: string;
   statusCode?: number;
+  contentType?: string;
+  cacheState?: string;
+  cachedAt?: string;
+  proxyUsed?: string;
+  scrapeId?: string;
   liveViewUrl?: string;
   interactOutput?: string;
   interactPrompt?: string;
@@ -1134,6 +1617,11 @@ interface TimelineItem {
   // workers
   workerTasks?: { id: string; prompt: string }[];
   workerResults?: WorkerResultData[];
+  // raw input/output JSON for "View raw" panels across all tile types
+  rawInput?: string;
+  rawOutput?: string;
+  toolName?: string;
+  toolCallId?: string;
   // status
   status: "running" | "complete";
 }
@@ -1146,22 +1634,54 @@ interface SubagentStep {
 
 function extractTimeline(messages: UIMessage[]): TimelineItem[] {
   const items: TimelineItem[] = [];
+  // `itemByToolCallId` and `toolCallParent` are populated as we walk the
+  // messages: the server emits `data-subagent-map` parts that tell us which
+  // sub-agent tool_call_id belongs to which parent task_call_id. We hold the
+  // final grouping until all items are built so ordering doesn't matter.
+  const itemByToolCallId = new Map<string, TimelineItem>();
+  const toolCallParent: Record<string, string> = {};
 
   for (const msg of messages) {
     if (msg.role !== "assistant") continue;
     for (const part of msg.parts) {
+      // Server-side subagent mapping — merge every payload we see.
+      if ((part as { type?: string }).type === "data-subagent-map") {
+        const data = (part as { data?: Record<string, string> }).data ?? {};
+        for (const [childId, parentId] of Object.entries(data)) {
+          toolCallParent[childId] = parentId;
+        }
+        if (typeof window !== "undefined" && Object.keys(data).length > 0) {
+          // eslint-disable-next-line no-console
+          console.log("[ui] subagent-map part received:", data);
+        }
+        continue;
+      }
       if (part.type === "text" && part.text.trim()) {
         items.push({ type: "text", text: part.text, status: "complete" });
       } else if (isToolPart(part)) {
         const p = part as Record<string, unknown>;
+        const toolCallId = typeof p.toolCallId === "string" ? p.toolCallId as string : undefined;
         const state = (p.state ?? "") as string;
         const toolName = (p.toolName ?? (part.type as string).replace("tool-", "")) as string;
         const input = (p.input ?? p.args ?? {}) as Record<string, unknown>;
-        const output = (p.output ?? p.result ?? {}) as Record<string, unknown>;
-        const isComplete = state === "output-available" || state === "result" || state === "output-error";
+        const rawOutput = normalizeToolOutput(p.output ?? p.result);
+        const output = (rawOutput ?? {}) as Record<string, unknown>;
+        // Treat presence of any non-empty output as complete — the @ai-sdk/langchain
+        // bridge emits tool-output-available with the string content, but if the
+        // state field is missing or unfamiliar we still want the green-check render.
+        const hasOutput = rawOutput !== undefined && rawOutput !== null && (typeof rawOutput !== "object" || Object.keys(rawOutput as Record<string, unknown>).length > 0);
+        const isComplete = state === "output-available" || state === "result" || state === "output-error" || hasOutput;
         const status = isComplete ? "complete" as const : "running" as const;
 
+        // Serialize raw input/output once so each tile can expose "View raw".
+        const rawInputStr = Object.keys(input).length > 0 ? JSON.stringify(input, null, 2) : undefined;
+        const rawOutputStr = hasOutput
+          ? (typeof rawOutput === "string" ? rawOutput as string : JSON.stringify(rawOutput, null, 2))
+          : undefined;
 
+        // Record the pre-branch length so we can retroactively stamp any items
+        // pushed below with this part's toolCallId (used for server-map grouping).
+        const beforePushLen = items.length;
 
         if (toolName === "search") {
           const results: SearchResult[] = [];
@@ -1191,11 +1711,29 @@ function extractTimeline(messages: UIMessage[]): TimelineItem[] {
           const searchCredits = typeof (output as Record<string, unknown>).creditsUsed === "number"
             ? (output as Record<string, unknown>).creditsUsed as number
             : undefined;
+          // Infer which source categories were queried (web/news/images)
+          const sources: string[] = [];
+          const inputSources = input.sources as unknown;
+          if (Array.isArray(inputSources)) {
+            for (const s of inputSources) {
+              if (typeof s === "string") sources.push(s);
+              else if (s && typeof s === "object" && "type" in s) sources.push(String((s as { type: string }).type));
+            }
+          } else if (output && typeof output === "object") {
+            const o = output as Record<string, unknown>;
+            if (Array.isArray(o.web) && o.web.length) sources.push("web");
+            if (Array.isArray(o.news) && o.news.length) sources.push("news");
+            if (Array.isArray(o.images) && o.images.length) sources.push("images");
+          }
           items.push({
             type: "search",
             query: String(input.query ?? ""),
             searchResults: results,
+            searchSources: sources.length > 0 ? sources : undefined,
             creditsUsed: searchCredits,
+            rawInput: rawInputStr,
+            rawOutput: rawOutputStr,
+            toolName,
             status,
           });
         } else if (toolName === "scrape" || toolName === "interact" || toolName === "map") {
@@ -1247,7 +1785,17 @@ function extractTimeline(messages: UIMessage[]): TimelineItem[] {
           const meta = (outObj?.metadata ?? (outObj?.data as Record<string, unknown>)?.metadata) as Record<string, unknown> | undefined;
           const pageTitle = typeof meta?.title === "string" ? meta.title as string
             : typeof meta?.ogTitle === "string" ? meta.ogTitle as string : undefined;
-          const statusCode = typeof meta?.statusCode === "number" ? meta.statusCode as number : undefined;
+          const pageDescription = typeof meta?.description === "string" ? meta.description as string
+            : typeof meta?.ogDescription === "string" ? meta.ogDescription as string : undefined;
+          const pageLanguage = typeof meta?.language === "string" ? meta.language as string : undefined;
+          const statusCode = typeof meta?.statusCode === "number" ? meta.statusCode as number
+            : typeof outObj?.statusCode === "number" ? outObj.statusCode as number : undefined;
+          const contentType = typeof meta?.contentType === "string" ? meta.contentType as string
+            : typeof outObj?.contentType === "string" ? outObj.contentType as string : undefined;
+          const cacheState = typeof outObj?.cacheState === "string" ? outObj.cacheState as string : undefined;
+          const cachedAt = typeof outObj?.cachedAt === "string" ? outObj.cachedAt as string : undefined;
+          const proxyUsed = typeof outObj?.proxyUsed === "string" ? outObj.proxyUsed as string : undefined;
+          const scrapeId = typeof outObj?.scrapeId === "string" ? outObj.scrapeId as string : undefined;
           // Extract input metadata
           const formats = Array.isArray(input.formats) ? (input.formats as unknown[]).map((f) => {
             if (typeof f === "string") return f;
@@ -1268,10 +1816,20 @@ function extractTimeline(messages: UIMessage[]): TimelineItem[] {
             scrapeQuery: scrapeQuery ? String(scrapeQuery) : undefined,
             scrapeFormats: formats,
             pageTitle,
+            pageDescription,
+            pageLanguage,
             statusCode,
+            contentType,
+            cacheState,
+            cachedAt,
+            proxyUsed,
+            scrapeId,
             liveViewUrl: liveViewUrl ? String(liveViewUrl) : undefined,
             interactOutput: interactOutput,
             interactPrompt,
+            rawInput: rawInputStr,
+            rawOutput: rawOutputStr,
+            toolName,
             status,
           });
         } else if (toolName === "bashExec" || toolName === "bash_exec") {
@@ -1281,8 +1839,83 @@ function extractTimeline(messages: UIMessage[]): TimelineItem[] {
             stdout: String((output as { stdout?: string }).stdout ?? ""),
             stderr: String((output as { stderr?: string }).stderr ?? ""),
             exitCode: Number((output as { exitCode?: number }).exitCode ?? 0),
+            rawInput: rawInputStr,
+            rawOutput: rawOutputStr,
+            toolName,
             status,
           });
+        } else if (toolName === "scrapeBash" || toolName === "scrape_bash") {
+          // scrapeBash has two output shapes:
+          //  - load mode: { loaded, total, pages: [{status,url,sandboxPath,lineCount}], hint }
+          //  - run mode : { stdout, stderr, exitCode, cmd, ms, context }
+          //  - or an error envelope: { error: "..." } / page with status: "error"
+          const outObj = output as Record<string, unknown>;
+          const isRun = typeof outObj?.cmd === "string" || typeof outObj?.stdout === "string";
+          const isLoad = Array.isArray(outObj?.pages) || typeof outObj?.sandboxPath === "string";
+          const topError = typeof outObj?.error === "string" ? outObj.error as string : undefined;
+          const pageErrors = Array.isArray(outObj?.pages)
+            ? (outObj.pages as Array<Record<string, unknown>>).filter((p) => p.status === "error").map((p) => String(p.url ?? "")).filter(Boolean)
+            : [];
+
+          if (isRun) {
+            items.push({
+              type: "bash",
+              command: String(outObj.cmd ?? input.command ?? ""),
+              stdout: String(outObj.stdout ?? ""),
+              stderr: String(outObj.stderr ?? topError ?? ""),
+              exitCode: Number(outObj.exitCode ?? (topError ? 1 : 0)),
+              rawInput: rawInputStr,
+              rawOutput: rawOutputStr,
+              toolName,
+              status,
+            });
+          } else if (isLoad) {
+            const pages = Array.isArray(outObj.pages) ? outObj.pages as Array<Record<string, unknown>> : [];
+            const inputUrlsArr = Array.isArray(input.urls) ? (input.urls as unknown[]).map(String) : undefined;
+            const singleUrl = typeof outObj.url === "string" ? outObj.url as string : (typeof input.url === "string" ? input.url as string : undefined);
+
+            // Build a normalized pages list — if Firecrawl returned per-page
+            // entries, use those; otherwise fall back to single-url or the
+            // input urls array so the UI can still show what was attempted.
+            const pageList: ScrapeBashPage[] = pages.length > 0
+              ? pages.map((p) => ({
+                  url: String(p.url ?? ""),
+                  status: (p.status === "loaded" || p.status === "empty" || p.status === "error") ? p.status as ScrapeBashPage["status"] : "loaded",
+                  lineCount: typeof p.lineCount === "number" ? p.lineCount as number : undefined,
+                  sandboxPath: typeof p.sandboxPath === "string" ? p.sandboxPath as string : undefined,
+                }))
+              : singleUrl
+                ? [{
+                    url: singleUrl,
+                    status: topError ? "error" : "loaded",
+                    lineCount: typeof outObj.lineCount === "number" ? outObj.lineCount as number : undefined,
+                    sandboxPath: typeof outObj.sandboxPath === "string" ? outObj.sandboxPath as string : undefined,
+                  }]
+                : (inputUrlsArr ?? []).map((u) => ({ url: u, status: topError ? "error" as const : "loaded" as const }));
+
+            items.push({
+              type: "scrapeBashLoad",
+              scrapePages: pageList,
+              scrapeError: topError ?? (pageErrors.length > 0 && pageErrors.length === pages.length ? "All URLs failed to load" : undefined),
+              rawInput: rawInputStr,
+              rawOutput: rawOutputStr,
+              toolName,
+              status,
+            });
+          } else {
+            // Unknown shape — treat error string as stderr, fall back to raw.
+            items.push({
+              type: "bash",
+              command: String(input.command ?? input.url ?? "(scrapeBash)"),
+              stdout: "",
+              stderr: topError ?? "",
+              exitCode: topError ? 1 : 0,
+              rawInput: rawInputStr,
+              rawOutput: rawOutputStr,
+              toolName,
+              status,
+            });
+          }
         } else if (toolName === "lookup_site_playbook") {
           // Site playbooks are sub-resources, not top-level skills — don't show them as cards
         } else if (toolName === "load_skill" || toolName === "read_skill_resource") {
@@ -1309,6 +1942,28 @@ function extractTimeline(messages: UIMessage[]): TimelineItem[] {
             type: "workers",
             workerTasks: taskList,
             workerResults: outObj?.results ?? [],
+            status,
+          });
+        } else if (toolName === "task") {
+          // Deep Agents' built-in task tool: input { description, subagent_type }
+          // Output is a string (the sub-agent's final response).
+          const description = typeof input.description === "string" ? input.description as string : undefined;
+          const subagentType = typeof input.subagent_type === "string" ? input.subagent_type as string : undefined;
+          const resultText = typeof rawOutput === "string"
+            ? rawOutput
+            : (rawOutput && typeof rawOutput === "object" && typeof (rawOutput as Record<string, unknown>).content === "string")
+              ? (rawOutput as { content: string }).content
+              : rawOutputStr;
+          const firstLine = description?.split("\n")[0]?.slice(0, 120);
+          items.push({
+            type: "subagent",
+            text: resultText,
+            skillName: subagentType ?? "sub-agent",
+            subagentDescription: firstLine,
+            subagentTask: description,
+            rawInput: rawInputStr,
+            rawOutput: rawOutputStr,
+            toolName,
             status,
           });
         } else if (toolName.startsWith("subagent_")) {
@@ -1338,8 +1993,40 @@ function extractTimeline(messages: UIMessage[]): TimelineItem[] {
             formatData: fmtOutput?.content ? { format: fmtOutput.format ?? "text", content: fmtOutput.content } : undefined,
             status,
           });
+        } else if (toolName === "write_todos") {
+          // Deep Agents' built-in planning tool. Collapse repeated calls into
+          // the last one — the model often rewrites the todo list each step,
+          // which would otherwise produce N duplicate tiles. Keep only the most
+          // recent todos state.
+          const existingIdx = items.findIndex((it) => it.toolName === "write_todos");
+          if (existingIdx >= 0) items.splice(existingIdx, 1);
+          items.push({
+            type: "other",
+            text: "Updating plan",
+            rawInput: rawInputStr,
+            rawOutput: rawOutputStr,
+            toolName,
+            status,
+          });
         } else {
-          items.push({ type: "other", text: toolName, status });
+          items.push({
+            type: "other",
+            text: toolName,
+            rawInput: rawInputStr,
+            rawOutput: rawOutputStr,
+            toolName,
+            status,
+          });
+        }
+
+        // Stamp toolCallId on every item that was pushed by this branch, and
+        // register the last one (usually there's only one) under the map so
+        // children can look up their parent by id.
+        if (toolCallId && items.length > beforePushLen) {
+          for (let i = beforePushLen; i < items.length; i++) {
+            if (!items[i].toolCallId) items[i].toolCallId = toolCallId;
+          }
+          itemByToolCallId.set(toolCallId, items[items.length - 1]);
         }
       }
     }
@@ -1366,7 +2053,51 @@ function extractTimeline(messages: UIMessage[]): TimelineItem[] {
     }
   }
 
-  return items;
+  // Group sub-agent tool calls under their parent task tile using the
+  // server-emitted mapping. If the map is empty (e.g. first render before a
+  // data-subagent-map part has arrived) we fall back to an order heuristic:
+  // everything between a task call and the next task/format goes under it.
+  const grouped: TimelineItem[] = [];
+  const hasServerMap = Object.keys(toolCallParent).length > 0;
+
+  if (hasServerMap) {
+    for (const item of items) {
+      const parentId = item.toolCallId ? toolCallParent[item.toolCallId] : undefined;
+      if (parentId) {
+        const parent = itemByToolCallId.get(parentId);
+        if (parent) {
+          if (!parent.subagentChildren) parent.subagentChildren = [];
+          parent.subagentChildren.push(item);
+          continue;
+        }
+      }
+      grouped.push(item);
+    }
+  } else {
+    let currentTaskIdx = -1;
+    for (const item of items) {
+      const isTask = item.type === "subagent" && item.toolName === "task";
+      if (isTask) {
+        grouped.push(item);
+        currentTaskIdx = grouped.length - 1;
+        continue;
+      }
+      if (item.type === "format") {
+        grouped.push(item);
+        currentTaskIdx = -1;
+        continue;
+      }
+      if (currentTaskIdx >= 0 && item.type !== "text") {
+        const parent = grouped[currentTaskIdx];
+        if (!parent.subagentChildren) parent.subagentChildren = [];
+        parent.subagentChildren.push(item);
+        continue;
+      }
+      grouped.push(item);
+    }
+  }
+
+  return grouped;
 }
 
 // --- Main ---
@@ -1412,14 +2143,31 @@ export default function PlanVisualization({
       ))}
 
       {timeline.map((item, i) => {
+        // Suppress intermediate narration ("Now let me scrape X", "Let me load more…").
+        // Keep: the mermaid plan (first text with a ```mermaid fence), and the final
+        // summary sentence (the last text item in the timeline, or any text that is
+        // the last item before/after a format tile).
+        if (item.type === "text") {
+          const t = item.text ?? "";
+          const hasMermaid = /```mermaid/.test(t);
+          const isLastItem = i === timeline.length - 1;
+          const nextItem = timeline[i + 1];
+          const isBeforeFormat = nextItem?.type === "format";
+          const isAfterFormat = timeline[i - 1]?.type === "format";
+          const keep = hasMermaid || isLastItem || isBeforeFormat || isAfterFormat;
+          if (!keep) return null;
+          return <TextBlock key={i} text={t} />;
+        }
         switch (item.type) {
-          case "text":
-            return <TextBlock key={i} text={item.text!} />;
           case "search":
             return (
               <SearchResults
                 key={i}
                 query={item.query!}
+                sources={item.searchSources}
+                rawInput={item.rawInput}
+                rawOutput={item.rawOutput}
+                toolName={item.toolName}
                 results={item.status === "complete" && item.searchResults?.length ? item.searchResults : []}
                 creditsUsed={item.creditsUsed}
                 isLatest={i === timeline.length - 1}
@@ -1436,7 +2184,17 @@ export default function PlanVisualization({
                 scrapeQuery={item.scrapeQuery}
                 scrapeFormats={item.scrapeFormats}
                 pageTitle={item.pageTitle}
+                pageDescription={item.pageDescription}
+                pageLanguage={item.pageLanguage}
                 statusCode={item.statusCode}
+                contentType={item.contentType}
+                cacheState={item.cacheState}
+                cachedAt={item.cachedAt}
+                proxyUsed={item.proxyUsed}
+                scrapeId={item.scrapeId}
+                rawInput={item.rawInput}
+                rawOutput={item.rawOutput}
+                toolName={item.toolName}
                 isInteract={(item.type as string) === "interact"}
                 isLatest={i === timeline.length - 1}
               />
@@ -1444,7 +2202,7 @@ export default function PlanVisualization({
               (() => {
                 const domain = item.url ? getDomain(item.url) : null;
                 return (
-                  <div key={i} className="my-12 rounded-10 border border-border-faint px-14 py-10 flex items-center gap-8 text-black-alpha-40 animate-pulse">
+                  <div key={i} className="my-12 border border-border-faint px-14 py-10 flex items-center gap-8 text-black-alpha-40 animate-pulse">
                     {domain ? <Favicon domain={domain} /> : <GlobeIcon />}
                     <span className="text-label-medium flex-1">Scraping {item.url}</span>
                     <div className="w-5 h-5 rounded-full bg-heat-100 animate-pulse flex-shrink-0" />
@@ -1456,11 +2214,11 @@ export default function PlanVisualization({
             return <InteractCard key={i} item={item} />;
           case "bash":
             return item.status === "complete" ? (
-              <BashResult key={i} command={item.command!} stdout={item.stdout!} stderr={item.stderr!} exitCode={item.exitCode!} />
+              <BashResult key={i} command={item.command!} stdout={item.stdout!} stderr={item.stderr!} exitCode={item.exitCode!} rawInput={item.rawInput} rawOutput={item.rawOutput} toolName={item.toolName} />
             ) : (() => {
               const bashInfo = describeBashAction(item.command ?? "");
               return bashInfo.isFileOp ? (
-                <div key={i} className="my-12 rounded-10 border border-border-faint overflow-hidden">
+                <div key={i} className="my-12 border border-border-faint overflow-hidden">
                   <div className="flex items-center gap-8 px-14 py-10">
                     <div className="w-24 h-24 rounded-6 bg-black-alpha-4 flex-center flex-shrink-0">
                       <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className="text-black-alpha-40" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1475,7 +2233,7 @@ export default function PlanVisualization({
                   </div>
                 </div>
               ) : (
-                <div key={i} className="my-12 rounded-10 border border-border-faint overflow-hidden">
+                <div key={i} className="my-12 border border-border-faint overflow-hidden">
                   <div className="flex items-center gap-8 px-14 py-10">
                     <div className="w-24 h-24 rounded-6 bg-black-alpha-4 flex-center flex-shrink-0">
                       <svg fill="none" height="12" viewBox="0 0 24 24" width="12" className="text-black-alpha-40" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1499,7 +2257,7 @@ export default function PlanVisualization({
             const fmtLabel: Record<string, string> = { csv: "CSV", json: "JSON", text: "Markdown" };
             const label = fmtLabel[item.formatType ?? "text"] ?? "Output";
             return (
-              <div key={i} className="my-12 rounded-10 border border-border-faint overflow-hidden">
+              <div key={i} className="my-12 border border-border-faint overflow-hidden">
                 <button
                   type="button"
                   className="w-full flex items-center gap-8 px-14 py-10 text-left hover:bg-black-alpha-2 transition-all"
@@ -1524,8 +2282,12 @@ export default function PlanVisualization({
           }
           case "workers":
             return <WorkersPanel key={i} item={item} apiBase={apiBase} />;
+          case "scrapeBashLoad":
+            return <ScrapeBashLoadCard key={i} item={item} />;
+          case "other":
+            return <GenericToolTile key={i} item={item} />;
           default:
-            return null;
+            return <GenericToolTile key={i} item={item} />;
         }
       })}
 
@@ -1542,13 +2304,13 @@ export default function PlanVisualization({
         let title = "Thinking";
         let subtitle = "";
         if (lastRunning?.type === "search") { title = "Searching"; subtitle = lastRunning.text?.slice(0, 80) ?? ""; }
-        else if (lastRunning?.type === "scrape") { title = "Scraping"; subtitle = lastRunning.url ? new URL(lastRunning.url).hostname : ""; }
+        else if (lastRunning?.type === "scrape") { title = "Scraping"; subtitle = lastRunning.url ? (getDomain(lastRunning.url) ?? "") : ""; }
         else if (lastRunning?.type === "bash") { const b = describeBashAction(lastRunning.command ?? ""); title = b.label; subtitle = b.detail ?? ""; }
         else if (lastRunning?.type === "skill") { title = "Loading skill"; subtitle = lastRunning.skillName ?? ""; }
         else if (lastRunning?.type === "subagent") { title = "Running sub-agent"; subtitle = lastRunning.skillName ?? ""; }
 
         return (
-          <div className="my-12 rounded-10 border border-border-faint overflow-hidden animate-pulse">
+          <div className="my-12 border border-border-faint overflow-hidden animate-pulse">
             <div className="flex items-center gap-8 px-14 py-10">
               <div className="flex-1 min-w-0">
                 <div className="text-label-medium text-accent-black">{title}</div>
