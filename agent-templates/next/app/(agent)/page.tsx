@@ -1189,7 +1189,7 @@ export default function AgentPage(props: AgentPageProps) {
               <button
                 key={prompt}
                 type="button"
-                className="text-left px-14 py-10 rounded-10 border border-border-faint bg-accent-white hover:border-heat-40 hover:bg-heat-4 transition-all group"
+                className="text-left px-14 py-10 border border-border-faint bg-accent-white hover:border-heat-40 hover:bg-heat-4 transition-all group"
                 onClick={() => {
                   const updated = { ...config, prompt };
                   setConfig(updated);
@@ -1369,11 +1369,7 @@ export default function AgentPage(props: AgentPageProps) {
             {/* Follow-up input */}
             {!isRunning && (
               <div
-                className="bg-accent-white overflow-hidden transition-opacity"
-                style={{
-                  boxShadow:
-                    "0px 2px 12px -2px rgba(0,0,0,0.04), 0px 0px 0px 1px rgba(0,0,0,0.06)",
-                }}
+                className="bg-accent-white border border-border-faint overflow-hidden transition-opacity"
               >
                 <div className="flex items-center gap-8 px-16 py-12">
                   <input
@@ -1417,12 +1413,14 @@ export default function AgentPage(props: AgentPageProps) {
 
             {/* Suggestions */}
             {!isRunning && suggestions.length > 0 && (
-              <div className="flex flex-wrap gap-6 mt-10">
+              <div
+                className="flex flex-col border border-border-faint border-t-0 overflow-hidden"
+              >
                 {suggestions.slice(0, 3).map((s, i) => (
                   <button
                     key={i}
                     type="button"
-                    className="px-12 py-6 text-body-small text-black-alpha-40 bg-black-alpha-2 hover:bg-black-alpha-4 hover:text-accent-black transition-all text-left"
+                    className="w-full px-16 py-12 text-body-medium text-black-alpha-40 hover:bg-black-alpha-2 hover:text-accent-black transition-all text-left border-t border-border-faint first:border-t-0"
                     onClick={() => {
                       setSuggestions([]);
                       sendMessage({ text: s });

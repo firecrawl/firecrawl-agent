@@ -120,24 +120,14 @@
   padding: 0.5rem !important;
   gap: 0.5rem !important;
 }
+/* Hide mermaid header + actions toolbar — show only the diagram */
 [data-streamdown="mermaid-block"] > div:first-child {
-  padding: 0.25rem 0.5rem !important;
-  height: auto !important;
-  /* Streamdown uses h-8 (=32px in default Tailwind); this theme maps h-8 to 8px, so force readable header height */
-  min-height: 2rem !important;
+  display: none !important;
 }
-/*
- * Mermaid actions reuse the code-block pattern: sticky + negative margin pulls the toolbar over the block.
- * With this project's px-based spacing scale, that overlaps the diagram; keep toolbar in normal flow.
- */
-[data-streamdown="mermaid-block"] > div.pointer-events-none.sticky {
-  position: relative !important;
-  top: auto !important;
-  margin-top: 0 !important;
-  margin-bottom: 0.125rem !important;
-  min-height: 2.25rem !important;
-  height: auto !important;
-  align-items: center !important;
+[data-streamdown="mermaid-block"] > div.pointer-events-none,
+[data-streamdown="mermaid-block"] > .pointer-events-none,
+[data-streamdown="mermaid-block"] .pointer-events-none.sticky {
+  display: none !important;
 }
 /* Let mermaid SVGs grow to fit their content */
 [data-streamdown="mermaid-block"] > div:not([data-streamdown]) svg {
@@ -161,19 +151,12 @@
   height: auto !important;
   overflow: visible !important;
 }
-[data-streamdown="mermaid-block"] > div:first-child > span {
-  font-size: 0.75rem;
-  visibility: hidden;
-  position: relative;
+
+/* Hide mermaid action buttons entirely */
+[data-streamdown="mermaid-block-actions"] {
+  display: none !important;
 }
-[data-streamdown="mermaid-block"] > div:first-child > span::after {
-  content: "Plan";
-  visibility: visible;
-  position: absolute;
-  left: 0;
-}
-/* Mermaid action buttons (download/copy/fullscreen) */
-[data-streamdown="mermaid-block-actions"],
+/* Code block action buttons */
 [data-streamdown="code-block-actions"] {
   padding: 0.25rem 0.375rem !important;
   gap: 0.25rem !important;
@@ -212,4 +195,61 @@
   font-size: 13px !important;
   line-height: 1.6 !important;
   background: transparent !important;
+}
+
+/*
+ * Compact timeline: condensed typography + tighter spacing for the agent
+ * activity column. Applied via the `timeline-compact` wrapper on
+ * PlanVisualization's root, so we can dial the whole feed down to a more
+ * Claude-Code-like density without touching 80+ individual class usages.
+ */
+.timeline-compact .text-body-small,
+.timeline-compact .text-body-medium,
+.timeline-compact .text-label-small,
+.timeline-compact .text-label-medium {
+  font-size: 12.5px !important;
+  line-height: 1.45 !important;
+  letter-spacing: 0 !important;
+}
+.timeline-compact .text-body-large {
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
+.timeline-compact .text-label-x-small,
+.timeline-compact .text-mono-x-small {
+  font-size: 10.5px !important;
+  line-height: 1.4 !important;
+}
+.timeline-compact .text-mono-small,
+.timeline-compact .text-mono-medium,
+.timeline-compact pre,
+.timeline-compact code {
+  font-size: 11.5px !important;
+  line-height: 1.55 !important;
+}
+.timeline-compact .text-label-small,
+.timeline-compact .text-label-medium {
+  font-weight: 500 !important;
+}
+
+/* Tighter vertical rhythm — tiles and their chrome. */
+.timeline-compact .my-12 { margin-top: 4px !important; margin-bottom: 4px !important; }
+.timeline-compact .my-6  { margin-top: 3px !important; margin-bottom: 3px !important; }
+.timeline-compact .py-10 { padding-top: 6px !important; padding-bottom: 6px !important; }
+.timeline-compact .py-8  { padding-top: 5px !important; padding-bottom: 5px !important; }
+.timeline-compact .py-6  { padding-top: 4px !important; padding-bottom: 4px !important; }
+.timeline-compact .gap-10 { gap: 8px !important; }
+.timeline-compact .gap-8  { gap: 6px !important; }
+.timeline-compact .mt-20 { margin-top: 10px !important; }
+.timeline-compact .mt-16 { margin-top: 8px !important; }
+.timeline-compact .mb-10 { margin-bottom: 6px !important; }
+
+/* Dense nested timeline (inside a sub-agent's expanded body): collapse
+   per-tile vertical margins so actions read as a tight list, not a stack
+   of equally-weighted cards. Covers both direct .my-12 children and
+   wrapped ones. */
+.timeline-compact .timeline-dense > .my-12,
+.timeline-compact .timeline-dense > * > .my-12 {
+  margin-top: 2px !important;
+  margin-bottom: 2px !important;
 }

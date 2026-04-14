@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type { UIMessage } from "ai";
 import StreamdownBlock from "@/components/shared/streamdown-block";
 import { cn } from "@/utils/cn";
+import { JsonViewer } from "./output-panel";
 import {
   parseToolResult,
   normalizeToolOutput,
@@ -124,15 +125,6 @@ function MetaChip({ label, value, tone = "neutral" }: { label?: string; value: s
   );
 }
 
-// Legacy "Raw I/O" debug panel, now a no-op — the canonical payload from
-// agent-core's parseToolResult is rich enough to render friendly tiles, so
-// raw JSON never appears in the main UI. The TimelineItem.rawInput/rawOutput
-// fields are still populated so a future debug inspector can surface them
-// out-of-band (e.g. on cmd-click of a tile), but nothing renders them here.
-function RawIOToggle(_: { input?: string; output?: string; toolName?: string }) {
-  return null;
-}
-
 // --- Search results rendering ---
 
 // Canonical row shape from agent-core. Re-exported as a local alias so
@@ -218,7 +210,7 @@ function SearchResultItem({ result }: { result: SearchResult }) {
   );
 }
 
-function SearchResults({ query, results, creditsUsed, sources, rawInput, rawOutput, toolName, isLatest }: { query: string; results: SearchResult[]; creditsUsed?: number; sources?: string[]; rawInput?: string; rawOutput?: string; toolName?: string; isLatest?: boolean }) {
+function SearchResults({ query, results, creditsUsed, sources, isLatest }: { query: string; results: SearchResult[]; creditsUsed?: number; sources?: string[]; isLatest?: boolean }) {
   const [userExpanded, setUserExpanded] = useState<boolean | null>(null);
   const collapsed = userExpanded !== null ? !userExpanded : !isLatest;
 
@@ -256,7 +248,6 @@ function SearchResults({ query, results, creditsUsed, sources, rawInput, rawOutp
               <SearchResultItem key={i} result={r} />
             ))}
           </div>
-          <RawIOToggle input={rawInput} output={rawOutput} toolName={toolName} />
         </>
       )}
     </div>
@@ -283,9 +274,6 @@ function ScrapeResult({
   scrapeId,
   liveViewUrl,
   interactOutput,
-  rawInput,
-  rawOutput,
-  toolName,
   isInteract,
   isLatest,
 }: {
@@ -306,9 +294,6 @@ function ScrapeResult({
   scrapeId?: string;
   liveViewUrl?: string;
   interactOutput?: string;
-  rawInput?: string;
-  rawOutput?: string;
-  toolName?: string;
   isInteract?: boolean;
   isLatest?: boolean;
 }) {
@@ -429,8 +414,6 @@ function ScrapeResult({
             <div className="text-body-small text-black-alpha-24 italic">No content returned</div>
           </div>
         )}
-
-        <RawIOToggle input={rawInput} output={rawOutput} toolName={toolName} />
       </div>
     </div>
   );
@@ -586,14 +569,7 @@ function SubAgentCard({ item }: { item: TimelineItem }) {
   // timeline tidy). Manual toggles win during the current state, but the
   // transition-driven fold always fires so a completed task snaps shut
   // even if the user had expanded it mid-run.
-  const [expanded, setExpanded] = useState(isRunning);
-  const prevRunningRef = useRef(isRunning);
-  useEffect(() => {
-    const wasRunning = prevRunningRef.current;
-    if (wasRunning && !isRunning) setExpanded(false);
-    if (!wasRunning && isRunning) setExpanded(true);
-    prevRunningRef.current = isRunning;
-  }, [isRunning]);
+  const [expanded, setExpanded] = useState(false);
   const onToggle = () => setExpanded((v) => !v);
   const steps = item.subagentSteps ?? [];
 
@@ -658,6 +634,19 @@ function SubAgentCard({ item }: { item: TimelineItem }) {
     return result;
   }, [steps]);
 
+  // URLs touched by this sub-agent's children (searches, scrapes, bash loads).
+  // Rendered as an overlapping favicon stack in the header so the user can see
+  // *what* the sub-agent touched without expanding the card.
+  const childDomains = useMemo(() => {
+    const urls: string[] = [];
+    for (const c of item.subagentChildren ?? []) {
+      if (c.url) urls.push(c.url);
+      for (const r of c.searchResults ?? []) if (r.url) urls.push(r.url);
+      for (const p of c.scrapePages ?? []) if (p.url) urls.push(p.url);
+    }
+    return urls;
+  }, [item.subagentChildren]);
+
   return (
     <div className="my-12 border border-border-faint overflow-hidden transition-all">
       {/* Header - clickable to expand */}
@@ -666,11 +655,7 @@ function SubAgentCard({ item }: { item: TimelineItem }) {
         className="w-full flex items-center gap-8 px-14 py-10 hover:bg-black-alpha-2 transition-colors text-left cursor-pointer"
         onClick={onToggle}
       >
-        <div className="w-28 h-28 rounded-8 bg-black-alpha-4 flex-center flex-shrink-0">
-          <svg fill="none" height="16" viewBox="0 0 24 24" width="16" className="text-black-alpha-56">
-            <path d="M16 18l6-6-6-6M8 6l-6 6 6 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-          </svg>
-        </div>
+        {childDomains.length > 0 && <FaviconStack urls={childDomains} max={5} />}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-6">
             <span className="text-label-medium text-accent-black">
@@ -723,7 +708,7 @@ function SubAgentCard({ item }: { item: TimelineItem }) {
           {(item.subagentChildren?.length ?? 0) > 0 && (
             <>
               <div className="text-label-x-small text-black-alpha-24 mb-2">Sub-agent activity</div>
-              <div className="flex flex-col">
+              <div className="flex flex-col timeline-dense">
                 {item.subagentChildren!.map((child, j) => (
                   <ChildTile key={j} item={child} />
                 ))}
@@ -852,11 +837,8 @@ function describeBashAction(command: string): { label: string; detail?: string; 
   return { label: "Running command", isFileOp: false };
 }
 
-function BashResult({ command, stdout, stderr, exitCode, rawInput, rawOutput, toolName }: { command: string; stdout: string; stderr: string; exitCode: number; rawInput?: string; rawOutput?: string; toolName?: string }) {
-  const hasOutput = !!(stdout || stderr);
-  // Default to expanded whenever the command finished with output so users
-  // can see stdout/stderr without clicking into each tile.
-  const [expanded, setExpanded] = useState(hasOutput);
+function BashResult({ command, stdout, stderr, exitCode, durationMs, bashContext }: { command: string; stdout: string; stderr: string; exitCode: number; durationMs?: number; bashContext?: string }) {
+  const [expanded, setExpanded] = useState(false);
   const { label, detail } = describeBashAction(command);
   const singleLine = command.split("\n")[0];
   const cmdPreview = singleLine.length > 120 ? singleLine.slice(0, 117) + "…" : singleLine;
@@ -877,6 +859,9 @@ function BashResult({ command, stdout, stderr, exitCode, rawInput, rawOutput, to
             <div className="text-mono-x-small text-black-alpha-40 truncate font-mono">{cmdPreview}</div>
             {detail && <div className="text-body-small text-black-alpha-32 truncate">{detail}</div>}
           </div>
+          {typeof durationMs === "number" && (
+            <div className="mt-2"><MetaChip label="ms" value={durationMs} /></div>
+          )}
           {exitCode === 0 ? (
             <svg className="w-14 h-14 text-accent-forest flex-shrink-0 mt-2" fill="none" viewBox="0 0 16 16">
               <path d="M13.3 4.3L6 11.6 2.7 8.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -909,13 +894,10 @@ function BashResult({ command, stdout, stderr, exitCode, rawInput, rawOutput, to
               )}
             </div>
 
-            {/* Raw response — full tool output, always inline. Shows exitCode,
-                ms, context, etc. alongside the stdout echo. No input section
-                because the command block above already has it. */}
-            {rawOutput && (
-              <div className="border-t border-border-faint bg-black-alpha-1 px-14 py-8 max-h-[300px] overflow-auto no-scrollbar">
-                <div className="text-mono-x-small text-black-alpha-32 mb-3">raw response</div>
-                <pre className="text-mono-small text-accent-black whitespace-pre-wrap break-all">{rawOutput}</pre>
+            {bashContext && (
+              <div className="border-t border-border-faint bg-black-alpha-2 px-14 py-8 max-h-[200px] overflow-auto no-scrollbar">
+                <div className="text-mono-x-small text-black-alpha-32 mb-3">context</div>
+                <pre className="text-mono-small text-accent-black whitespace-pre-wrap">{bashContext}</pre>
               </div>
             )}
           </>
@@ -927,7 +909,7 @@ function BashResult({ command, stdout, stderr, exitCode, rawInput, rawOutput, to
 // Thin dispatcher used to render a nested TimelineItem (a sub-agent's tool
 // call) inside a SubAgentCard. Delegates to the same tile components used at
 // the top level so nothing looks different — just nested.
-function ChildTile({ item }: { item: TimelineItem }) {
+function ChildTile({ item, isLatest = false }: { item: TimelineItem; isLatest?: boolean }) {
   switch (item.type) {
     case "text":
       return (
@@ -938,15 +920,12 @@ function ChildTile({ item }: { item: TimelineItem }) {
         <SearchResults
           query={item.query ?? ""}
           sources={item.searchSources}
-          rawInput={item.rawInput}
-          rawOutput={item.rawOutput}
-          toolName={item.toolName}
           results={item.status === "complete" && item.searchResults?.length ? item.searchResults : []}
           creditsUsed={item.creditsUsed}
-          // Auto-expand sub-agent results so the favicons/titles are visible
-          // without an extra click. Users can collapse manually if they want
-          // the sub-agent panel tighter.
-          isLatest={true}
+          // Only the currently-running (or latest in-progress) sub-agent
+          // search stays expanded; earlier ones fold so the column stays
+          // compact as the agent walks through multiple searches.
+          isLatest={isLatest}
         />
       );
     case "scrape":
@@ -967,13 +946,8 @@ function ChildTile({ item }: { item: TimelineItem }) {
           cachedAt={item.cachedAt}
           proxyUsed={item.proxyUsed}
           scrapeId={item.scrapeId}
-          rawInput={item.rawInput}
-          rawOutput={item.rawOutput}
-          toolName={item.toolName}
           isInteract={false}
-          // Auto-expand so sub-agent scrape content (markdown/answer) is
-          // visible inline; matches search/bash behavior.
-          isLatest={true}
+          isLatest={isLatest}
         />
       );
     case "scrapeBashLoad":
@@ -985,9 +959,8 @@ function ChildTile({ item }: { item: TimelineItem }) {
           stdout={item.stdout ?? ""}
           stderr={item.stderr ?? ""}
           exitCode={item.exitCode ?? 0}
-          rawInput={item.rawInput}
-          rawOutput={item.rawOutput}
-          toolName={item.toolName}
+          durationMs={item.durationMs}
+          bashContext={item.bashContext}
         />
       );
     case "skill":
@@ -1170,7 +1143,6 @@ function ScrapeBashLoadCard({ item }: { item: TimelineItem }) {
               );
             })}
           </div>
-          <RawIOToggle input={item.rawInput} output={item.rawOutput} toolName={item.toolName} />
         </>
       )}
     </div>
@@ -1207,7 +1179,76 @@ function GenericToolTile({ item }: { item: TimelineItem }) {
           </svg>
         )}
       </button>
-      {expanded && <RawIOToggle input={item.rawInput} output={item.rawOutput} toolName={toolName} />}
+      {expanded && <GenericToolDetails item={item} />}
+    </div>
+  );
+}
+
+function GenericToolDetails({ item }: { item: TimelineItem }) {
+  // Parse the input JSON once. Each top-level key renders as a chip+value row;
+  // nested objects/arrays fall through to JsonViewer. Fall back to a markdown
+  // block if the input isn't parseable JSON.
+  const inputEntries = useMemo<Array<[string, unknown]> | null>(() => {
+    if (!item.rawInput) return null;
+    try {
+      const parsed = JSON.parse(item.rawInput);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return Object.entries(parsed);
+      }
+    } catch { /* fall through */ }
+    return null;
+  }, [item.rawInput]);
+
+  const outputKind = useMemo<"running" | "empty" | "json" | "text">(() => {
+    if (item.status === "running") return "running";
+    if (!item.rawOutput) return "empty";
+    try {
+      const parsed = JSON.parse(item.rawOutput);
+      if (parsed && typeof parsed === "object") return "json";
+    } catch { /* not JSON */ }
+    return "text";
+  }, [item.rawOutput, item.status]);
+
+  return (
+    <div className="border-t border-border-faint bg-black-alpha-2 px-14 py-10 flex flex-col gap-10">
+      {item.rawInput && (
+        <div>
+          <div className="text-mono-x-small text-black-alpha-32 mb-4">input</div>
+          {inputEntries ? (
+            <div className="flex flex-col gap-4">
+              {inputEntries.map(([k, v]) => {
+                const isNested = v !== null && typeof v === "object";
+                return (
+                  <div key={k} className="flex items-start gap-8">
+                    <span className="text-mono-x-small text-black-alpha-40 bg-black-alpha-4 px-6 py-1 rounded-4 flex-shrink-0 mt-1">{k}</span>
+                    <div className="min-w-0 flex-1">
+                      {isNested ? (
+                        <JsonViewer data={JSON.stringify(v)} />
+                      ) : (
+                        <span className="text-body-small text-accent-black break-words">{String(v)}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <StreamdownBlock>{item.rawInput}</StreamdownBlock>
+          )}
+        </div>
+      )}
+      {outputKind !== "empty" && (
+        <div>
+          <div className="text-mono-x-small text-black-alpha-32 mb-4">output</div>
+          {outputKind === "running" ? (
+            <div className="text-body-small text-black-alpha-32 italic">running…</div>
+          ) : outputKind === "json" ? (
+            <JsonViewer data={item.rawOutput!} />
+          ) : (
+            <StreamdownBlock>{item.rawOutput!}</StreamdownBlock>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1645,6 +1686,8 @@ interface TimelineItem {
   stdout?: string;
   stderr?: string;
   exitCode?: number;
+  durationMs?: number;
+  bashContext?: string;
   // skill
   skillName?: string;
   skillInstructions?: string;
@@ -1828,8 +1871,6 @@ function extractTimeline(messages: UIMessage[]): {
             searchResults: pay.results,
             searchSources: pay.sources.length > 0 ? pay.sources : undefined,
             creditsUsed: pay.creditsUsed,
-            rawInput: rawInputStr,
-            rawOutput: rawOutputStr,
             toolName,
             status,
           });
@@ -1866,8 +1907,6 @@ function extractTimeline(messages: UIMessage[]): {
             liveViewUrl: scrape.liveViewUrl,
             interactOutput: scrape.interactOutput,
             interactPrompt: scrape.interactPrompt,
-            rawInput: rawInputStr,
-            rawOutput: rawOutputStr,
             toolName,
             status,
           });
@@ -1877,8 +1916,6 @@ function extractTimeline(messages: UIMessage[]): {
             type: "scrapeBashLoad",
             scrapePages: load.pages,
             scrapeError: load.error,
-            rawInput: rawInputStr,
-            rawOutput: rawOutputStr,
             toolName,
             status,
           });
@@ -1890,8 +1927,8 @@ function extractTimeline(messages: UIMessage[]): {
             stdout: bash.stdout,
             stderr: bash.stderr || bash.error || "",
             exitCode: bash.exitCode,
-            rawInput: rawInputStr,
-            rawOutput: rawOutputStr,
+            durationMs: bash.durationMs,
+            bashContext: bash.context,
             toolName,
             status,
           });
@@ -1925,14 +1962,38 @@ function extractTimeline(messages: UIMessage[]): {
           });
         } else if (toolName === "task") {
           // Deep Agents' built-in task tool: input { description, subagent_type }
-          // Output is a string (the sub-agent's final response).
+          // Output can arrive in three shapes:
+          //   1. A plain string (the simple happy path).
+          //   2. `{ content: string }` — LangChain wrapped it.
+          //   3. An array of content blocks `[{type: "text", text: "..."}, ...]`
+          //      — LangChain's multi-part message content. JSON.stringifying
+          //      this produces an ugly escaped blob, so concat the text blocks.
           const description = typeof input.description === "string" ? input.description as string : undefined;
           const subagentType = typeof input.subagent_type === "string" ? input.subagent_type as string : undefined;
-          const resultText = typeof rawOutput === "string"
-            ? rawOutput
-            : (rawOutput && typeof rawOutput === "object" && typeof (rawOutput as Record<string, unknown>).content === "string")
-              ? (rawOutput as { content: string }).content
-              : rawOutputStr;
+          const extractTaskText = (v: unknown): string | undefined => {
+            if (typeof v === "string") return v;
+            if (Array.isArray(v)) {
+              const parts: string[] = [];
+              for (const block of v) {
+                if (typeof block === "string") parts.push(block);
+                else if (block && typeof block === "object") {
+                  const b = block as { type?: string; text?: string; content?: string };
+                  if (b.type === "text" && typeof b.text === "string") parts.push(b.text);
+                  else if (typeof b.text === "string") parts.push(b.text);
+                  else if (typeof b.content === "string") parts.push(b.content);
+                }
+              }
+              if (parts.length > 0) return parts.join("\n");
+            }
+            if (v && typeof v === "object") {
+              const o = v as Record<string, unknown>;
+              if (typeof o.content === "string") return o.content as string;
+              if (Array.isArray(o.content)) return extractTaskText(o.content);
+              if (typeof o.text === "string") return o.text as string;
+            }
+            return undefined;
+          };
+          const resultText = extractTaskText(rawOutput) ?? rawOutputStr;
           const firstLine = description?.split("\n")[0]?.slice(0, 120);
           items.push({
             type: "subagent",
@@ -2151,7 +2212,7 @@ export default function PlanVisualization({
   }
 
   return (
-    <div>
+    <div className="timeline-compact">
       {/* Pre-loaded skills shown as loading before real timeline */}
       {isRunning && pendingSkills.map((skillName) => (
         <SkillLoad key={`preload-${skillName}`} name={skillName} status="running" />
@@ -2180,9 +2241,6 @@ export default function PlanVisualization({
                 key={i}
                 query={item.query!}
                 sources={item.searchSources}
-                rawInput={item.rawInput}
-                rawOutput={item.rawOutput}
-                toolName={item.toolName}
                 results={item.status === "complete" && item.searchResults?.length ? item.searchResults : []}
                 creditsUsed={item.creditsUsed}
                 isLatest={i === timeline.length - 1}
@@ -2207,9 +2265,6 @@ export default function PlanVisualization({
                 cachedAt={item.cachedAt}
                 proxyUsed={item.proxyUsed}
                 scrapeId={item.scrapeId}
-                rawInput={item.rawInput}
-                rawOutput={item.rawOutput}
-                toolName={item.toolName}
                 isInteract={(item.type as string) === "interact"}
                 isLatest={i === timeline.length - 1}
               />
@@ -2229,7 +2284,7 @@ export default function PlanVisualization({
             return <InteractCard key={i} item={item} />;
           case "bash":
             return item.status === "complete" ? (
-              <BashResult key={i} command={item.command!} stdout={item.stdout!} stderr={item.stderr!} exitCode={item.exitCode!} rawInput={item.rawInput} rawOutput={item.rawOutput} toolName={item.toolName} />
+              <BashResult key={i} command={item.command!} stdout={item.stdout!} stderr={item.stderr!} exitCode={item.exitCode!} durationMs={item.durationMs} bashContext={item.bashContext} />
             ) : (() => {
               const bashInfo = describeBashAction(item.command ?? "");
               return bashInfo.isFileOp ? (
@@ -2308,7 +2363,10 @@ export default function PlanVisualization({
             const title = isRunning ? `Generating ${label}` : `${label} ready`;
 
             return (
-              <div key={i} className="my-12 border border-border-faint overflow-hidden">
+              <div
+                key={i}
+                className="my-12 border border-border-faint overflow-hidden"
+              >
                 <button
                   type="button"
                   className="w-full flex items-center gap-8 px-14 py-10 text-left hover:bg-black-alpha-2 transition-all"

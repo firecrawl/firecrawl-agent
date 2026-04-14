@@ -51,8 +51,8 @@ function download(content: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function JsonViewer({ data }: { data: string }) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+export function JsonViewer({ data }: { data: string }) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const parsed = useMemo(() => {
     try { return JSON.parse(data); }
@@ -64,62 +64,152 @@ function JsonViewer({ data }: { data: string }) {
   }
 
   const toggle = (path: string) => {
-    setCollapsed((prev) => {
+    setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(path)) next.delete(path); else next.add(path);
       return next;
     });
   };
 
-  const renderValue = (value: unknown, path: string, depth: number): React.ReactNode => {
-    if (value === null) return <span className="text-black-alpha-24 italic">null</span>;
-    if (typeof value === "boolean") return <span className="text-black-alpha-56">{String(value)}</span>;
-    if (typeof value === "number") return <span className="text-black-alpha-56">{value}</span>;
+  // Syntax-highlight colors: numbers amethyst/purple, strings heat/orange,
+  // keys + structural chars stay accent-black so the shape reads first.
+  const NUM = "text-accent-amethyst";
+  const STR = "text-heat-100";
+  const PUNCT = "text-black-alpha-32";
+  const KEY = "text-accent-black";
+  const STRUCT = "text-accent-black";
+  const MUTED = "text-black-alpha-32";
+
+  const PREVIEW_COUNT = 3;
+  const INLINE_MAX_WIDTH = 90;
+  const INDENT = "  ";
+
+  // A "simple" value is one that fits on one line alongside its siblings.
+  const isPrimitive = (v: unknown): boolean =>
+    v === null || typeof v !== "object";
+
+  // When all of an object's values are primitives AND the rendered form is
+  // short enough, render inline like `{ "name": "X", "price": "Y" }`.
+  const canInline = (value: unknown): boolean => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0 || entries.length > 6) return false;
+    if (!entries.every(([, v]) => isPrimitive(v))) return false;
+    // Rough width estimate: keys + values with separators. Under 90 chars fits.
+    const approx = entries.reduce((n, [k, v]) => n + k.length + String(v).length + 6, 0);
+    return approx <= INLINE_MAX_WIDTH;
+  };
+
+  const renderPrimitive = (value: unknown): React.ReactNode => {
+    if (value === null) return <span className={MUTED}>null</span>;
+    if (typeof value === "boolean") return <span className={NUM}>{String(value)}</span>;
+    if (typeof value === "number") return <span className={NUM}>{value}</span>;
     if (typeof value === "string") {
-      const display = value.length > 200 ? value.slice(0, 200) + "..." : value;
-      return <span className="text-accent-black">&quot;{display}&quot;</span>;
+      const display = value.length > 200 ? value.slice(0, 200) + "…" : value;
+      return <span className={STR}>&quot;{display}&quot;</span>;
     }
+    return <span className={STRUCT}>{String(value)}</span>;
+  };
+
+  const renderInlineObject = (value: Record<string, unknown>): React.ReactNode => {
+    const entries = Object.entries(value);
+    return (
+      <span>
+        <span className={STRUCT}>{"{ "}</span>
+        {entries.map(([k, v], i) => (
+          <span key={k}>
+            <span className={KEY}>&quot;{k}&quot;</span>
+            <span className={PUNCT}>: </span>
+            {renderPrimitive(v)}
+            {i < entries.length - 1 && <span className={PUNCT}>, </span>}
+          </span>
+        ))}
+        <span className={STRUCT}>{" }"}</span>
+      </span>
+    );
+  };
+
+  const renderValue = (value: unknown, path: string, depth: number): React.ReactNode => {
+    if (isPrimitive(value)) return renderPrimitive(value);
 
     if (Array.isArray(value)) {
-      if (value.length === 0) return <span className="text-black-alpha-32">[]</span>;
-      const isCollapsed = collapsed.has(path);
+      if (value.length === 0) return <span className={MUTED}>[]</span>;
+      const showAll = expanded.has(path);
+      const visible = showAll ? value : value.slice(0, PREVIEW_COUNT);
+      const hidden = value.length - visible.length;
+      const pad = INDENT.repeat(depth + 1);
       return (
         <span>
-          <button type="button" className="text-black-alpha-32 hover:text-accent-black" onClick={() => toggle(path)}>
-            {isCollapsed ? "▸" : "▾"}
-          </button>
-          {isCollapsed ? <span className="text-black-alpha-32"> [{value.length} items]</span> : (
-            <>{"[\n"}{value.map((item, i) => (
-              <span key={i}>{"    ".repeat(depth + 1)}{renderValue(item, `${path}[${i}]`, depth + 1)}{i < value.length - 1 ? <span className="text-black-alpha-24">,</span> : ""}{"\n"}</span>
-            ))}{"    ".repeat(depth)}<span className="text-black-alpha-32">]</span></>
+          <span className={STRUCT}>[</span>
+          {"\n"}
+          {visible.map((item, i) => (
+            <span key={i}>
+              {pad}
+              {renderValue(item, `${path}[${i}]`, depth + 1)}
+              {i < visible.length - 1 || hidden > 0 ? <span className={PUNCT}>,</span> : null}
+              {"\n"}
+            </span>
+          ))}
+          {hidden > 0 && (
+            <span>
+              {pad}
+              <button
+                type="button"
+                className={cn(MUTED, "hover:text-accent-black cursor-pointer")}
+                onClick={() => toggle(path)}
+              >
+                … +{hidden} more
+              </button>
+              {"\n"}
+            </span>
           )}
+          {showAll && value.length > PREVIEW_COUNT && (
+            <span>
+              {pad}
+              <button
+                type="button"
+                className={cn(MUTED, "hover:text-accent-black cursor-pointer")}
+                onClick={() => toggle(path)}
+              >
+                ↑ collapse
+              </button>
+              {"\n"}
+            </span>
+          )}
+          {INDENT.repeat(depth)}
+          <span className={STRUCT}>]</span>
         </span>
       );
     }
 
-    if (typeof value === "object") {
-      const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b));
-      if (entries.length === 0) return <span className="text-black-alpha-32">{"{}"}</span>;
-      const isCollapsed = collapsed.has(path);
-      return (
-        <span>
-          <button type="button" className="text-black-alpha-32 hover:text-accent-black" onClick={() => toggle(path)}>
-            {isCollapsed ? "▸" : "▾"}
-          </button>
-          {isCollapsed ? <span className="text-black-alpha-32"> {"{"}{entries.length} keys{"}"}</span> : (
-            <><span className="text-black-alpha-24">{"{"}</span>{"\n"}{entries.map(([key, val], i) => (
-              <span key={key}>{"    ".repeat(depth + 1)}<span className="text-black-alpha-48">&quot;{key}&quot;</span><span className="text-black-alpha-24">: </span>{renderValue(val, `${path}.${key}`, depth + 1)}{i < entries.length - 1 ? <span className="text-black-alpha-24">,</span> : ""}{"\n"}</span>
-            ))}{"    ".repeat(depth)}<span className="text-black-alpha-24">{"}"}</span></>
-          )}
-        </span>
-      );
-    }
-
-    return <span className="text-accent-black">{String(value)}</span>;
+    // Object
+    const obj = value as Record<string, unknown>;
+    if (canInline(obj)) return renderInlineObject(obj);
+    const entries = Object.entries(obj);
+    if (entries.length === 0) return <span className={MUTED}>{"{}"}</span>;
+    const pad = INDENT.repeat(depth + 1);
+    return (
+      <span>
+        <span className={STRUCT}>{"{"}</span>
+        {"\n"}
+        {entries.map(([key, val], i) => (
+          <span key={key}>
+            {pad}
+            <span className={KEY}>&quot;{key}&quot;</span>
+            <span className={PUNCT}>: </span>
+            {renderValue(val, `${path}.${key}`, depth + 1)}
+            {i < entries.length - 1 ? <span className={PUNCT}>,</span> : null}
+            {"\n"}
+          </span>
+        ))}
+        {INDENT.repeat(depth)}
+        <span className={STRUCT}>{"}"}</span>
+      </span>
+    );
   };
 
   return (
-    <pre className="text-[13px] text-accent-black whitespace-pre-wrap font-mono leading-[1.7]">
+    <pre className="text-[13px] whitespace-pre-wrap font-mono leading-[1.8]">
       {renderValue(parsed, "$", 0)}
     </pre>
   );
