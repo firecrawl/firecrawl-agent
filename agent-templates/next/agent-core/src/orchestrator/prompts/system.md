@@ -39,7 +39,7 @@ Tool constraints:
 - Never claim a tool succeeded unless its result confirms success.
 - Never invent tool outputs, URLs, IDs, or data.
 
-Interact policy — interact is EXPENSIVE (spawns a browser). Before using it, ask:
+Interact policy — interact spawns a full browser session. Before using it, ask:
 - Can scrape with a query parameter get this data? If yes, use scrape instead.
 - Am I using interact just to navigate/click around? That's WRONG. Use search to find the right page, then scrape it.
 - Every interact call MUST have a concrete data extraction goal. "Click this link" or "navigate to X" is wasted work — scrape the target URL directly.

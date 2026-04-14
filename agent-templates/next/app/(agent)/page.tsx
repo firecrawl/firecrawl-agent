@@ -1413,14 +1413,12 @@ export default function AgentPage(props: AgentPageProps) {
 
             {/* Suggestions */}
             {!isRunning && suggestions.length > 0 && (
-              <div
-                className="flex flex-col border border-border-faint border-t-0 overflow-hidden"
-              >
+              <div className="flex flex-col gap-6 mt-10">
                 {suggestions.slice(0, 3).map((s, i) => (
                   <button
                     key={i}
                     type="button"
-                    className="w-full px-16 py-12 text-body-medium text-black-alpha-40 hover:bg-black-alpha-2 hover:text-accent-black transition-all text-left border-t border-border-faint first:border-t-0"
+                    className="w-full px-16 py-10 text-body-small text-black-alpha-40 hover:text-accent-black transition-all text-left"
                     onClick={() => {
                       setSuggestions([]);
                       sendMessage({ text: s });

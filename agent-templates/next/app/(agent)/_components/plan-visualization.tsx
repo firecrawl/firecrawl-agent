@@ -1044,9 +1044,7 @@ function ScrapeBashLoadCard({ item }: { item: TimelineItem }) {
   const pages = item.scrapePages ?? [];
   const isRunning = item.status === "running";
   const error = item.scrapeError;
-  // Default expanded once the load is finished and there's at least one
-  // page (or an error) so users see the per-URL list inline.
-  const [expanded, setExpanded] = useState(!isRunning && (pages.length > 0 || !!error));
+  const [expanded, setExpanded] = useState(false);
 
   const domains = useMemo(() => {
     const seen = new Set<string>();
