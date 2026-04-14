@@ -611,6 +611,8 @@ export default function AgentPage(props: AgentPageProps) {
   const typingPlaceholder = useTypewriter(PLACEHOLDER_PHRASES);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [followUp, setFollowUp] = useState("");
+  const [followUpMentionQuery, setFollowUpMentionQuery] = useState<string | null>(null);
+  const [followUpMentionStart, setFollowUpMentionStart] = useState(0);
   const [showPlus, setShowPlus] = useState(false);
   const [showModel, setShowModel] = useState(false);
   const [skills, setSkills] = useState<SkillInfo[] | null>(null);
@@ -943,6 +945,15 @@ export default function AgentPage(props: AgentPageProps) {
       .slice(0, 6);
   }, [mentionQuery, skills]);
 
+  const followUpMentionSkills = useMemo(() => {
+    if (followUpMentionQuery === null || !skills) return [];
+    const q = followUpMentionQuery.toLowerCase();
+    return skills
+      .filter((s) => s.category !== "Export")
+      .filter((s) => s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [followUpMentionQuery, skills]);
+
   const currentModel = AVAILABLE_MODELS[config.model.provider]?.find(
     (m) => m.id === config.model.model,
   );
@@ -980,13 +991,13 @@ export default function AgentPage(props: AgentPageProps) {
               onChange={(e) => {
                 const val = e.target.value;
                 setConfig({ ...config, prompt: val });
-                // @ mention detection
+                // @ or / skill mention detection
                 const pos = e.target.selectionStart ?? val.length;
                 const before = val.slice(0, pos);
-                const atMatch = before.match(/@([\w-]*)$/);
-                if (atMatch) {
-                  setMentionQuery(atMatch[1]);
-                  setMentionStart(pos - atMatch[0].length);
+                const slashMatch = before.match(/(?:@|\/)([\w-]*)$/);
+                if (slashMatch) {
+                  setMentionQuery(slashMatch[1]);
+                  setMentionStart(pos - slashMatch[0].length);
                 } else {
                   setMentionQuery(null);
                 }
@@ -1371,14 +1382,39 @@ export default function AgentPage(props: AgentPageProps) {
               <div
                 className="bg-accent-white border border-border-faint overflow-hidden transition-opacity"
               >
-                <div className="flex items-center gap-8 px-16 py-12">
+                <div className="flex items-center gap-8 px-16 py-12 relative">
                   <input
                     className="flex-1 bg-transparent text-body-medium text-accent-black placeholder:text-black-alpha-32 focus:outline-none"
                     placeholder="Ask another question..."
                     value={followUp}
-                    onChange={(e) => setFollowUp(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFollowUp(val);
+                      const pos = e.target.selectionStart ?? val.length;
+                      const before = val.slice(0, pos);
+                      const match = before.match(/(?:@|\/)([\w-]*)$/);
+                      if (match) {
+                        setFollowUpMentionQuery(match[1]);
+                        setFollowUpMentionStart(pos - match[0].length);
+                      } else {
+                        setFollowUpMentionQuery(null);
+                      }
+                    }}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && followUp.trim()) {
+                      if (followUpMentionQuery !== null && followUpMentionSkills.length > 0) {
+                        if (e.key === "Escape") { e.preventDefault(); setFollowUpMentionQuery(null); return; }
+                        if (e.key === "Enter" || e.key === "Tab") {
+                          e.preventDefault();
+                          const skill = followUpMentionSkills[0];
+                          const before = followUp.slice(0, followUpMentionStart);
+                          const after = followUp.slice(e.currentTarget.selectionStart ?? followUp.length);
+                          setFollowUp(before + after);
+                          setConfig({ ...config, skills: config.skills.includes(skill.name) ? config.skills : [...config.skills, skill.name] });
+                          setFollowUpMentionQuery(null);
+                          return;
+                        }
+                      }
+                      if (e.key === "Enter" && followUp.trim() && followUpMentionQuery === null) {
                         e.preventDefault();
                         setSuggestions([]);
                         sendMessage({ text: followUp });
@@ -1386,6 +1422,34 @@ export default function AgentPage(props: AgentPageProps) {
                       }
                     }}
                   />
+                  {followUpMentionQuery !== null && followUpMentionSkills.length > 0 && (
+                    <div
+                      className="absolute left-0 right-0 bottom-full mb-2 bg-accent-white border border-border-muted overflow-hidden z-10"
+                      style={{ boxShadow: "0px 8px 24px -4px rgba(0,0,0,0.08), 0px 2px 8px -2px rgba(0,0,0,0.04)" }}
+                    >
+                      {followUpMentionSkills.map((skill) => (
+                        <button
+                          key={skill.name}
+                          type="button"
+                          className="w-full text-left px-12 py-8 hover:bg-black-alpha-2 transition-all flex items-center gap-8"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            const before = followUp.slice(0, followUpMentionStart);
+                            const after = followUp.slice(followUp.length);
+                            setFollowUp(before + after);
+                            setConfig({ ...config, skills: config.skills.includes(skill.name) ? config.skills : [...config.skills, skill.name] });
+                            setFollowUpMentionQuery(null);
+                          }}
+                        >
+                          <SkillsIcon />
+                          <div className="min-w-0">
+                            <div className="text-label-small text-accent-black">{skill.name}</div>
+                            <div className="text-body-small text-black-alpha-40 truncate">{skill.description}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   {followUp.trim() && (
                     <button
                       type="button"

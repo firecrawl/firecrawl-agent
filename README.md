@@ -2,6 +2,8 @@
 
 <img src=".internal/agent.jpg" alt="Firecrawl Agent" />
 
+![Firecrawl Agent Demo](https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExcWhub2Jmd3NvejdhaTFsb3RvZWtpb2Q3cDVpN2pzYjVqeTgxdDEwbiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/CVyWVobjHwYGJiRz6r/giphy.gif)
+
 When we built [Firecrawl's /agent endpoint](https://docs.firecrawl.dev/features/agent), the most common request was more control. People wanted to customize the agent, swap models, add their own skills, and build on top of the core primitives.
 
 So we're open-sourcing the entire stack. One command scaffolds an agent at whatever level of abstraction you want to work with. Everything in this repo is yours to fork, extend, and deploy however you want.
