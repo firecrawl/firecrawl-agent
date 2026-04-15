@@ -5,7 +5,7 @@ describe("wrapInteractWithTimeout", () => {
   it("resolves with a timeout envelope when execute hangs", async () => {
     const hanging = {
       description: "stub",
-      execute: () => new Promise<unknown>(() => {}),
+      execute: (_input: unknown, _opts?: unknown) => new Promise<unknown>(() => {}),
     };
     const wrapped = wrapInteractWithTimeout(hanging, 50)!;
     const t0 = Date.now();
@@ -22,7 +22,7 @@ describe("wrapInteractWithTimeout", () => {
   it("passes through fast results untouched", async () => {
     const fast = {
       description: "stub",
-      execute: async () => ({ output: "ok" }),
+      execute: async (_input: unknown, _opts?: unknown) => ({ output: "ok" }),
     };
     const wrapped = wrapInteractWithTimeout(fast, 1000)!;
     const out = await wrapped.execute!({});

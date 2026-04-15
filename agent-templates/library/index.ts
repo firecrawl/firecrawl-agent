@@ -9,7 +9,8 @@ import "dotenv/config";
  *   npm start               run this file
  *   npm run example:basic   run any example from examples/
  */
-import { createFirecrawlAgent } from "./agent-core/src";
+import { createAgent } from "./agent-core/src";
+import type { ModelConfig } from "./agent-core/src";
 
 const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
 if (!firecrawlApiKey) {
@@ -19,21 +20,20 @@ if (!firecrawlApiKey) {
   process.exit(1);
 }
 
-const model = process.env.MODEL ?? "anthropic:claude-sonnet-4-6";
+const modelSpec = process.env.MODEL ?? "anthropic:claude-sonnet-4-6";
+const [provider, ...rest] = modelSpec.split(":");
+const model: ModelConfig = { provider: provider as ModelConfig["provider"], model: rest.join(":") };
+
 const keys = ["FIRECRAWL_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY"]
   .filter((k) => process.env[k])
   .map((k) => k.replace(/_API_KEY/, "").toLowerCase());
 
-console.log(`\n  firecrawl-agent  ${model}  keys: ${keys.join(", ")}\n`);
+console.log(`\n  firecrawl-agent  ${modelSpec}  keys: ${keys.join(", ")}\n`);
 
-const agent = await createFirecrawlAgent({ firecrawlApiKey, model });
+const agent = createAgent({ firecrawlApiKey, model });
 
 const prompt = process.argv[2] ?? "What are the top 3 stories on Hacker News right now?";
 console.log(`→ ${prompt}\n`);
 
-const result = await agent.invoke({
-  messages: [{ role: "user", content: prompt }],
-});
-
-const last = result.messages[result.messages.length - 1];
-console.log(typeof last.content === "string" ? last.content : JSON.stringify(last.content));
+const result = await agent.run({ prompt });
+console.log(result.text);

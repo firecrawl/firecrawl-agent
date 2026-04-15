@@ -1,26 +1,40 @@
 import "dotenv/config";
 import express from "express";
-import { createFirecrawlAgentFromEnv, toSSE } from "./agent-core/src";
+import { createAgentFromEnv } from "./agent-core/src";
+import type { ModelConfig } from "./agent-core/src";
 
 const app = express();
 app.use(express.json());
+
+function parseModel(m: unknown): ModelConfig | undefined {
+  if (!m) return undefined;
+  if (typeof m === "object") return m as ModelConfig;
+  if (typeof m === "string") {
+    const [provider, ...rest] = m.split(":");
+    return { provider: provider as ModelConfig["provider"], model: rest.join(":") };
+  }
+  return undefined;
+}
 
 app.post("/v1/run", async (req, res) => {
   const { prompt, stream, model, ...rest } = req.body;
   if (!prompt) return res.status(400).json({ error: "prompt is required" });
 
   try {
-    const agent = await createFirecrawlAgentFromEnv(model ? { model } : undefined);
-    const input = { messages: [{ role: "user" as const, content: prompt }] };
+    const modelConfig = parseModel(model);
+    const agent = await createAgentFromEnv(modelConfig ? { model: modelConfig } : undefined);
+    const params = { prompt, ...rest };
 
     if (stream) {
-      await toSSE(agent, input, res);
+      await agent.sse(params, res);
     } else {
-      const result = await agent.invoke(input, rest);
-      const last = result.messages[result.messages.length - 1];
+      const result = await agent.run(params);
       res.json({
-        text: typeof last.content === "string" ? last.content : JSON.stringify(last.content),
-        messages: result.messages,
+        text: result.text,
+        data: result.data,
+        format: result.format,
+        steps: result.steps,
+        usage: result.usage,
       });
     }
   } catch (err) {
