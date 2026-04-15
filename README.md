@@ -41,7 +41,7 @@ Each layer builds on the one below it. Start at the top for a ready-to-use app, 
 |---|---|
 | Next.js | [Full template](./agent-templates/next/) |
 | Express | [API server](./agent-templates/express/) |
-| Agent Core | [Basic](./agent-core/examples/1-basic.ts) · [Structured output](./agent-core/examples/2-structured-output.ts) · [Parallel Subagents](./agent-core/examples/3-parallel-subagents.ts) · [With Skills](./agent-core/examples/4-with-skills.ts) · [Streaming](./agent-core/examples/5-streaming.ts) |
+| Agent Core | [Basic](./agent-core/examples/1-basic.ts) · [Structured output](./agent-core/examples/2-structured-output.ts) · [Parallel Subagents](./agent-core/examples/3-parallel-subagents.ts) · [With Skills](./agent-core/examples/4-with-skills.ts) |
 | Firecrawl AI SDK | [npmjs.com/package/firecrawl-aisdk](https://npmjs.com/package/firecrawl-aisdk) |
 
 ## Skills
