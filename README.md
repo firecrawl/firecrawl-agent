@@ -14,10 +14,6 @@ Firecrawl's hosted [/agent](https://firecrawl.dev/app/agent) and [Spark 1](https
 npx -y firecrawl-cli@latest init -y --browser
 ```
 
-```bash
-npx -y firecrawl-cli@latest init -y --browser -t next
-```
-
 ## Hosted
 
 > **[firecrawl.dev/app/agent](https://firecrawl.dev/app/agent)** - Powered by Firecrawl [Spark 1](https://docs.firecrawl.dev/features/models) models. No setup, no config, no API keys to manage. [Docs](https://docs.firecrawl.dev/features/agent)
