@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node --import tsx/esm index.ts",
     "dev": "node --import tsx/esm --watch index.ts",
+    "doctor": "node --import tsx/esm scripts/doctor.ts",
     "example:basic": "node --import tsx/esm examples/1-basic.ts",
     "example:structured": "node --import tsx/esm examples/2-structured-output.ts",
     "example:parallel": "node --import tsx/esm examples/3-parallel-subagents.ts",
