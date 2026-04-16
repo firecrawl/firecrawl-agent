@@ -12,6 +12,7 @@ export { formatOutput, bashExec, initBashWithFiles, listBashFiles, readBashFile,
 export { buildFirecrawlToolkit } from "./toolkit";
 export { firecrawlTools, firecrawlSystemPrompt, utilityTools } from "./firecrawl-tools";
 export { aiToLc, aiToolkitToLc, coerceStringifiedJson, type AISDKTool } from "./adapter";
+export { streamEvents, toResponse, toSSE } from "./stream-helpers";
 export { loadOrchestratorPrompt } from "./orchestrator/loader";
 export { loadWorkerPrompt } from "./worker/loader";
 export { parseToolResult, normalizeToolOutput } from "./tool-results";
