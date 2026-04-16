@@ -15,6 +15,17 @@ app.use((_req, res, next) => {
   next();
 });
 
+// Request logger — prints method, path, status, duration. Disable with LOG=0
+if (process.env.LOG !== "0") {
+  app.use((req, res, next) => {
+    const start = Date.now();
+    res.on("finish", () => {
+      console.log(`  ${req.method} ${req.path} ${res.statusCode} ${Date.now() - start}ms`);
+    });
+    next();
+  });
+}
+
 function parseModel(m: unknown): ModelConfig | undefined {
   if (!m) return undefined;
   if (typeof m === "object") return m as ModelConfig;
@@ -53,6 +64,12 @@ app.get("/", (_req, res) => {
     version: "0.1.0",
     model: defaultModel(),
     keys: configuredKeys(),
+    routes: {
+      "GET /v1/skills": "List available skills",
+      "GET /v1/workers/progress": "Live progress of parallel workers",
+      "POST /v1/plan": "Preview the agent's execution plan",
+      "POST /v1/run": "Run the agent (set stream=true for SSE)",
+    },
   });
 });
 
@@ -103,6 +120,12 @@ app.post("/v1/run", async (req, res) => {
     const message = err instanceof Error ? err.message : String(err);
     if (!res.headersSent) res.status(500).json({ error: message });
   }
+});
+
+// JSON 404 handler — Express's default returns HTML, which breaks
+// JSON clients that try to res.json() the body.
+app.use((req, res) => {
+  res.status(404).json({ error: `Cannot ${req.method} ${req.path}` });
 });
 
 const port = Number(process.env.PORT) || 3000;
