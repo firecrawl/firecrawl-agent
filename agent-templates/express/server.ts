@@ -5,7 +5,10 @@ import { createAgentFromEnv, discoverSkills, workerProgress } from "./agent-core
 import type { ModelConfig } from "./agent-core/src";
 
 const app = express();
-app.use(express.json());
+
+// 1 MB default body limit — agent requests are small (prompt + config),
+// bigger = probably a mistake or abuse. Override with BODY_LIMIT env var.
+app.use(express.json({ limit: process.env.BODY_LIMIT ?? "1mb" }));
 
 // CORS — allows frontend apps on other ports/domains to call this API
 app.use((_req, res, next) => {
