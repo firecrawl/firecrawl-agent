@@ -179,7 +179,13 @@ export function createPrepareStepWithCompaction(
         state.hasCompacted = true;
         state.lastInputTokens = 0;
         return { messages: compacted };
-      } catch {
+      } catch (err) {
+        // Swallowing the error keeps the agent running — compaction is a
+        // best-effort optimization, not a correctness requirement. But
+        // surface the reason so users aren't mystified when they later hit
+        // a context-limit error downstream.
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(`[firecrawl-agent] compaction failed, continuing without: ${message}`);
         return { messages };
       }
     },
