@@ -2,6 +2,29 @@
   "name": "@firecrawl/agent-core",
   "version": "0.1.0",
   "description": "AI-powered web research agent framework built on Firecrawl",
+  "keywords": [
+    "ai",
+    "agent",
+    "firecrawl",
+    "web-scraping",
+    "research",
+    "llm",
+    "anthropic",
+    "openai",
+    "gemini",
+    "deep-agents",
+    "langchain",
+    "vercel-ai-sdk"
+  ],
+  "homepage": "https://github.com/firecrawl/firecrawl-agent#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/firecrawl/firecrawl-agent.git",
+    "directory": "agent-core"
+  },
+  "bugs": {
+    "url": "https://github.com/firecrawl/firecrawl-agent/issues"
+  },
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
