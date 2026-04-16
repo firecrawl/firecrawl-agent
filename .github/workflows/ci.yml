@@ -7,31 +7,48 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  agent-core:
+    name: agent-core
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: agent-core
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-
       - uses: pnpm/action-setup@v4
         with:
           version: 10
-
       - name: Install
         run: pnpm install --frozen-lockfile
-
       - name: Typecheck
         run: pnpm exec tsc --noEmit
-
       - name: Test
         run: pnpm test
-
       - name: Build
         run: pnpm build
+
+  templates:
+    name: templates / ${{ matrix.template }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [express, library]
+    defaults:
+      run:
+        working-directory: agent-templates/${{ matrix.template }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Install
+        run: pnpm install --no-frozen-lockfile
+      - name: Typecheck
+        run: pnpm run typecheck

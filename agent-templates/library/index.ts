@@ -17,7 +17,7 @@ import type { ModelConfig } from "./agent-core/src";
 const firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
 if (!firecrawlApiKey) {
   console.error(
-    "\n  FIRECRAWL_API_KEY not set.\n  Get one at https://firecrawl.dev/app/api-keys and add it to your .env file.\n",
+    "\n  FIRECRAWL_API_KEY not set.\n  Get one at https://firecrawl.dev/app/api-keys and add it to your .env file.\n  Run `npm run doctor` to verify all required env vars.\n",
   );
   process.exit(1);
 }
