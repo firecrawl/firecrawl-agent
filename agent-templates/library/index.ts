@@ -40,7 +40,10 @@ const keys = Object.entries(keyLabels)
 
 console.log(`\n  firecrawl-agent  ${modelSpec}  keys: ${keys.join(", ")}\n`);
 
-// Warn if the selected provider's API key is missing
+// Collect provider API keys for both the AI SDK and LangChain sides.
+// Without this, deepagents' internal LangChain model has no auth and run()
+// fails with "No authentication method available".
+const apiKeys: Record<string, string> = {};
 const providerKeyEnv: Record<string, string> = {
   anthropic: "ANTHROPIC_API_KEY",
   openai: "OPENAI_API_KEY",
@@ -48,12 +51,21 @@ const providerKeyEnv: Record<string, string> = {
   gateway: "AI_GATEWAY_API_KEY",
   "custom-openai": "CUSTOM_OPENAI_API_KEY",
 };
+for (const [providerId, envName] of Object.entries(providerKeyEnv)) {
+  const v = process.env[envName];
+  if (v) apiKeys[providerId] = v;
+}
+if (process.env.CUSTOM_OPENAI_BASE_URL) {
+  apiKeys["custom-openai:baseURL"] = process.env.CUSTOM_OPENAI_BASE_URL;
+}
+
+// Warn if the selected provider's API key is missing
 const requiredKey = providerKeyEnv[model.provider];
 if (requiredKey && !process.env[requiredKey]) {
   console.warn(`  ⚠  ${requiredKey} is not set (required for provider "${model.provider}"). Run \`npm run doctor\` for details.\n`);
 }
 
-const agent = createAgent({ firecrawlApiKey, model });
+const agent = createAgent({ firecrawlApiKey, model, apiKeys });
 
 // Prompt from CLI arg, piped stdin, or the default
 let prompt = process.argv[2];
