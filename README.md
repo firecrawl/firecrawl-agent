@@ -1,4 +1,4 @@
-# Firecrawl Agent
+# Firecrawl Web Agent
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
