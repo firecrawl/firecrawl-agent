@@ -28,7 +28,7 @@ export const config = {
   // ═══════════════════════════════════════════
   // orchestrator: { provider: "openai", model: "gpt-5.4" } satisfies ModelRef,
   // subAgent:     { provider: "openai", model: "gpt-5.4" } satisfies ModelRef,
-  // background:   { provider: "openai", model: "gpt-5.4" } satisfies ModelRef,
+  // background:   { provider: "openai", model: "o4-mini" } satisfies ModelRef,
 
   // ═══════════════════════════════════════════
   // Custom OpenAI-compatible
