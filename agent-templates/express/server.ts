@@ -138,6 +138,20 @@ app.use((req, res) => {
   res.status(404).json({ error: `Cannot ${req.method} ${req.path}` });
 });
 
+// JSON error handler — converts body-parser errors and unhandled
+// exceptions into clean JSON. Express's default leaks stack traces
+// as HTML which is bad DX for API clients and a mild info leak.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (res.headersSent) return;
+  const message = err instanceof Error ? err.message : String(err);
+  // body-parser errors carry a `status` field with the right HTTP code
+  const status = (err as { status?: number; statusCode?: number }).status
+    ?? (err as { statusCode?: number }).statusCode
+    ?? 500;
+  res.status(status).json({ error: message });
+});
+
 const port = Number(process.env.PORT) || 3000;
 const server = app.listen(port, () => {
   console.log(`\n  firecrawl-agent  http://localhost:${port}  ${defaultModel()}  keys: ${configuredKeys().join(", ")}\n`);
