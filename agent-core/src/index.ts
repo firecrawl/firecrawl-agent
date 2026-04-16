@@ -1,3 +1,23 @@
+/**
+ * @firecrawl/agent-core — public API entry point.
+ *
+ * Most apps start with `createAgent`:
+ *
+ * ```ts
+ * import { createAgent } from '@firecrawl/agent-core';
+ *
+ * const agent = createAgent({
+ *   firecrawlApiKey: process.env.FIRECRAWL_API_KEY!,
+ *   model: { provider: 'google', model: 'gemini-3-flash-preview' },
+ * });
+ *
+ * const result = await agent.run({ prompt: 'get firecrawl pricing' });
+ * ```
+ *
+ * See agent-core/README.md for the full API reference and openapi.yaml
+ * for the HTTP-side schema that templates implement.
+ */
+
 // ─── Agent factory & class ───
 export { createAgent, createAgentFromEnv, FirecrawlAgent } from "./agent";
 
