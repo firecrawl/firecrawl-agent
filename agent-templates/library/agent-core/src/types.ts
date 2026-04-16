@@ -37,13 +37,21 @@ export interface ModelConfig {
 }
 
 export interface SubAgentConfig {
+  /** Unique identifier used as the tool name suffix (e.g. "vercel_researcher") */
   id: string;
+  /** Human-readable name surfaced to the orchestrator */
   name: string;
+  /** What this sub-agent does — included in the tool description so the orchestrator knows when to delegate */
   description: string;
+  /** Optional instructions appended to the sub-agent's system prompt */
   instructions?: string;
+  /** Model for this sub-agent. Different sub-agents can use different models */
   model: ModelConfig;
+  /** Which Firecrawl tools this sub-agent can access */
   tools: ("search" | "scrape" | "interact" | "map")[];
+  /** Skill slugs to pre-load for this sub-agent */
   skills: string[];
+  /** Max steps this sub-agent can take before returning */
   maxSteps?: number;
 }
 
@@ -189,24 +197,50 @@ export interface RunParams {
   onStep?: (event: StepEvent) => void;
 }
 
+/**
+ * Emitted to the onStep callback after a run completes (replayed from the
+ * step list). Lighter than AgentEvent — no "done" / "error" lifecycle events.
+ */
 export interface StepEvent {
   type: "text" | "tool-call" | "tool-result" | "usage";
+  /** Assistant-generated text for this step (type: "text") */
   text?: string;
+  /** Tool name for tool-call / tool-result events */
   toolName?: string;
+  /** Arguments passed to the tool (tool-call) */
   input?: unknown;
+  /** Tool return value (tool-result) */
   output?: unknown;
+  /** Token usage for this step (type: "usage") */
   usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number };
 }
 
+/**
+ * Events yielded by `agent.stream()`. The relevant fields depend on `type`:
+ *   - "text":        content
+ *   - "tool-call":   toolName, input
+ *   - "tool-result": toolName, output
+ *   - "usage":       usage
+ *   - "done":        text, steps, usage, durationMs, model
+ *   - "error":       error
+ */
 export interface AgentEvent {
   type: "text" | "tool-call" | "tool-result" | "usage" | "done" | "error";
+  /** Assistant-generated text delta (type: "text") */
   content?: string;
+  /** Tool name for tool-call / tool-result events */
   toolName?: string;
+  /** Arguments passed to the tool (tool-call) */
   input?: unknown;
+  /** Tool return value (tool-result) */
   output?: unknown;
+  /** Final token usage (type: "done") or per-step usage */
   usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number };
+  /** Final text response (type: "done") */
   text?: string;
+  /** Full step-by-step record (type: "done") */
   steps?: StepDetail[];
+  /** Error message (type: "error") */
   error?: string;
   /** On "done": wall-clock duration of the stream in milliseconds */
   durationMs?: number;
@@ -214,9 +248,16 @@ export interface AgentEvent {
   model?: string;
 }
 
+/**
+ * A single step in the agent loop — the assistant's text output along with
+ * any tool calls it made and results it received.
+ */
 export interface StepDetail {
+  /** Assistant-generated text for this step (may be empty if the step was pure tool use) */
   text: string;
+  /** Tool calls made during this step */
   toolCalls: { name: string; input: unknown }[];
+  /** Results returned by those tool calls */
   toolResults: { name: string; output: unknown }[];
 }
 
