@@ -150,18 +150,29 @@ export interface CreateAgentOptions {
 }
 
 export interface RunParams {
+  /** The research task or question for the agent */
   prompt: string;
+  /** Seed URLs for the agent to start from instead of searching */
   urls?: string[];
+  /** JSON schema describing the expected output shape (used with format=json) */
   schema?: Record<string, unknown>;
+  /** Output format. If set, formatOutput is called to coerce the final response */
   format?: "json" | "markdown";
+  /** Column names the agent should extract — useful for tabular data */
   columns?: string[];
+  /** Files to load into the bash sandbox before the run starts */
   uploads?: UploadedFile[];
+  /** Skill slugs to pre-load (bypass on-demand skill loading) */
   skills?: string[];
+  /** Per-skill custom instructions appended when the skill is loaded */
   skillInstructions?: Record<string, string>;
+  /** Sub-agents available during this run, exposed as tools to the orchestrator */
   subAgents?: SubAgentConfig[];
+  /** Hard cap on orchestrator steps — prevents runaway loops */
   maxSteps?: number;
   /** When true, post-processes the run into a reusable skill (SKILL.md + workflow.mjs + schema.json) */
   exportSkill?: boolean;
+  /** Callback fired for each significant step during the run */
   onStep?: (event: StepEvent) => void;
 }
 
