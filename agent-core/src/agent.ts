@@ -102,6 +102,18 @@ async function resolveLcModel(config: ModelConfig, apiKeys?: Record<string, stri
   return initChatModel(modelName, opts);
 }
 
+/**
+ * The main agent class. Prefer the `createAgent` factory over `new FirecrawlAgent(...)`
+ * — the factory is the stable public API; this class is exported so advanced users can
+ * subclass it when they need custom behavior.
+ *
+ * Key methods:
+ *   - `run(params)`: execute the agent and return a RunResult (text, data, steps, usage)
+ *   - `stream(params)`: same as run, but yields AgentEvents as they happen
+ *   - `plan(prompt)`: generate an execution plan without executing it
+ *   - `sse(params, res)`: pipe the event stream to a Node response object
+ *   - `toResponse(params)`: pipe the event stream to a Web Response (Next.js, Hono, Bun)
+ */
 export class FirecrawlAgent {
   constructor(private options: CreateAgentOptions) {}
 
