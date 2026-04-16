@@ -184,6 +184,10 @@ export interface AgentEvent {
   text?: string;
   steps?: StepDetail[];
   error?: string;
+  /** On "done": wall-clock duration of the stream in milliseconds */
+  durationMs?: number;
+  /** On "done": model that produced this response, as "provider:id" */
+  model?: string;
 }
 
 export interface StepDetail {
