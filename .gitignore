@@ -1,5 +1,6 @@
 node_modules/
 dist/
+coverage/
 __pycache__/
 *.pyc
 *.egg-info/
@@ -7,6 +8,7 @@ __pycache__/
 .env.local
 .env
 *.tsbuildinfo
+*.log
 next-env.d.ts
 .firecrawl/
 data/
