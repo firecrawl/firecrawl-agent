@@ -30,8 +30,8 @@ firecrawl-agent init my-agent
 
 ? Template
 ❯ Next.js (Full UI)      Complete web app with chat UI, history, settings
-  Express (API only)     Lightweight Node.js API server with /v1/run endpoint
-  Hono (Serverless)      Fast, lightweight API - ideal for edge and serverless
+  Express                Node.js REST API server with /v1/run endpoint
+  Library                Extensible agent-core for scripts, services, or your own app
 
 ? Default model provider
 ❯ Google Gemini          gemini-3-flash-preview
@@ -56,7 +56,7 @@ Ready!  /Users/you/my-agent
 firecrawl-agent init my-agent -t next                            # pick template
 firecrawl-agent init my-agent -t next --provider openai          # set the default provider
 firecrawl-agent init my-agent -t express --api-key fc-...        # set Firecrawl key
-firecrawl-agent init my-agent -t hono --key anthropic=sk-...     # set provider keys
+firecrawl-agent init my-agent -t library --key anthropic=sk-...  # set provider keys
 firecrawl-agent init my-agent -t express --key openai=sk-... --key google=AIza...
 firecrawl-agent init my-agent --from user/repo                   # from external repo
 firecrawl-agent init my-agent --from ./local-path                # from local directory
@@ -67,10 +67,10 @@ firecrawl-agent init my-agent -t express --skip-install          # don't run npm
 
 | Flag | Description |
 |------|-------------|
-| `-t, --template <id>` | `next`, `express`, or `hono` |
-| `--provider <id>` | Default model provider - `anthropic`, `openai`, `google`, or `gateway` |
+| `-t, --template <id>` | `next`, `express`, or `library` |
+| `--provider <id>` | Default model provider - `anthropic`, `openai`, `google`, `gateway`, or `custom-openai` |
 | `--api-key <key>` | Firecrawl API key |
-| `--key <provider=key>` | Provider key (repeatable) - `anthropic`, `openai`, `google`, `gateway` |
+| `--key <provider=key>` | Provider key (repeatable) - `anthropic`, `openai`, `google`, `gateway`, `custom-openai` |
 | `--from <source>` | External GitHub repo (`user/repo`) or local path |
 | `--skip-install` | Skip `npm install` |
 
@@ -142,7 +142,7 @@ firecrawl-agent deploy my-agent -p docker     # generates Dockerfile + .dockerig
 |----------|-------|-------|
 | Vercel | `vercel.json` | 300s function timeout for Next.js |
 | Railway | `railway.toml` | Nixpacks build, health check, auto-restart |
-| Docker | `Dockerfile`, `.dockerignore` | Multi-stage build for Next.js, simple build for Express/Hono |
+| Docker | `Dockerfile`, `.dockerignore` | Multi-stage build for Next.js and Express |
 
 ---
 
@@ -151,8 +151,8 @@ firecrawl-agent deploy my-agent -p docker     # generates Dockerfile + .dockerig
 | ID | Name | What you get |
 |----|------|-------------|
 | `next` | Next.js (Full UI) | Chat UI, conversation history, settings, streaming visualization |
-| `express` | Express (API only) | Single `POST /v1/run` endpoint, ~60 lines |
-| `hono` | Hono (Serverless) | Single `POST /v1/run` endpoint, SSE streaming, ~65 lines |
+| `express` | Express | REST API server with skills, workers, plan, run endpoints + Dockerfile |
+| `library` | Library | Extensible agent-core for scripts, services, or your own app |
 
 ---
 
