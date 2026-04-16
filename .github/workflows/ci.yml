@@ -8,8 +8,12 @@ on:
 
 jobs:
   agent-core:
-    name: agent-core
+    name: agent-core / node ${{ matrix.node }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["20", "22"]
     defaults:
       run:
         working-directory: agent-core
@@ -20,7 +24,7 @@ jobs:
           version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: ${{ matrix.node }}
           cache: pnpm
           cache-dependency-path: agent-core/pnpm-lock.yaml
       - name: Install
