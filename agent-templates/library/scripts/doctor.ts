@@ -1,26 +1,45 @@
 #!/usr/bin/env node
 /**
- * Pre-flight check: verify that required env vars are set and the
- * selected model provider has a matching API key.
+ * Pre-flight check: verify required env vars are set, provider keys
+ * match the selected model, and key formats look right.
  *
  *   npm run doctor
  */
 import "dotenv/config";
 
-const checks: Array<{ name: string; ok: boolean; detail: string }> = [];
+type Status = "ok" | "fail" | "warn";
+const checks: Array<{ name: string; status: Status; detail: string }> = [];
 
-function add(name: string, ok: boolean, detail = ""): void {
-  checks.push({ name, ok, detail });
+function add(name: string, status: Status, detail: string): void {
+  checks.push({ name, status, detail });
+}
+
+// Known API key prefixes — a mismatch is a strong signal the user
+// pasted the wrong key into the wrong variable.
+const KEY_PREFIXES: Record<string, { prefix: string; label: string }> = {
+  FIRECRAWL_API_KEY: { prefix: "fc-", label: "Firecrawl keys start with fc-" },
+  ANTHROPIC_API_KEY: { prefix: "sk-ant-", label: "Anthropic keys start with sk-ant-" },
+  OPENAI_API_KEY: { prefix: "sk-", label: "OpenAI keys start with sk-" },
+  GOOGLE_GENERATIVE_AI_API_KEY: { prefix: "AIza", label: "Google AI keys start with AIza" },
+  AI_GATEWAY_API_KEY: { prefix: "vck_", label: "AI Gateway keys start with vck_" },
+};
+
+function checkKey(envName: string, label: string, required: boolean): void {
+  const value = process.env[envName];
+  if (!value) {
+    if (required) add(label, "fail", `missing — set ${envName}`);
+    return;
+  }
+  const fmt = KEY_PREFIXES[envName];
+  if (fmt && !value.startsWith(fmt.prefix)) {
+    add(label, "warn", `format looks off — ${fmt.label} (got "${value.slice(0, 6)}...")`);
+  } else {
+    add(label, "ok", `set (${value.slice(0, 6)}...)`);
+  }
 }
 
 // --- required ---
-add(
-  "FIRECRAWL_API_KEY",
-  !!process.env.FIRECRAWL_API_KEY,
-  process.env.FIRECRAWL_API_KEY
-    ? `set (${process.env.FIRECRAWL_API_KEY.slice(0, 6)}...)`
-    : "missing — get one at https://firecrawl.dev/app/api-keys",
-);
+checkKey("FIRECRAWL_API_KEY", "FIRECRAWL_API_KEY", true);
 
 // --- model provider + key ---
 const provider = process.env.MODEL_PROVIDER ?? process.env.MODEL?.split(":")[0] ?? "google";
@@ -33,35 +52,37 @@ const providerKeyEnv: Record<string, string> = {
 };
 const requiredKey = providerKeyEnv[provider];
 if (requiredKey) {
-  add(
-    `${requiredKey} (for provider "${provider}")`,
-    !!process.env[requiredKey],
-    process.env[requiredKey]
-      ? `set (${process.env[requiredKey]!.slice(0, 6)}...)`
-      : `missing — set ${requiredKey} or change MODEL_PROVIDER`,
-  );
+  checkKey(requiredKey, `${requiredKey} (for provider "${provider}")`, true);
 }
 
 // --- custom-openai baseURL ---
 if (provider === "custom-openai") {
-  add(
-    "CUSTOM_OPENAI_BASE_URL",
-    !!process.env.CUSTOM_OPENAI_BASE_URL,
-    process.env.CUSTOM_OPENAI_BASE_URL || "missing — required for custom-openai provider",
-  );
+  const baseURL = process.env.CUSTOM_OPENAI_BASE_URL;
+  if (baseURL) {
+    try {
+      new URL(baseURL);
+      add("CUSTOM_OPENAI_BASE_URL", "ok", baseURL);
+    } catch {
+      add("CUSTOM_OPENAI_BASE_URL", "fail", `invalid URL: "${baseURL}"`);
+    }
+  } else {
+    add("CUSTOM_OPENAI_BASE_URL", "fail", "missing — required for custom-openai provider");
+  }
 }
 
 // --- report ---
 const lines: string[] = [""];
+const marks: Record<Status, string> = { ok: "✓", fail: "✗", warn: "⚠" };
 for (const c of checks) {
-  const mark = c.ok ? "✓" : "✗";
-  lines.push(`  ${mark} ${c.name}: ${c.detail}`);
+  lines.push(`  ${marks[c.status]} ${c.name}: ${c.detail}`);
 }
 lines.push("");
 
-const failed = checks.filter((c) => !c.ok).length;
+const failed = checks.filter((c) => c.status === "fail").length;
+const warned = checks.filter((c) => c.status === "warn").length;
 if (failed === 0) {
-  lines.push(`  All good. Ready to run: npm start`);
+  const note = warned > 0 ? ` (${warned} warning${warned === 1 ? "" : "s"})` : "";
+  lines.push(`  All good${note}. Ready to run: npm start`);
   console.log(lines.join("\n"));
   process.exit(0);
 } else {
