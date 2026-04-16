@@ -1,5 +1,5 @@
 import { FirecrawlTools } from "firecrawl-aisdk";
-import { aiToolkitToLc, aiToLc } from "./adapter";
+import { aiToolkitToLc, aiToLc, type AISDKTool } from "./adapter";
 import { formatOutput, bashExec, createExportSkillTool } from "./tools";
 import type { FirecrawlToolsConfig } from "./types";
 
@@ -12,7 +12,7 @@ import type { FirecrawlToolsConfig } from "./types";
 export function firecrawlTools(config: { apiKey: string } & FirecrawlToolsConfig) {
   const { apiKey, ...rest } = config;
   const { systemPrompt: _, ...tools } = FirecrawlTools({ apiKey, ...rest });
-  return aiToolkitToLc(tools as Record<string, any>);
+  return aiToolkitToLc(tools as Record<string, AISDKTool>);
 }
 
 /**
@@ -31,8 +31,8 @@ export function firecrawlSystemPrompt(config: { apiKey: string } & FirecrawlTool
  * Pull what you need; they're independent.
  */
 export const utilityTools = {
-  formatOutput: aiToLc("formatOutput", formatOutput as any),
-  bashExec: aiToLc("bashExec", bashExec as any),
+  formatOutput: aiToLc("formatOutput", formatOutput as unknown as AISDKTool),
+  bashExec: aiToLc("bashExec", bashExec as unknown as AISDKTool),
   exportSkill: (skillsDir?: string) =>
-    aiToLc("exportSkill", createExportSkillTool(skillsDir) as any),
+    aiToLc("exportSkill", createExportSkillTool(skillsDir) as unknown as AISDKTool),
 };
